@@ -16,9 +16,9 @@ from envsync.exceptions import (
     ValidationError,
 )
 from envsync.validation import (
-    FORMAT_VALIDATORS,
     ValidatorFunc,
     coerce_type,
+    get_validator,
     validate_choices,
     validate_pattern,
     validate_range,
@@ -158,8 +158,16 @@ class EnvSync:
             value = raw_value  # type: ignore[assignment]
 
         # Format validation
-        if format and format in FORMAT_VALIDATORS:
-            if not FORMAT_VALIDATORS[format](raw_value):
+        if format:
+            validator_func = get_validator(format)
+            if validator_func is None:
+                raise ValidationError(
+                    name,
+                    raw_value,
+                    error_message or f"Unknown format validator: {format}",
+                    expected=format,
+                )
+            if not validator_func(raw_value):
                 raise ValidationError(
                     name,
                     raw_value,

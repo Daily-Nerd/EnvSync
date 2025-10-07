@@ -1,0 +1,27 @@
+==========================================================================================
+EnvSync Performance Benchmark Results
+Generated: 2025-10-07 02:31:53
+==========================================================================================
+
+Benchmark                                     Avg (ms)     Min (ms)     Max (ms)    
+------------------------------------------------------------------------------------------
+env.require() with type coercion                  0.0010      0.0009      0.0064
+env.require() with validation                     0.0014      0.0013      0.0360
+env.optional() with default                       0.0010      0.0010      0.0058
+Parser: Simple .env file                          0.0266      0.0253      0.0677
+Parser: With interpolation                        0.0287      0.0276      0.0567
+Variable expansion                                0.0017      0.0015      0.0177
+List coercion (simple CSV)                        0.0009      0.0008      0.0087
+List coercion (JSON array)                        0.0015      0.0014      0.0134
+List coercion (quoted CSV)                        0.0028      0.0026      0.0114
+Dict coercion (JSON object)                       0.0012      0.0011      0.0081
+Dict coercion (key=value)                         0.0078      0.0074      0.0534
+Email validation                                  0.0005      0.0004      0.0078
+URL validation                                    0.0006      0.0006      0.0053
+Custom validator registration                     0.0003      0.0003      0.0005
+Config file parsing                               0.0049      0.0047      0.0120
+==========================================================================================
+
+Total operations: 113,100
+Total time: 265.48ms (0.27s)
+Average operation time: 0.0023ms

@@ -210,6 +210,7 @@ dependencies = [
     { name = "click", version = "8.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "python-dotenv" },
     { name = "rich" },
+    { name = "tomli" },
 ]
 
 [package.dev-dependencies]
@@ -226,6 +227,7 @@ requires-dist = [
     { name = "click", specifier = ">=8.1.8" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
     { name = "rich", specifier = ">=14.1.0" },
+    { name = "tomli", specifier = ">=2.2.1" },
 ]
 provides-extras = ["dev"]
 

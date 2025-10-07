@@ -1,9 +1,10 @@
 """Parser for .env files.
 
 This module provides functionality to parse .env and .env.example files,
-handling comments, quotes, multiline values, and various edge cases.
+handling comments, quotes, multiline values, variable interpolation, and various edge cases.
 """
 
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,16 +28,88 @@ class EnvEntry:
     line_number: int
 
 
+def expand_variables(
+    value: str,
+    env_dict: Dict[str, str],
+    allow_os_environ: bool = True,
+    max_depth: int = 10,
+) -> str:
+    """Expand variable references in a value string.
+
+    Supports both ${VAR} and $VAR syntax. Variables are resolved from:
+    1. env_dict (parsed .env variables)
+    2. os.environ (if allow_os_environ=True)
+
+    Expansion is recursive, so variables can reference other variables.
+    To prevent infinite loops, expansion stops after max_depth iterations.
+
+    Args:
+        value: String potentially containing variable references
+        env_dict: Dictionary of parsed environment variables
+        allow_os_environ: Whether to fall back to os.environ
+        max_depth: Maximum recursion depth for nested expansions
+
+    Returns:
+        String with all variables expanded
+
+    Examples:
+        >>> expand_variables("${HOME}/data", {})
+        "/Users/username/data"
+        >>> expand_variables("redis://${REDIS_HOST}:6379", {"REDIS_HOST": "localhost"})
+        "redis://localhost:6379"
+        >>> expand_variables("$USER@$DOMAIN", {"USER": "admin", "DOMAIN": "example.com"})
+        "admin@example.com"
+    """
+    if not value:
+        return value
+
+    # Pattern matches ${VAR} or $VAR (but not $$)
+    pattern = r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)"
+
+    def replace_var(match: re.Match[str]) -> str:
+        # Group 1 is ${VAR}, group 2 is $VAR
+        var_name = match.group(1) or match.group(2)
+
+        # Try env_dict first, then os.environ
+        if var_name in env_dict:
+            return env_dict[var_name]
+        elif allow_os_environ and var_name in os.environ:
+            return os.environ[var_name]
+        else:
+            # Keep original reference if not found
+            return match.group(0)
+
+    # Recursively expand until no more variables or max depth reached
+    previous = value
+    for _ in range(max_depth):
+        current = re.sub(pattern, replace_var, previous)
+        if current == previous:
+            # No more expansions
+            break
+        previous = current
+
+    return current
+
+
 class EnvFileParser:
     """Parser for .env files with support for comments and various formats."""
 
-    def __init__(self, preserve_comments: bool = True) -> None:
+    def __init__(
+        self,
+        preserve_comments: bool = True,
+        expand_vars: bool = True,
+        allow_os_environ: bool = True,
+    ) -> None:
         """Initialize parser.
 
         Args:
             preserve_comments: Whether to preserve comments when parsing
+            expand_vars: Whether to expand variable references (${VAR} syntax)
+            allow_os_environ: Whether to allow expansion from os.environ
         """
         self.preserve_comments = preserve_comments
+        self.expand_vars = expand_vars
+        self.allow_os_environ = allow_os_environ
 
     def parse_file(self, file_path: Path) -> Dict[str, EnvEntry]:
         """Parse a .env file.
@@ -96,6 +169,16 @@ class EnvFileParser:
                 pending_comment = None
 
             i += 1
+
+        # Apply variable expansion if enabled
+        if self.expand_vars:
+            env_dict = {key: entry.value for key, entry in entries.items()}
+            for entry in entries.values():
+                entry.value = expand_variables(
+                    entry.value,
+                    env_dict,
+                    self.allow_os_environ,
+                )
 
         return entries
 
