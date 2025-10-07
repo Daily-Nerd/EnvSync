@@ -98,11 +98,9 @@ DEBUG=false
     if example_path.exists():
         console.print("[yellow]⚠️  .env.example already exists, skipping...[/yellow]")
     else:
-        # Copy from .env if it exists, otherwise use empty template
-        if env_path.exists():
-            example_content = env_path.read_text()
-        else:
-            example_content = starter_vars.get(project_type, starter_vars["other"])
+        # Always use starter_vars template for .env.example to avoid leaking secrets
+        # Never copy from .env as it may contain real credentials
+        example_content = starter_vars.get(project_type, starter_vars["other"])
 
         # Add header comment to .env.example
         example_with_header = f"""# EnvSync Environment Variables Template
