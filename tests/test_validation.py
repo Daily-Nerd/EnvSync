@@ -116,8 +116,10 @@ class TestDictCoercion:
 
     def test_coerce_dict_invalid_json(self) -> None:
         """Test invalid JSON raises error."""
-        # With improved coercion, "not json" tries key=value format
-        # which fails with "Invalid key=value pair"
+        # With improved coercion, the input "not json" is not valid JSON,
+        # so it falls back to key=value parsing. Since "not json" does not contain
+        # an "=" character, it cannot form a valid key=value pair, resulting in the
+        # "Invalid key=value pair" error message.
         with pytest.raises(ValueError, match="Invalid key=value pair"):
             coerce_dict("not json")
 
