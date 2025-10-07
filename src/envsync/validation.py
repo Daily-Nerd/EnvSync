@@ -3,9 +3,23 @@
 This module provides built-in validators for common data types and formats,
 as well as utilities for creating custom validators and a plugin system for
 registering new format validators.
+
+Thread Safety:
+    All validator registry operations (register_validator, unregister_validator,
+    get_validator, list_validators, clear_custom_validators) are thread-safe.
+    They use a threading.Lock to ensure safe concurrent access in multi-threaded
+    environments such as web servers, async workers, and parallel test runners.
+
+    Example of thread-safe usage:
+        >>> from concurrent.futures import ThreadPoolExecutor
+        >>> def register_my_validator():
+        ...     register_validator("my_format", lambda v: len(v) > 5)
+        >>> with ThreadPoolExecutor(max_workers=10) as executor:
+        ...     futures = [executor.submit(register_my_validator) for _ in range(10)]
 """
 
 import re
+import threading
 from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
 
 from envsync.exceptions import TypeCoercionError
@@ -15,8 +29,9 @@ T = TypeVar("T")
 # Type alias for validator functions
 ValidatorFunc = Callable[[Any], bool]
 
-# Global registry for custom format validators
+# Global registry for custom format validators (thread-safe)
 _CUSTOM_VALIDATORS: Dict[str, ValidatorFunc] = {}
+_VALIDATOR_LOCK = threading.Lock()
 
 
 def coerce_bool(value: str) -> bool:
@@ -404,10 +419,14 @@ def validator(func: ValidatorFunc) -> ValidatorFunc:
 
 
 def register_validator(name: str, validator_func: ValidatorFunc) -> None:
-    """Register a custom format validator.
+    """Register a custom format validator (thread-safe).
 
     This allows users to add their own format validators that can be used
     with the `format` parameter in `require()` and `optional()`.
+
+    Thread Safety:
+        This function is thread-safe and can be called concurrently from
+        multiple threads without risk of race conditions.
 
     Args:
         name: Name of the validator format (e.g., "phone", "zip_code")
@@ -429,7 +448,8 @@ def register_validator(name: str, validator_func: ValidatorFunc) -> None:
             f"Built-in validators: {', '.join(sorted(built_in_validators))}"
         )
 
-    _CUSTOM_VALIDATORS[name] = validator_func
+    with _VALIDATOR_LOCK:
+        _CUSTOM_VALIDATORS[name] = validator_func
 
 
 def register_validator_decorator(name: str) -> Callable[[ValidatorFunc], ValidatorFunc]:
@@ -457,7 +477,11 @@ def register_validator_decorator(name: str) -> Callable[[ValidatorFunc], Validat
 
 
 def unregister_validator(name: str) -> bool:
-    """Unregister a custom format validator.
+    """Unregister a custom format validator (thread-safe).
+
+    Thread Safety:
+        This function is thread-safe and can be called concurrently from
+        multiple threads without risk of race conditions.
 
     Args:
         name: Name of the validator to remove
@@ -465,14 +489,19 @@ def unregister_validator(name: str) -> bool:
     Returns:
         True if validator was removed, False if not found
     """
-    if name in _CUSTOM_VALIDATORS:
-        del _CUSTOM_VALIDATORS[name]
-        return True
-    return False
+    with _VALIDATOR_LOCK:
+        if name in _CUSTOM_VALIDATORS:
+            del _CUSTOM_VALIDATORS[name]
+            return True
+        return False
 
 
 def get_validator(name: str) -> Optional[ValidatorFunc]:
-    """Get a validator by name (built-in or custom).
+    """Get a validator by name (built-in or custom, thread-safe).
+
+    Thread Safety:
+        This function is thread-safe and can be called concurrently from
+        multiple threads without risk of race conditions.
 
     Args:
         name: Name of the validator
@@ -480,37 +509,51 @@ def get_validator(name: str) -> Optional[ValidatorFunc]:
     Returns:
         Validator function or None if not found
     """
-    # Check built-in validators first
+    # Check built-in validators first (immutable, no lock needed)
     if name in _BUILTIN_VALIDATORS:
         return _BUILTIN_VALIDATORS[name]
 
-    # Then check custom validators
-    return _CUSTOM_VALIDATORS.get(name)
+    # Then check custom validators (thread-safe access)
+    with _VALIDATOR_LOCK:
+        return _CUSTOM_VALIDATORS.get(name)
 
 
 def list_validators() -> Dict[str, str]:
-    """List all available validators (built-in and custom).
+    """List all available validators (built-in and custom, thread-safe).
+
+    Thread Safety:
+        This function is thread-safe and can be called concurrently from
+        multiple threads without risk of race conditions.
 
     Returns:
         Dictionary mapping validator names to their types ("built-in" or "custom")
     """
     result: Dict[str, str] = {}
 
+    # Built-in validators are immutable, no lock needed
     for name in _BUILTIN_VALIDATORS:
         result[name] = "built-in"
 
-    for name in _CUSTOM_VALIDATORS:
-        result[name] = "custom"
+    # Custom validators require thread-safe access
+    with _VALIDATOR_LOCK:
+        for name in _CUSTOM_VALIDATORS:
+            result[name] = "custom"
 
     return result
 
 
 def clear_custom_validators() -> None:
-    """Clear all custom validators.
+    """Clear all custom validators (thread-safe).
 
-    This is mainly useful for testing.
+    Thread Safety:
+        This function is thread-safe and can be called concurrently from
+        multiple threads without risk of race conditions.
+
+    Note:
+        This is mainly useful for testing and cleanup scenarios.
     """
-    _CUSTOM_VALIDATORS.clear()
+    with _VALIDATOR_LOCK:
+        _CUSTOM_VALIDATORS.clear()
 
 
 # Built-in format validators
@@ -529,11 +572,16 @@ FORMAT_VALIDATORS: Dict[str, ValidatorFunc] = _BUILTIN_VALIDATORS.copy()
 
 
 def get_all_format_validators() -> Dict[str, ValidatorFunc]:
-    """Get all format validators (built-in and custom combined).
+    """Get all format validators (built-in and custom combined, thread-safe).
+
+    Thread Safety:
+        This function is thread-safe and can be called concurrently from
+        multiple threads without risk of race conditions.
 
     Returns:
         Dictionary mapping validator names to validator functions
     """
     result = _BUILTIN_VALIDATORS.copy()
-    result.update(_CUSTOM_VALIDATORS)
+    with _VALIDATOR_LOCK:
+        result.update(_CUSTOM_VALIDATORS)
     return result

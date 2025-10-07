@@ -115,18 +115,20 @@ class TestDictCoercion:
         assert result == {"key": "value", "number": 42}
 
     def test_coerce_dict_invalid_json(self) -> None:
-        """Test invalid JSON raises error."""
-        # With improved coercion, the input "not json" is not valid JSON,
-        # so it falls back to key=value parsing. Since "not json" does not contain
-        # an "=" character, it cannot form a valid key=value pair, resulting in the
-        # "Invalid key=value pair" error message.
+        """Test invalid JSON raises error.
+
+        Invalid JSON falls back to key=value parsing. Input without "=" character
+        fails validation with "Invalid key=value pair" error.
+        """
         with pytest.raises(ValueError, match="Invalid key=value pair"):
             coerce_dict("not json")
 
     def test_coerce_dict_non_object(self) -> None:
-        """Test non-object JSON (array) raises error."""
-        # Arrays don't have { } wrapper, so it tries key=value parsing
-        # which fails because "[1, 2, 3]" doesn't contain "=" anywhere
+        """Test non-object JSON (array) raises error.
+
+        Arrays lack curly braces, triggering key=value parsing. Array string
+        without "=" character fails with "Invalid key=value pair" error.
+        """
         with pytest.raises(ValueError, match="Invalid key=value pair"):
             coerce_dict("[1, 2, 3]")
 
