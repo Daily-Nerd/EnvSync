@@ -181,3 +181,39 @@ class DriftError(EnvSyncError):
             parts.append(f"Extra variables: {', '.join(extra_vars)}")
         message = "Environment drift detected\n" + "\n".join(parts)
         super().__init__(message)
+
+
+class GitAuditError(EnvSyncError):
+    """Base exception for git audit operations."""
+
+    pass
+
+
+class NotGitRepositoryError(GitAuditError):
+    """Raised when current directory is not a git repository."""
+
+    def __init__(self, path: str) -> None:
+        """Initialize NotGitRepositoryError.
+
+        Args:
+            path: Path that is not a git repository
+        """
+        self.path = path
+        super().__init__(f"Not a git repository: {path}")
+
+
+class GitCommandError(GitAuditError):
+    """Raised when git command fails."""
+
+    def __init__(self, command: str, stderr: str, returncode: int) -> None:
+        """Initialize GitCommandError.
+
+        Args:
+            command: Git command that failed
+            stderr: Standard error output
+            returncode: Git command return code
+        """
+        self.command = command
+        self.stderr = stderr
+        self.returncode = returncode
+        super().__init__(f"Git command failed (exit {returncode}): {command}\n{stderr}")

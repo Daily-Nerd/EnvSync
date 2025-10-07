@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Set
 class SecretType(Enum):
     """Types of secrets that can be detected."""
 
+    # Existing patterns
     AWS_ACCESS_KEY = "AWS Access Key"
     AWS_SECRET_KEY = "AWS Secret Key"
     GITHUB_TOKEN = "GitHub Token"
@@ -30,6 +31,70 @@ class SecretType(Enum):
     JWT_TOKEN = "JWT Token"
     DATABASE_URL = "Database URL with Credentials"
     HIGH_ENTROPY = "High Entropy String"
+
+    # Cloud Providers
+    AZURE_STORAGE_KEY = "Azure Storage Account Key"
+    AZURE_SAS_TOKEN = "Azure SAS Token"
+    GOOGLE_API_KEY = "Google Cloud API Key"
+    GOOGLE_OAUTH_TOKEN = "Google OAuth Access Token"
+    DIGITALOCEAN_PAT = "DigitalOcean Personal Access Token"
+    DIGITALOCEAN_OAUTH = "DigitalOcean OAuth Token"
+    HEROKU_API_KEY = "Heroku API Key"
+    ALIBABA_ACCESS_KEY_ID = "Alibaba Cloud AccessKey ID"
+    ALIBABA_ACCESS_KEY_SECRET = "Alibaba Cloud AccessKey Secret"
+    IBM_CLOUD_IAM_KEY = "IBM Cloud IAM Key"
+
+    # CI/CD & DevOps
+    CIRCLECI_TOKEN = "CircleCI Personal Token"
+    TRAVIS_TOKEN = "Travis CI Access Token"
+    JENKINS_TOKEN = "Jenkins API Token"
+    GITLAB_PAT = "GitLab Personal Access Token"
+    GITLAB_PIPELINE_TOKEN = "GitLab Pipeline Trigger Token"
+    BITBUCKET_APP_PASSWORD = "Bitbucket App Password"
+    DOCKER_HUB_TOKEN = "Docker Hub Access Token"
+    TERRAFORM_CLOUD_TOKEN = "Terraform Cloud API Token"
+
+    # Communication & Monitoring
+    SLACK_BOT_TOKEN = "Slack Bot Token"
+    SLACK_USER_TOKEN = "Slack User Token"
+    DISCORD_BOT_TOKEN = "Discord Bot Token"
+    DISCORD_WEBHOOK = "Discord Webhook"
+    TWILIO_API_KEY = "Twilio API Key"
+    SENDGRID_API_KEY = "SendGrid API Key"
+
+    # Payments & Commerce
+    PAYPAL_ACCESS_TOKEN = "PayPal Access Token"
+    SQUARE_ACCESS_TOKEN = "Square Access Token"
+    COINBASE_API_KEY = "Coinbase API Key"
+    SHOPIFY_ACCESS_TOKEN = "Shopify Access Token"
+
+    # Email & SMS
+    MAILGUN_API_KEY = "Mailgun API Key"
+    MAILCHIMP_API_KEY = "Mailchimp API Key"
+    POSTMARK_SERVER_TOKEN = "Postmark Server Token"
+
+    # Databases & Storage
+    MONGODB_CONNECTION_STRING = "MongoDB Connection String"
+    REDIS_URL_WITH_PASSWORD = "Redis Connection String"
+    FIREBASE_FCM_KEY = "Firebase Cloud Messaging Server Key"
+
+    # APIs & Services
+    DATADOG_API_KEY = "Datadog API Key"
+    NEW_RELIC_API_KEY = "New Relic API Key"
+    PAGERDUTY_API_KEY = "PagerDuty API Key"
+    SENTRY_AUTH_TOKEN = "Sentry Auth Token"
+    ALGOLIA_API_KEY = "Algolia API Key"
+    CLOUDFLARE_API_KEY = "Cloudflare API Key"
+
+    # Package Managers
+    NPM_ACCESS_TOKEN = "NPM Access Token"
+    PYPI_UPLOAD_TOKEN = "PyPI Upload Token"
+
+    # Generic Credential Detection
+    GENERIC_PASSWORD = "Generic Password"
+    GENERIC_TOKEN = "Generic Token"
+    GENERIC_API_SECRET = "Generic API Secret"
+    GENERIC_ENCRYPTION_KEY = "Generic Encryption Key"
 
 
 @dataclass
@@ -81,10 +146,12 @@ SECRET_PATTERNS: List[SecretPattern] = [
         description="AWS Access Key ID",
         severity="critical",
     ),
+    # NOTE: AWS_SECRET_KEY detection moved to context-aware detection in detect_secrets_in_value()
+    # The pattern below only works for raw file scanning (git history), not parsed .env values
     SecretPattern(
         secret_type=SecretType.AWS_SECRET_KEY,
         pattern=r"aws_secret_access_key\s*=\s*['\"]?([A-Za-z0-9/+=]{40})['\"]?",
-        description="AWS Secret Access Key",
+        description="AWS Secret Access Key (for git history scanning)",
         severity="critical",
     ),
     # GitHub Tokens
@@ -154,10 +221,208 @@ SECRET_PATTERNS: List[SecretPattern] = [
         description="Database URL with embedded credentials",
         severity="high",
     ),
+    # Cloud Providers
+    SecretPattern(
+        secret_type=SecretType.AZURE_STORAGE_KEY,
+        pattern=r"[a-zA-Z0-9+/]{88}==",
+        description="Azure Storage Account Key",
+        severity="critical",
+    ),
+    SecretPattern(
+        secret_type=SecretType.AZURE_SAS_TOKEN,
+        pattern=r"(\?|&)sig=[a-zA-Z0-9%]{43,53}(&|$)",
+        description="Azure SAS Token",
+        severity="high",
+    ),
+    SecretPattern(
+        secret_type=SecretType.GOOGLE_API_KEY,
+        pattern=r"AIza[0-9A-Za-z_-]{35}",
+        description="Google Cloud API Key",
+        severity="critical",
+    ),
+    SecretPattern(
+        secret_type=SecretType.GOOGLE_OAUTH_TOKEN,
+        pattern=r"ya29\.[0-9A-Za-z_-]+",
+        description="Google OAuth Access Token",
+        severity="critical",
+    ),
+    SecretPattern(
+        secret_type=SecretType.DIGITALOCEAN_PAT,
+        pattern=r"dop_v1_[a-f0-9]{64}",
+        description="DigitalOcean Personal Access Token",
+        severity="critical",
+    ),
+    SecretPattern(
+        secret_type=SecretType.DIGITALOCEAN_OAUTH,
+        pattern=r"doo_v1_[a-f0-9]{64}",
+        description="DigitalOcean OAuth Token",
+        severity="critical",
+    ),
+    SecretPattern(
+        secret_type=SecretType.HEROKU_API_KEY,
+        pattern=r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+        description="Heroku API Key",
+        severity="high",
+    ),
+    SecretPattern(
+        secret_type=SecretType.ALIBABA_ACCESS_KEY_ID,
+        pattern=r"LTAI[A-Za-z0-9]{12,20}",
+        description="Alibaba Cloud AccessKey ID",
+        severity="critical",
+    ),
+    # NOTE: Alibaba, IBM, CircleCI, Travis, Jenkins patterns are too generic
+    # They will be caught by generic credential detection with variable name context
+    SecretPattern(
+        secret_type=SecretType.GITLAB_PAT,
+        pattern=r"glpat-[0-9a-zA-Z_-]{20,}",
+        description="GitLab Personal Access Token",
+        severity="critical",
+    ),
+    SecretPattern(
+        secret_type=SecretType.GITLAB_PIPELINE_TOKEN,
+        pattern=r"glptt-[0-9a-f]{40}",
+        description="GitLab Pipeline Trigger Token",
+        severity="high",
+    ),
+    SecretPattern(
+        secret_type=SecretType.BITBUCKET_APP_PASSWORD,
+        pattern=r"ATBB[a-zA-Z0-9]{24,}",
+        description="Bitbucket App Password",
+        severity="high",
+    ),
+    SecretPattern(
+        secret_type=SecretType.DOCKER_HUB_TOKEN,
+        pattern=r"dckr_pat_[a-zA-Z0-9_-]{36,}",
+        description="Docker Hub Access Token",
+        severity="high",
+    ),
+    SecretPattern(
+        secret_type=SecretType.TERRAFORM_CLOUD_TOKEN,
+        pattern=r"[a-zA-Z0-9]{14}\.atlasv1\.[a-zA-Z0-9_-]{60,}",
+        description="Terraform Cloud API Token",
+        severity="high",
+    ),
+    # Communication & Monitoring
+    SecretPattern(
+        secret_type=SecretType.SLACK_BOT_TOKEN,
+        pattern=r"xoxb-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24,}",
+        description="Slack Bot Token",
+        severity="high",
+    ),
+    SecretPattern(
+        secret_type=SecretType.SLACK_USER_TOKEN,
+        pattern=r"xoxp-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24,}",
+        description="Slack User Token",
+        severity="high",
+    ),
+    SecretPattern(
+        secret_type=SecretType.DISCORD_BOT_TOKEN,
+        pattern=r"[MN][A-Za-z\d]{23}\.[A-Za-z\d_-]{6}\.[A-Za-z\d_-]{27,}",
+        description="Discord Bot Token",
+        severity="critical",
+    ),
+    SecretPattern(
+        secret_type=SecretType.DISCORD_WEBHOOK,
+        pattern=r"https://discord(?:app)?\.com/api/webhooks/[0-9]{17,19}/[a-zA-Z0-9_-]{68}",
+        description="Discord Webhook",
+        severity="medium",
+    ),
+    SecretPattern(
+        secret_type=SecretType.TWILIO_API_KEY,
+        pattern=r"SK[a-z0-9]{32}",
+        description="Twilio API Key",
+        severity="high",
+    ),
+    SecretPattern(
+        secret_type=SecretType.SENDGRID_API_KEY,
+        pattern=r"SG\.[a-zA-Z0-9_\-]{22}\.[a-zA-Z0-9_\-]{43}",
+        description="SendGrid API Key",
+        severity="high",
+    ),
+    # Payments & Commerce
+    SecretPattern(
+        secret_type=SecretType.PAYPAL_ACCESS_TOKEN,
+        pattern=r"access_token\$production\$[a-z0-9]{16}\$[a-f0-9]{32}",
+        description="PayPal Access Token",
+        severity="critical",
+    ),
+    SecretPattern(
+        secret_type=SecretType.SQUARE_ACCESS_TOKEN,
+        pattern=r"sq0atp-[0-9A-Za-z_-]{22,}",
+        description="Square Access Token",
+        severity="critical",
+    ),
+    # NOTE: Coinbase pattern is too generic - will be caught by generic detection
+    SecretPattern(
+        secret_type=SecretType.SHOPIFY_ACCESS_TOKEN,
+        pattern=r"shpat_[a-fA-F0-9]{32}",
+        description="Shopify Access Token",
+        severity="critical",
+    ),
+    # Email & SMS
+    SecretPattern(
+        secret_type=SecretType.MAILGUN_API_KEY,
+        pattern=r"key-[a-z0-9]{32}",
+        description="Mailgun API Key",
+        severity="high",
+    ),
+    SecretPattern(
+        secret_type=SecretType.MAILCHIMP_API_KEY,
+        pattern=r"[a-f0-9]{32}-us[0-9]{1,2}",
+        description="Mailchimp API Key",
+        severity="high",
+    ),
+    SecretPattern(
+        secret_type=SecretType.POSTMARK_SERVER_TOKEN,
+        pattern=r"[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+        description="Postmark Server Token",
+        severity="high",
+    ),
+    # Databases & Storage
+    SecretPattern(
+        secret_type=SecretType.MONGODB_CONNECTION_STRING,
+        pattern=r"mongodb(\+srv)?://[^:]+:[^@]+@",
+        description="MongoDB Connection String",
+        severity="high",
+    ),
+    SecretPattern(
+        secret_type=SecretType.REDIS_URL_WITH_PASSWORD,
+        pattern=r"redis://[^:]*:[^@]+@",
+        description="Redis Connection String with Password",
+        severity="high",
+    ),
+    SecretPattern(
+        secret_type=SecretType.FIREBASE_FCM_KEY,
+        pattern=r"AAAA[A-Za-z0-9_-]{7}:[A-Za-z0-9_-]{140}",
+        description="Firebase Cloud Messaging Server Key",
+        severity="high",
+    ),
+    # APIs & Services
+    SecretPattern(
+        secret_type=SecretType.NEW_RELIC_API_KEY,
+        pattern=r"NRAK-[A-Z0-9]{27}",
+        description="New Relic API Key",
+        severity="high",
+    ),
+    # NOTE: Datadog, PagerDuty, Sentry, Algolia, Cloudflare patterns are too generic
+    # They will be caught by generic credential detection with variable name context
+    # Package Managers
+    SecretPattern(
+        secret_type=SecretType.NPM_ACCESS_TOKEN,
+        pattern=r"npm_[A-Za-z0-9]{36}",
+        description="NPM Access Token",
+        severity="high",
+    ),
+    SecretPattern(
+        secret_type=SecretType.PYPI_UPLOAD_TOKEN,
+        pattern=r"pypi-AgEIcHlwaS5vcmc[A-Za-z0-9_-]{50,}",
+        description="PyPI Upload Token",
+        severity="critical",
+    ),
     # Generic patterns (lower priority)
     SecretPattern(
         secret_type=SecretType.GENERIC_API_KEY,
-        pattern=r"(?i)(api[_-]?key|apikey|api[_-]?secret)\s*[=:]\s*['\"]?([0-9a-zA-Z\-_]{32,})['\"]?",
+        pattern=r"(?i)(api[_-]?key|apikey|api[_-]?secret)\s*[=:]\s*['\"]?([0-9a-zA-Z_-]{32,})['\"]?",
         description="Generic API Key",
         severity="medium",
     ),
@@ -228,8 +493,149 @@ def is_high_entropy(value: str, threshold: float = 4.5) -> bool:
     return entropy >= threshold
 
 
+def detect_generic_credential(variable_name: str, value: str, line_number: int) -> Optional[SecretMatch]:
+    """Detect generic credentials using smart heuristics.
+
+    Detects credentials like:
+    - DB_PASSWORD=mySecretPass123
+    - SERVER_SECRET=production_key_2024
+    - API_TOKEN=secure_token_xyz
+    - ENCRYPTION_KEY=base64encodedkey
+
+    Uses a multi-factor approach:
+    1. Variable name matching (PASSWORD, SECRET, TOKEN, KEY, etc.)
+    2. Value validation (length, entropy, format)
+    3. Dynamic entropy thresholds based on credential type
+    4. False positive filtering (DEBUG=true, PORT=8080, etc.)
+
+    Args:
+        variable_name: Environment variable name
+        value: Environment variable value
+        line_number: Line number in file
+
+    Returns:
+        SecretMatch if generic credential detected, None otherwise
+    """
+    # Normalize variable name for comparison
+    var_name_upper = variable_name.upper()
+
+    # Define credential type patterns with their characteristics
+    credential_patterns = [
+        {
+            "type": SecretType.GENERIC_PASSWORD,
+            "keywords": ["PASSWORD", "PASSWD", "PWD"],
+            "min_length": 8,
+            "min_entropy": 3.0,
+            "severity": "critical",
+            "exclude_keywords": ["RESET", "PLACEHOLDER", "EXAMPLE"],
+        },
+        {
+            "type": SecretType.GENERIC_TOKEN,
+            "keywords": ["TOKEN", "ACCESS_TOKEN", "AUTH_TOKEN", "BEARER"],
+            "min_length": 16,
+            "min_entropy": 3.5,
+            "severity": "high",
+            "exclude_keywords": ["ENDPOINT", "URL", "NAME"],
+        },
+        {
+            "type": SecretType.GENERIC_API_SECRET,
+            "keywords": ["SECRET", "API_SECRET", "CLIENT_SECRET", "APP_SECRET", "API_KEY", "APIKEY"],
+            "min_length": 16,
+            "min_entropy": 3.5,
+            "severity": "high",
+            "exclude_keywords": ["NAME", "ID", "ENDPOINT", "PATH", "FILE"],
+        },
+        {
+            "type": SecretType.GENERIC_ENCRYPTION_KEY,
+            "keywords": ["ENCRYPTION_KEY", "ENCRYPT_KEY", "PRIVATE_KEY", "SIGNING_KEY"],
+            "min_length": 16,
+            "min_entropy": 4.0,
+            "severity": "critical",
+            "exclude_keywords": ["PUBLIC", "PATH", "FILE"],
+        },
+    ]
+
+    # False positive filters - common non-secret variable patterns
+    false_positive_patterns = [
+        # Boolean values
+        r"^(true|false|yes|no|on|off|enabled?|disabled?)$",
+        # Numbers only
+        r"^[0-9]+$",
+        # Common non-secret values
+        r"^(debug|development|production|staging|test|local)$",
+        # File paths
+        r"^[./~].*",
+        # URLs/domains (without credentials)
+        r"^https?://[^:@]+$",
+        r"^[a-z0-9.-]+\.[a-z]{2,}$",
+        # Short alphanumeric identifiers
+        r"^[a-zA-Z0-9_-]{1,7}$",
+    ]
+
+    # Check if value matches false positive patterns
+    for pattern in false_positive_patterns:
+        if re.match(pattern, value, re.IGNORECASE):
+            return None
+
+    # Check for placeholder values (more comprehensive)
+    if is_placeholder(value):
+        return None
+
+    # Try to match credential patterns
+    for cred_pattern in credential_patterns:
+        # Check if any keyword matches the variable name
+        keyword_match = any(keyword in var_name_upper for keyword in cred_pattern["keywords"])
+
+        if not keyword_match:
+            continue
+
+        # Check for exclusion keywords
+        has_exclusion = any(exclude in var_name_upper for exclude in cred_pattern["exclude_keywords"])
+        if has_exclusion:
+            continue
+
+        # Check minimum length
+        if len(value) < cred_pattern["min_length"]:
+            continue
+
+        # Check entropy
+        entropy = calculate_entropy(value)
+        if entropy < cred_pattern["min_entropy"]:
+            continue
+
+        # Additional validation: ensure value has some complexity
+        # Must have at least 2 different character types (letters, numbers, special)
+        has_letters = bool(re.search(r"[a-zA-Z]", value))
+        has_numbers = bool(re.search(r"[0-9]", value))
+        has_special = bool(re.search(r"[^a-zA-Z0-9]", value))
+
+        char_type_count = sum([has_letters, has_numbers, has_special])
+        if char_type_count < 2:
+            continue
+
+        # Matched! Create secret match
+        return SecretMatch(
+            secret_type=cred_pattern["type"],
+            variable_name=variable_name,
+            value=redact_value(value),
+            line_number=line_number,
+            severity=cred_pattern["severity"],
+            recommendation=get_recommendation(cred_pattern["type"]),
+        )
+
+    # No generic credential detected
+    return None
+
+
 def detect_secrets_in_value(variable_name: str, value: str, line_number: int = 0) -> List[SecretMatch]:
     """Detect secrets in a single environment variable value.
+
+    Detection order:
+    1. Skip placeholders
+    2. Context-aware detection (AWS secrets, etc.)
+    3. Platform-specific pattern matching
+    4. Generic credential detection (if no platform pattern matched)
+    5. High-entropy detection (fallback)
 
     Args:
         variable_name: Name of the environment variable
@@ -245,7 +651,27 @@ def detect_secrets_in_value(variable_name: str, value: str, line_number: int = 0
     if is_placeholder(value):
         return matches
 
-    # Check each pattern
+    # Special case: AWS Secret Access Key (context-aware detection)
+    # The pattern in SECRET_PATTERNS expects the variable name in the value,
+    # but when scanning parsed .env files, we only get the value portion.
+    # Use variable name as context to detect AWS secrets.
+    if re.match(r"(?i)aws.*(secret|access).*(key|token)", variable_name):
+        # AWS secret keys are exactly 40 characters: alphanumeric + / + =
+        if re.match(r"^[A-Za-z0-9/+=]{40}$", value):
+            matches.append(
+                SecretMatch(
+                    secret_type=SecretType.AWS_SECRET_KEY,
+                    variable_name=variable_name,
+                    value=redact_value(value),
+                    line_number=line_number,
+                    severity="critical",
+                    recommendation=get_recommendation(SecretType.AWS_SECRET_KEY),
+                )
+            )
+            # Return early to avoid duplicate detection
+            return matches
+
+    # Check each platform-specific pattern
     for pattern_def in SECRET_PATTERNS:
         if re.search(pattern_def.pattern, value, re.IGNORECASE):
             matches.append(
@@ -258,6 +684,15 @@ def detect_secrets_in_value(variable_name: str, value: str, line_number: int = 0
                     recommendation=get_recommendation(pattern_def.secret_type),
                 )
             )
+
+    # If no platform-specific pattern matched, try generic credential detection
+    # This catches credentials like DB_PASSWORD=mypass123, SERVER_TOKEN=abc...
+    if not matches:
+        generic_match = detect_generic_credential(variable_name, value, line_number)
+        if generic_match:
+            matches.append(generic_match)
+            # Return early to avoid duplicate detection with high-entropy
+            return matches
 
     # Check for high entropy (only if no specific pattern matched)
     if not matches and is_high_entropy(value):
@@ -327,6 +762,7 @@ def get_recommendation(secret_type: SecretType) -> str:
         Recommendation text
     """
     recommendations = {
+        # Existing secrets
         SecretType.AWS_ACCESS_KEY: "Rotate this AWS key immediately via IAM console. Use AWS Secrets Manager or IAM roles instead.",
         SecretType.AWS_SECRET_KEY: "Rotate this AWS secret key immediately. Never commit AWS credentials to version control.",
         SecretType.GITHUB_TOKEN: "Revoke this GitHub token at github.com/settings/tokens and generate a new one.",
@@ -342,6 +778,61 @@ def get_recommendation(secret_type: SecretType) -> str:
         SecretType.GENERIC_SECRET: "Rotate this secret immediately and consider using a dedicated secret manager.",
         SecretType.JWT_TOKEN: "This JWT token may be compromised. Invalidate it and issue a new one.",
         SecretType.HIGH_ENTROPY: "Review this high-entropy value. If it's a secret, rotate it and use a secret manager.",
+        # Cloud Providers
+        SecretType.AZURE_STORAGE_KEY: "Regenerate this Azure Storage key in the Azure Portal. Update all applications using this key.",
+        SecretType.AZURE_SAS_TOKEN: "Revoke this Azure SAS token and generate a new one with minimal permissions.",
+        SecretType.GOOGLE_API_KEY: "Rotate this Google Cloud API key at console.cloud.google.com/apis/credentials.",
+        SecretType.GOOGLE_OAUTH_TOKEN: "Revoke this Google OAuth token and re-authenticate your application.",
+        SecretType.DIGITALOCEAN_PAT: "Delete this DigitalOcean token at cloud.digitalocean.com/account/api/tokens and create a new one.",
+        SecretType.DIGITALOCEAN_OAUTH: "Revoke this DigitalOcean OAuth token and re-authenticate your application.",
+        SecretType.HEROKU_API_KEY: "Regenerate this Heroku API key at dashboard.heroku.com/account.",
+        SecretType.ALIBABA_ACCESS_KEY_ID: "Disable this Alibaba Cloud AccessKey in RAM console and create a new one.",
+        SecretType.ALIBABA_ACCESS_KEY_SECRET: "Rotate this Alibaba Cloud AccessKey Secret immediately in RAM console.",
+        SecretType.IBM_CLOUD_IAM_KEY: "Delete this IBM Cloud IAM key and create a new one with minimal permissions.",
+        # CI/CD & DevOps
+        SecretType.CIRCLECI_TOKEN: "Revoke this CircleCI token at app.circleci.com/settings/user/tokens and generate a new one.",
+        SecretType.TRAVIS_TOKEN: "Regenerate this Travis CI token at travis-ci.com/account/preferences.",
+        SecretType.JENKINS_TOKEN: "Revoke this Jenkins API token and generate a new one in user configuration.",
+        SecretType.GITLAB_PAT: "Revoke this GitLab PAT at gitlab.com/-/profile/personal_access_tokens and create a new one.",
+        SecretType.GITLAB_PIPELINE_TOKEN: "Regenerate this GitLab pipeline trigger token in CI/CD settings.",
+        SecretType.BITBUCKET_APP_PASSWORD: "Revoke this Bitbucket app password at bitbucket.org/account/settings/app-passwords/.",
+        SecretType.DOCKER_HUB_TOKEN: "Delete this Docker Hub access token at hub.docker.com/settings/security and create a new one.",
+        SecretType.TERRAFORM_CLOUD_TOKEN: "Revoke this Terraform Cloud token at app.terraform.io/app/settings/tokens.",
+        # Communication & Monitoring
+        SecretType.SLACK_BOT_TOKEN: "Regenerate this Slack bot token at api.slack.com/apps and reinstall the app.",
+        SecretType.SLACK_USER_TOKEN: "Revoke this Slack user token and re-authenticate your application.",
+        SecretType.DISCORD_BOT_TOKEN: "Regenerate this Discord bot token at discord.com/developers/applications.",
+        SecretType.DISCORD_WEBHOOK: "Delete this Discord webhook and create a new one in server settings.",
+        SecretType.TWILIO_API_KEY: "Delete this Twilio API key at twilio.com/console/project/api-keys and create a new one.",
+        SecretType.SENDGRID_API_KEY: "Revoke this SendGrid API key at app.sendgrid.com/settings/api_keys and generate a new one.",
+        # Payments & Commerce
+        SecretType.PAYPAL_ACCESS_TOKEN: "Rotate this PayPal access token immediately and update your application.",
+        SecretType.SQUARE_ACCESS_TOKEN: "Revoke this Square access token at developer.squareup.com and generate a new one.",
+        SecretType.COINBASE_API_KEY: "Delete this Coinbase API key at coinbase.com/settings/api and create a new one.",
+        SecretType.SHOPIFY_ACCESS_TOKEN: "Regenerate this Shopify access token in your app settings.",
+        # Email & SMS
+        SecretType.MAILGUN_API_KEY: "Rotate this Mailgun API key at app.mailgun.com/app/account/security/api_keys.",
+        SecretType.MAILCHIMP_API_KEY: "Regenerate this Mailchimp API key at admin.mailchimp.com/account/api/.",
+        SecretType.POSTMARK_SERVER_TOKEN: "Rotate this Postmark server token at account.postmarkapp.com/servers.",
+        # Databases & Storage
+        SecretType.MONGODB_CONNECTION_STRING: "Rotate the password in this MongoDB connection string and update the connection string.",
+        SecretType.REDIS_URL_WITH_PASSWORD: "Change the Redis password and update all connection strings.",
+        SecretType.FIREBASE_FCM_KEY: "Regenerate this Firebase FCM server key in Firebase Console.",
+        # APIs & Services
+        SecretType.DATADOG_API_KEY: "Revoke this Datadog API key at app.datadoghq.com/organization-settings/api-keys.",
+        SecretType.NEW_RELIC_API_KEY: "Delete this New Relic API key at one.newrelic.com/api-keys and create a new one.",
+        SecretType.PAGERDUTY_API_KEY: "Regenerate this PagerDuty API key at pagerduty.com/developer/api-keys.",
+        SecretType.SENTRY_AUTH_TOKEN: "Revoke this Sentry auth token at sentry.io/settings/account/api/auth-tokens/.",
+        SecretType.ALGOLIA_API_KEY: "Regenerate this Algolia API key at dashboard.algolia.com/account/api-keys.",
+        SecretType.CLOUDFLARE_API_KEY: "Roll this Cloudflare API key at dash.cloudflare.com/profile/api-tokens.",
+        # Package Managers
+        SecretType.NPM_ACCESS_TOKEN: "Revoke this NPM token at npmjs.com/settings/tokens and generate a new one.",
+        SecretType.PYPI_UPLOAD_TOKEN: "Delete this PyPI token at pypi.org/manage/account/token/ and create a new one.",
+        # Generic Credential Detection
+        SecretType.GENERIC_PASSWORD: "Rotate this password immediately and use a password manager or secret management solution.",
+        SecretType.GENERIC_TOKEN: "Revoke and regenerate this token using the service's dashboard or API.",
+        SecretType.GENERIC_API_SECRET: "Rotate this API secret and consider using environment-specific secret management.",
+        SecretType.GENERIC_ENCRYPTION_KEY: "Generate a new encryption key and re-encrypt all data. Store keys in a secure vault.",
     }
 
     return recommendations.get(
