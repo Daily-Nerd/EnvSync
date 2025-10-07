@@ -27,6 +27,7 @@ dependencies = [
     "click>=8.1.8",
     "python-dotenv>=1.1.1",
     "rich>=14.1.0",
+    "tomli>=2.2.1",
 ]
 
 [project.optional-dependencies]
