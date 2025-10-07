@@ -41,19 +41,19 @@ def init(project_type: str) -> None:
     """
     console.print("\n[bold cyan]Welcome to EnvSync! 🎯[/bold cyan]\n")
 
-    # Generate a secure random key for SECRET_KEY
+    # Generate a secure random key for SECRET_KEY in .env only
     # This provides a safe default even if user forgets to change it
     random_secret_key = secrets.token_urlsafe(32)
 
-    # Project-type-specific starter variables
-    starter_vars = {
+    # Project-type-specific starter variables for .env (with real random key)
+    starter_vars_env = {
         "web": f"""# Web Application Configuration
 # Database connection
 DATABASE_URL=postgresql://localhost:5432/mydb
 
 # Security
-# IMPORTANT: Generate a new random key for production!
-# This is a randomly generated key for development only.
+# IMPORTANT: This is a randomly generated key for development.
+# Generate a new random key for production!
 SECRET_KEY={random_secret_key}
 DEBUG=false
 
@@ -92,22 +92,69 @@ DEBUG=false
 """,
     }
 
-    # Create .env file
+    # Project-type-specific templates for .env.example (with placeholders only)
+    starter_vars_example = {
+        "web": """# Web Application Configuration
+# Database connection
+DATABASE_URL=postgresql://localhost:5432/mydb
+
+# Security
+# IMPORTANT: Generate a secure random key for production!
+# Never commit real secrets to version control.
+SECRET_KEY=CHANGE_ME_TO_RANDOM_SECRET_KEY
+DEBUG=false
+
+# Server configuration
+PORT=8000
+ALLOWED_HOSTS=localhost,127.0.0.1
+""",
+        "cli": """# CLI Tool Configuration
+# API access
+API_KEY=your-api-key-here
+
+# Logging
+DEBUG=false
+LOG_LEVEL=INFO
+""",
+        "data": """# Data Pipeline Configuration
+# Database
+DATABASE_URL=postgresql://localhost:5432/mydb
+
+# Cloud storage
+S3_BUCKET=my-data-bucket
+AWS_REGION=us-east-1
+
+# Processing
+DEBUG=false
+MAX_WORKERS=4
+""",
+        "other": """# Application Configuration
+# Add your environment variables here
+
+# Example: API key
+# API_KEY=your-api-key-here
+
+# Example: Debug mode
+DEBUG=false
+""",
+    }
+
+    # Create .env file (with real random secrets)
     env_path = Path(".env")
     if env_path.exists():
         console.print("[yellow]⚠️  .env already exists, skipping...[/yellow]")
     else:
-        env_path.write_text(starter_vars.get(project_type, starter_vars["other"]))
+        env_path.write_text(starter_vars_env.get(project_type, starter_vars_env["other"]))
         console.print("[green]✅ Created .env[/green]")
 
-    # Create .env.example
+    # Create .env.example (with placeholder secrets only)
     example_path = Path(".env.example")
     if example_path.exists():
         console.print("[yellow]⚠️  .env.example already exists, skipping...[/yellow]")
     else:
-        # Always use starter_vars template for .env.example to avoid leaking secrets
-        # Never copy from .env as it may contain real credentials
-        example_content = starter_vars.get(project_type, starter_vars["other"])
+        # Use placeholder template for .env.example to avoid committing real secrets
+        # Real random secrets only go in .env (which is gitignored)
+        example_content = starter_vars_example.get(project_type, starter_vars_example["other"])
 
         # Add header comment to .env.example
         example_with_header = f"""# EnvSync Environment Variables Template
