@@ -9,8 +9,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List
 
-import pytest
-
 from envsync.validation import (
     clear_custom_validators,
     get_validator,
@@ -215,7 +213,7 @@ class TestValidatorRegistryConcurrency:
 
         def register_random_validators() -> None:
             for i in range(10):
-                register_validator(f"random_{threading.get_ident()}_{i}", lambda v: True)
+                register_validator(f"random_{threading.get_ident()}_{i}", lambda _v: True)
                 time.sleep(0.001)
 
         # Mix listing and registration operations
@@ -233,7 +231,7 @@ class TestValidatorRegistryConcurrency:
         for validators in results:
             assert isinstance(validators, dict)
             # Each result should be internally consistent
-            for name, validator_type in validators.items():
+            for _name, validator_type in validators.items():
                 assert validator_type in ("built-in", "custom")
 
     def test_concurrent_clear_validators(self) -> None:
@@ -243,7 +241,7 @@ class TestValidatorRegistryConcurrency:
         """
         # Register some validators
         for i in range(50):
-            register_validator(f"clearable_{i}", lambda v: True)
+            register_validator(f"clearable_{i}", lambda _v: True)
 
         clear_count = 0
         lock = threading.Lock()
@@ -287,7 +285,7 @@ class TestValidatorRegistryConcurrency:
         def mixed_operations(thread_id: int) -> None:
             for i in range(20):
                 # Register
-                register_validator(f"stress_{thread_id}_{i}", lambda v: True)
+                register_validator(f"stress_{thread_id}_{i}", lambda _v: True)
                 with lock:
                     operation_counts["register"] += 1
 
@@ -375,7 +373,7 @@ class TestValidatorRegistryEdgeCases:
 
         def try_register_builtin() -> None:
             try:
-                register_validator("email", lambda v: True)
+                register_validator("email", lambda _v: True)
             except ValueError as e:
                 errors.append(e)
 
