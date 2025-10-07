@@ -422,7 +422,7 @@ def register_validator(name: str, validator_func: ValidatorFunc) -> None:
         >>> register_validator("phone", validate_phone)
         >>> # Now can use format="phone" in require()
     """
-    built_in_validators = {"email", "url", "uuid", "ipv4", "postgresql"}
+    built_in_validators = set(_BUILTIN_VALIDATORS.keys())
     if name in built_in_validators:
         raise ValueError(
             f"Cannot register validator '{name}': conflicts with built-in validator. "
