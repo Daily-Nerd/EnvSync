@@ -15,6 +15,70 @@ from rich.console import Console
 
 console = Console()
 
+# Project template definitions (module-level constant)
+# Templates use {secret_section} placeholder for dynamic secret injection
+PROJECT_TEMPLATES = {
+    "web": {
+        "base": """# Web Application Configuration
+# Database connection
+DATABASE_URL=postgresql://localhost:5432/mydb
+
+# Security
+{secret_section}
+DEBUG=false
+
+# Server configuration
+PORT=8000
+ALLOWED_HOSTS=localhost,127.0.0.1
+""",
+        "secret_comment": """# IMPORTANT: This is a randomly generated key for development.
+# Generate a new random key for production!""",
+        "placeholder_comment": """# IMPORTANT: Generate a secure random key for production!
+# Never commit real secrets to version control.""",
+    },
+    "cli": {
+        "base": """# CLI Tool Configuration
+# API access
+API_KEY=your-api-key-here
+
+# Logging
+DEBUG=false
+LOG_LEVEL=INFO
+""",
+        "secret_comment": "",
+        "placeholder_comment": "",
+    },
+    "data": {
+        "base": """# Data Pipeline Configuration
+# Database
+DATABASE_URL=postgresql://localhost:5432/mydb
+
+# Cloud storage
+S3_BUCKET=my-data-bucket
+AWS_REGION=us-east-1
+
+# Processing
+DEBUG=false
+MAX_WORKERS=4
+""",
+        "secret_comment": "",
+        "placeholder_comment": "",
+    },
+    "other": {
+        "base": """# Application Configuration
+# Add your environment variables here
+
+# Example: API key
+# API_KEY=your-api-key-here
+
+# Example: Debug mode
+DEBUG=false
+""",
+        "secret_comment": "",
+        "placeholder_comment": "",
+    },
+}
+
 
 @click.group()
 @click.version_option(version="0.1.0", prog_name="envsync")
@@ -52,73 +116,25 @@ def init(project_type: str) -> None:
         Args:
             project_type: Type of project (web, cli, data, other)
             inject_secret: If True, use real random secret; if False, use placeholder
+
+        Returns:
+            Formatted template string with secrets injected appropriately
         """
-        templates = {
-            "web": {
-                "base": """# Web Application Configuration
-# Database connection
-DATABASE_URL=postgresql://localhost:5432/mydb
+        # Get template data from module-level constant
+        template_data = PROJECT_TEMPLATES.get(project_type, PROJECT_TEMPLATES["other"])
 
-# Security
-{secret_section}
-DEBUG=false
+        # Build secret section based on injection mode
+        if inject_secret:
+            # Real random secret for .env file
+            comment = template_data["secret_comment"]
+            secret_line = f"SECRET_KEY={random_secret_key}" if comment else ""
+            secret_section = f"{comment}\n{secret_line}" if comment else secret_line
+        else:
+            # Placeholder for .env.example file
+            comment = template_data["placeholder_comment"]
+            secret_line = "SECRET_KEY=CHANGE_ME_TO_RANDOM_SECRET_KEY" if comment else ""
+            secret_section = f"{comment}\n{secret_line}" if comment else secret_line
 
-# Server configuration
-PORT=8000
-ALLOWED_HOSTS=localhost,127.0.0.1
-""",
-                "secret_real": f"""# IMPORTANT: This is a randomly generated key for development.
-# Generate a new random key for production!
-SECRET_KEY={random_secret_key}""",
-                "secret_placeholder": """# IMPORTANT: Generate a secure random key for production!
-# Never commit real secrets to version control.
-SECRET_KEY=CHANGE_ME_TO_RANDOM_SECRET_KEY"""
-            },
-            "cli": {
-                "base": """# CLI Tool Configuration
-# API access
-API_KEY=your-api-key-here
-
-# Logging
-DEBUG=false
-LOG_LEVEL=INFO
-""",
-                "secret_real": "",
-                "secret_placeholder": ""
-            },
-            "data": {
-                "base": """# Data Pipeline Configuration
-# Database
-DATABASE_URL=postgresql://localhost:5432/mydb
-
-# Cloud storage
-S3_BUCKET=my-data-bucket
-AWS_REGION=us-east-1
-
-# Processing
-DEBUG=false
-MAX_WORKERS=4
-""",
-                "secret_real": "",
-                "secret_placeholder": ""
-            },
-            "other": {
-                "base": """# Application Configuration
-# Add your environment variables here
-
-# Example: API key
-# API_KEY=your-api-key-here
-
-# Example: Debug mode
-DEBUG=false
-""",
-                "secret_real": "",
-                "secret_placeholder": ""
-            }
-        }
-
-        template_data = templates.get(project_type, templates["other"])
-        secret_section = template_data["secret_real"] if inject_secret else template_data["secret_placeholder"]
         return template_data["base"].format(secret_section=secret_section)
 
     # Create .env file (with real random secrets)
