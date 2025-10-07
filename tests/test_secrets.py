@@ -65,7 +65,7 @@ def test_redact_value():
     """Test value redaction."""
     # Short value
     assert redact_value('abc') == '***'
-    assert redact_value('abcdefgh') == '********'  # Fixed: shows actual length
+    assert redact_value('abcdefgh') == '********'  # shows actual length
 
     # Long value
     redacted = redact_value('sk-1234567890abcdef1234567890abcdef')
