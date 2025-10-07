@@ -4,6 +4,7 @@ This module provides CLI commands for environment variable management,
 including generation, validation, and team synchronization features.
 """
 
+import fnmatch
 import secrets
 import sys
 from pathlib import Path
@@ -42,73 +43,39 @@ def init(project_type: str) -> None:
     console.print("\n[bold cyan]Welcome to EnvSync! 🎯[/bold cyan]\n")
 
     # Generate a secure random key for SECRET_KEY in .env only
-    # This provides a safe default even if user forgets to change it
     random_secret_key = secrets.token_urlsafe(32)
 
-    # Project-type-specific starter variables for .env (with real random key)
-    starter_vars_env = {
-        "web": f"""# Web Application Configuration
+    # Helper function to generate templates with secret injection
+    def get_template(project_type: str, inject_secret: bool = False) -> str:
+        """Generate environment template with optional secret injection.
+
+        Args:
+            project_type: Type of project (web, cli, data, other)
+            inject_secret: If True, use real random secret; if False, use placeholder
+        """
+        templates = {
+            "web": {
+                "base": """# Web Application Configuration
 # Database connection
 DATABASE_URL=postgresql://localhost:5432/mydb
 
 # Security
-# IMPORTANT: This is a randomly generated key for development.
+{secret_section}
+DEBUG=false
+
+# Server configuration
+PORT=8000
+ALLOWED_HOSTS=localhost,127.0.0.1
+""",
+                "secret_real": f"""# IMPORTANT: This is a randomly generated key for development.
 # Generate a new random key for production!
-SECRET_KEY={random_secret_key}
-DEBUG=false
-
-# Server configuration
-PORT=8000
-ALLOWED_HOSTS=localhost,127.0.0.1
-""",
-        "cli": """# CLI Tool Configuration
-# API access
-API_KEY=your-api-key-here
-
-# Logging
-DEBUG=false
-LOG_LEVEL=INFO
-""",
-        "data": """# Data Pipeline Configuration
-# Database
-DATABASE_URL=postgresql://localhost:5432/mydb
-
-# Cloud storage
-S3_BUCKET=my-data-bucket
-AWS_REGION=us-east-1
-
-# Processing
-DEBUG=false
-MAX_WORKERS=4
-""",
-        "other": """# Application Configuration
-# Add your environment variables here
-
-# Example: API key
-# API_KEY=your-api-key-here
-
-# Example: Debug mode
-DEBUG=false
-""",
-    }
-
-    # Project-type-specific templates for .env.example (with placeholders only)
-    starter_vars_example = {
-        "web": """# Web Application Configuration
-# Database connection
-DATABASE_URL=postgresql://localhost:5432/mydb
-
-# Security
-# IMPORTANT: Generate a secure random key for production!
+SECRET_KEY={random_secret_key}""",
+                "secret_placeholder": """# IMPORTANT: Generate a secure random key for production!
 # Never commit real secrets to version control.
-SECRET_KEY=CHANGE_ME_TO_RANDOM_SECRET_KEY
-DEBUG=false
-
-# Server configuration
-PORT=8000
-ALLOWED_HOSTS=localhost,127.0.0.1
-""",
-        "cli": """# CLI Tool Configuration
+SECRET_KEY=CHANGE_ME_TO_RANDOM_SECRET_KEY"""
+            },
+            "cli": {
+                "base": """# CLI Tool Configuration
 # API access
 API_KEY=your-api-key-here
 
@@ -116,7 +83,11 @@ API_KEY=your-api-key-here
 DEBUG=false
 LOG_LEVEL=INFO
 """,
-        "data": """# Data Pipeline Configuration
+                "secret_real": "",
+                "secret_placeholder": ""
+            },
+            "data": {
+                "base": """# Data Pipeline Configuration
 # Database
 DATABASE_URL=postgresql://localhost:5432/mydb
 
@@ -128,7 +99,11 @@ AWS_REGION=us-east-1
 DEBUG=false
 MAX_WORKERS=4
 """,
-        "other": """# Application Configuration
+                "secret_real": "",
+                "secret_placeholder": ""
+            },
+            "other": {
+                "base": """# Application Configuration
 # Add your environment variables here
 
 # Example: API key
@@ -137,14 +112,21 @@ MAX_WORKERS=4
 # Example: Debug mode
 DEBUG=false
 """,
-    }
+                "secret_real": "",
+                "secret_placeholder": ""
+            }
+        }
+
+        template_data = templates.get(project_type, templates["other"])
+        secret_section = template_data["secret_real"] if inject_secret else template_data["secret_placeholder"]
+        return template_data["base"].format(secret_section=secret_section)
 
     # Create .env file (with real random secrets)
     env_path = Path(".env")
     if env_path.exists():
         console.print("[yellow]⚠️  .env already exists, skipping...[/yellow]")
     else:
-        env_path.write_text(starter_vars_env.get(project_type, starter_vars_env["other"]))
+        env_path.write_text(get_template(project_type, inject_secret=True))
         console.print("[green]✅ Created .env[/green]")
 
     # Create .env.example (with placeholder secrets only)
@@ -154,7 +136,7 @@ DEBUG=false
     else:
         # Use placeholder template for .env.example to avoid committing real secrets
         # Real random secrets only go in .env (which is gitignored)
-        example_content = starter_vars_example.get(project_type, starter_vars_example["other"])
+        example_content = get_template(project_type, inject_secret=False)
 
         # Add header comment to .env.example
         example_with_header = f"""# EnvSync Environment Variables Template
@@ -171,10 +153,18 @@ DEBUG=false
     gitignore_path = Path(".gitignore")
     gitignore_content = gitignore_path.read_text() if gitignore_path.exists() else ""
 
-    # Check for exact line match to avoid false positives with .envrc, .env.example, etc.
-    # Note: .env.* pattern does NOT match plain .env file, so we must check explicitly
-    gitignore_lines = {line.strip() for line in gitignore_content.splitlines()}
-    has_env_entry = ".env" in gitignore_lines
+    # Check if .env is already protected by any pattern
+    # Use fnmatch to properly handle gitignore glob patterns:
+    #   .env*    matches .env (and .envrc, .environment, etc.)
+    #   .env.*   matches .env.local, .env.prod (but NOT .env)
+    #   .env     matches .env exactly
+    gitignore_lines = [
+        line.strip() for line in gitignore_content.splitlines()
+        if line.strip() and not line.strip().startswith('#')
+    ]
+    has_env_entry = any(
+        fnmatch.fnmatch('.env', pattern) for pattern in gitignore_lines
+    )
 
     if not has_env_entry:
         with gitignore_path.open("a") as f:
