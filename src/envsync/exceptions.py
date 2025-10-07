@@ -25,9 +25,36 @@ class MissingVariableError(EnvSyncError):
         """
         self.variable_name = variable_name
         self.description = description
-        message = f"Missing required environment variable: {variable_name}"
+
+        # Build multi-line helpful message
+        lines = [
+            f"\n❌ Missing required environment variable: {variable_name}",
+            "",
+        ]
+
         if description:
-            message += f"\nDescription: {description}"
+            lines.append(f"Description: {description}")
+            lines.append("")
+
+        lines.extend(
+            [
+                "To fix this, choose one option:",
+                "",
+                "  1. Add to .env file:",
+                f"     {variable_name}=your-value-here",
+                "",
+                "  2. Set in your shell:",
+                f"     export {variable_name}=your-value-here",
+                "",
+                "  3. Copy from example (if available):",
+                "     cp .env.example .env",
+                "",
+                "💡 Tip: Run 'envsync init' to create starter files",
+                "",
+            ]
+        )
+
+        message = "\n".join(lines)
         super().__init__(message)
 
 

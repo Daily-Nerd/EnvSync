@@ -1,11 +1,60 @@
-"""Basic usage example for EnvSync.
+"""EnvSync Basic Usage - Complete Feature Tour
 
-This example demonstrates the core functionality of EnvSync including:
-- Loading environment variables with validation
-- Type coercion
-- Format validation
-- Optional vs required variables
+⚠️  IMPORTANT: This example demonstrates ALL features and requires many environment variables.
+    If this is your first time, try quickstart.py instead!
+
+SETUP INSTRUCTIONS:
+1. Copy the example environment file:
+   cp examples/.env.example examples/.env
+
+2. Edit examples/.env and fill in ALL variable values (see .env.example for details)
+
+3. Run this example:
+   python examples/basic_usage.py
+
+4. Or run in demo mode (no .env required):
+   python examples/basic_usage.py --demo
+
+For a simpler introduction with just 3 variables, see:
+   python examples/quickstart.py
+
+This comprehensive example demonstrates:
+- Required vs optional variables
+- Type coercion (int, bool, float, list)
+- Format validators (email, URL, postgresql, etc.)
+- Pattern validation (custom regex)
+- Choices validation (enum-like behavior)
+- Custom validators
+- Range validation for numbers
+- Secret marking
+- And more!
 """
+
+import sys
+
+# Demo mode support - run with --demo flag to use example values
+DEMO_MODE = "--demo" in sys.argv
+
+if DEMO_MODE:
+    print("🎭 Running in DEMO MODE with example values\n")
+    import os
+
+    os.environ.update(
+        {
+            "API_KEY": "demo-api-key-1234567890",
+            "DATABASE_URL": "postgresql://user:pass@localhost:5432/demo_db",
+            "DEBUG": "true",
+            "PORT": "8000",
+            "MAX_RETRIES": "3",
+            "ADMIN_EMAIL": "admin@example.com",
+            "ALLOWED_HOSTS": "localhost,127.0.0.1,example.com",
+            "ENVIRONMENT": "development",
+            "API_TOKEN": "sk-abcd1234efgh5678ijkl9012mnop3456",
+            "S3_BUCKET": "demo-bucket",
+            "SECRET_KEY": "demo-secret-key-for-testing-purposes-only",
+            "TIMEOUT": "30.0",
+        }
+    )
 
 from envsync import env
 
