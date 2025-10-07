@@ -7,7 +7,7 @@ operations to ensure no race conditions occur in multi-threaded environments.
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List
+from typing import Callable, List
 
 from envsync.validation import (
     clear_custom_validators,
@@ -16,6 +16,15 @@ from envsync.validation import (
     register_validator,
     unregister_validator,
 )
+
+
+def _make_simple_validator() -> Callable[[str], bool]:
+    """Factory to create simple validators without closure issues.
+
+    Returns:
+        A validator function that always returns True
+    """
+    return lambda _v: True
 
 
 class TestValidatorRegistryConcurrency:
@@ -136,7 +145,9 @@ class TestValidatorRegistryConcurrency:
         def register_validators() -> None:
             nonlocal registration_count
             for i in range(10):
-                register_validator(f"concurrent_{i}", lambda v: len(v) > i)
+                # Use factory to avoid lambda closure issue
+                validator_func = (lambda length: lambda v: len(v) > length)(i)
+                register_validator(f"concurrent_{i}", validator_func)
                 with lock:
                     registration_count += 1
                 time.sleep(0.001)  # Small delay to interleave operations
@@ -213,7 +224,9 @@ class TestValidatorRegistryConcurrency:
 
         def register_random_validators() -> None:
             for i in range(10):
-                register_validator(f"random_{threading.get_ident()}_{i}", lambda _v: True)
+                register_validator(
+                    f"random_{threading.get_ident()}_{i}", _make_simple_validator()
+                )
                 time.sleep(0.001)
 
         # Mix listing and registration operations
@@ -241,7 +254,7 @@ class TestValidatorRegistryConcurrency:
         """
         # Register some validators
         for i in range(50):
-            register_validator(f"clearable_{i}", lambda _v: True)
+            register_validator(f"clearable_{i}", _make_simple_validator())
 
         clear_count = 0
         lock = threading.Lock()
@@ -285,7 +298,7 @@ class TestValidatorRegistryConcurrency:
         def mixed_operations(thread_id: int) -> None:
             for i in range(20):
                 # Register
-                register_validator(f"stress_{thread_id}_{i}", lambda _v: True)
+                register_validator(f"stress_{thread_id}_{i}", _make_simple_validator())
                 with lock:
                     operation_counts["register"] += 1
 
@@ -329,7 +342,9 @@ class TestValidatorRegistryConcurrency:
         """
 
         def complex_validator(value: str) -> bool:
-            # This validator accesses the registry during validation
+            # INTENTIONAL: This validator accesses the registry during validation
+            # to test that nested lock acquisition doesn't cause deadlocks.
+            # In production, avoid calling list_validators() in validators.
             all_validators = list_validators()
             return len(value) > 5 and "email" in all_validators
 
@@ -373,7 +388,7 @@ class TestValidatorRegistryEdgeCases:
 
         def try_register_builtin() -> None:
             try:
-                register_validator("email", lambda _v: True)
+                register_validator("email", _make_simple_validator())
             except ValueError as e:
                 errors.append(e)
 

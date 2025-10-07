@@ -34,6 +34,48 @@ _CUSTOM_VALIDATORS: Dict[str, ValidatorFunc] = {}
 _VALIDATOR_LOCK = threading.Lock()
 
 
+def _parse_delimited_string(
+    value: str,
+    delimiter: str = ",",
+    strip_quotes: bool = True,
+) -> List[str]:
+    """Parse a delimited string respecting quotes.
+
+    Args:
+        value: String to parse
+        delimiter: Delimiter character (default: comma)
+        strip_quotes: Whether to strip surrounding quotes
+
+    Returns:
+        List of parsed items
+    """
+    items = []
+    current = []
+    in_quotes = False
+    quote_char = None
+
+    for char in value:
+        if char in ('"', "'") and (quote_char is None or char == quote_char):
+            in_quotes = not in_quotes
+            quote_char = char if in_quotes else None
+            if not strip_quotes:
+                current.append(char)
+        elif char == delimiter and not in_quotes:
+            item = "".join(current).strip()
+            if item:
+                items.append(item)
+            current = []
+        else:
+            current.append(char)
+
+    # Add final item
+    final = "".join(current).strip()
+    if final:
+        items.append(final)
+
+    return items
+
+
 def coerce_bool(value: str) -> bool:
     """Convert string to boolean.
 
@@ -116,57 +158,11 @@ def coerce_list(value: str, delimiter: str = ",") -> List[str]:
         except json.JSONDecodeError:
             pass
 
-    # Try quoted CSV with double quotes
-    if '"' in value:
-        items = []
-        in_quotes = False
-        current = []
+    # Use common parsing utility for quoted or unquoted CSV
+    if '"' in value or "'" in value:
+        return _parse_delimited_string(value, delimiter, strip_quotes=True)
 
-        for char in value:
-            if char == '"':
-                in_quotes = not in_quotes
-            elif char == delimiter and not in_quotes:
-                item = "".join(current).strip()
-                if item:
-                    items.append(item)
-                current = []
-            else:
-                current.append(char)
-
-        # Add last item
-        item = "".join(current).strip()
-        if item:
-            items.append(item)
-
-        if items:
-            return items
-
-    # Try quoted CSV with single quotes
-    if "'" in value:
-        items = []
-        in_quotes = False
-        current = []
-
-        for char in value:
-            if char == "'":
-                in_quotes = not in_quotes
-            elif char == delimiter and not in_quotes:
-                item = "".join(current).strip()
-                if item:
-                    items.append(item)
-                current = []
-            else:
-                current.append(char)
-
-        # Add last item
-        item = "".join(current).strip()
-        if item:
-            items.append(item)
-
-        if items:
-            return items
-
-    # Fall back to simple split
+    # Fall back to simple split for unquoted values
     return [item.strip() for item in value.split(delimiter) if item.strip()]
 
 
@@ -201,32 +197,11 @@ def coerce_dict(value: str) -> Dict[str, Any]:
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON: {e}") from e
 
-    # Try key=value pairs
-    result: Dict[str, Any] = {}
-    pairs = []
-    current = []
-    in_quotes = False
-    quote_char = None
-
-    for char in value:
-        if char in ('"', "'") and (quote_char is None or char == quote_char):
-            in_quotes = not in_quotes
-            quote_char = char if in_quotes else None
-            current.append(char)
-        elif char == "," and not in_quotes:
-            pair = "".join(current).strip()
-            if pair:
-                pairs.append(pair)
-            current = []
-        else:
-            current.append(char)
-
-    # Add last pair
-    pair = "".join(current).strip()
-    if pair:
-        pairs.append(pair)
+    # Use common parsing utility to split key=value pairs
+    pairs = _parse_delimited_string(value, delimiter=",", strip_quotes=False)
 
     # Parse each key=value pair
+    result: Dict[str, Any] = {}
     for pair in pairs:
         if "=" not in pair:
             raise ValueError(f"Invalid key=value pair: {pair}")
