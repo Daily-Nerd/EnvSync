@@ -22,7 +22,7 @@ The quickstart example uses only 3 variables and is perfect for learning the bas
 python examples/quickstart.py
 ```
 
-**Too lazy to setup .env?** Try demo mode:
+**Too lazy to set up .env?** Try demo mode:
 
 ```bash
 python examples/quickstart.py --demo
