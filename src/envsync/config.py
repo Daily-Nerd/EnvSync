@@ -215,9 +215,7 @@ def validate_config(config: EnvSyncConfig) -> List[str]:
         if var.format:
             valid_formats = ["email", "url", "uuid", "ipv4", "postgresql"]
             if var.format not in valid_formats:
-                errors.append(
-                    f"{name}: invalid format '{var.format}', must be one of {valid_formats}"
-                )
+                errors.append(f"{name}: invalid format '{var.format}', must be one of {valid_formats}")
 
         # Check min/max only used with numeric types
         if (var.min_val is not None or var.max_val is not None) and var.type not in [
@@ -243,7 +241,7 @@ def generate_example_config() -> str:
     Returns:
         Example configuration as a string
     """
-    return '''# EnvSync Configuration File
+    return """# EnvSync Configuration File
 # This file defines environment variable requirements for your project
 
 [envsync]
@@ -321,4 +319,4 @@ description = "Comma-separated list of allowed hosts"
 required = false
 type = "dict"
 description = "JSON object with feature flags"
-'''
+"""

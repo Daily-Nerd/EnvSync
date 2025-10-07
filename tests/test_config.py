@@ -336,9 +336,7 @@ class TestValidateConfig:
     def test_validate_choices_on_non_string(self):
         """Test validation catches choices on non-string types."""
         config = EnvSyncConfig()
-        config.variables["TEST"] = VariableConfig(
-            name="TEST", type="int", choices=["one", "two"]
-        )
+        config.variables["TEST"] = VariableConfig(name="TEST", type="int", choices=["one", "two"])
         errors = validate_config(config)
         assert len(errors) == 1
         assert "choices can only be used with str" in errors[0]

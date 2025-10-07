@@ -32,9 +32,7 @@ class TestExpandVariables:
     def test_expand_with_text(self):
         """Test expansion with surrounding text."""
         env_dict = {"DB_HOST": "postgres"}
-        result = expand_variables(
-            "postgresql://${DB_HOST}:5432/mydb", env_dict, allow_os_environ=False
-        )
+        result = expand_variables("postgresql://${DB_HOST}:5432/mydb", env_dict, allow_os_environ=False)
         assert result == "postgresql://postgres:5432/mydb"
 
     def test_expand_undefined_variable_keeps_reference(self):
@@ -262,13 +260,9 @@ APP_LOGS=${APP_ROOT}/logs
         parser = EnvFileParser(expand_vars=True, allow_os_environ=False)
         entries = parser.parse_file(env_file)
 
+        assert entries["DATABASE_URL"].value == "postgresql://postgres:secret123@localhost:5432/myapp"
         assert (
-            entries["DATABASE_URL"].value
-            == "postgresql://postgres:secret123@localhost:5432/myapp"
-        )
-        assert (
-            entries["DATABASE_URL_READ_ONLY"].value
-            == "postgresql://postgres_readonly:secret123@localhost:5432/myapp"
+            entries["DATABASE_URL_READ_ONLY"].value == "postgresql://postgres_readonly:secret123@localhost:5432/myapp"
         )
         assert entries["REDIS_URL"].value == "redis://redis-server:6379"
         assert entries["APP_DATA"].value == "/opt/myapp/data"

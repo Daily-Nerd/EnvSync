@@ -162,10 +162,7 @@ class EnvVarScanner(ast.NodeVisitor):
         elif isinstance(node, ast.List):
             return [self._extract_value(elt) for elt in node.elts]
         elif isinstance(node, ast.Dict):
-            return {
-                self._extract_value(k): self._extract_value(v)
-                for k, v in zip(node.keys, node.values)
-            }
+            return {self._extract_value(k): self._extract_value(v) for k, v in zip(node.keys, node.values)}
         elif isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
             # Handle negative numbers
             if isinstance(node.operand, ast.Constant):
@@ -356,6 +353,7 @@ def format_default_value(value: Any) -> str:
         return str(value).lower()
     elif isinstance(value, (list, dict)):
         import json
+
         return json.dumps(value)
     else:
         return str(value)

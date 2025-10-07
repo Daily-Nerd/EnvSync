@@ -228,9 +228,7 @@ def is_high_entropy(value: str, threshold: float = 4.5) -> bool:
     return entropy >= threshold
 
 
-def detect_secrets_in_value(
-    variable_name: str, value: str, line_number: int = 0
-) -> List[SecretMatch]:
+def detect_secrets_in_value(variable_name: str, value: str, line_number: int = 0) -> List[SecretMatch]:
     """Detect secrets in a single environment variable value.
 
     Args:
@@ -431,9 +429,7 @@ def scan_git_history(
                         entries = parser.parse_string(content)
 
                         for key, entry in entries.items():
-                            matches = detect_secrets_in_value(
-                                key, entry.value, entry.line_number
-                            )
+                            matches = detect_secrets_in_value(key, entry.value, entry.line_number)
 
                             for match in matches:
                                 findings.append(

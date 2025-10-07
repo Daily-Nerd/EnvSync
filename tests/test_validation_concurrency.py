@@ -83,10 +83,7 @@ class TestValidatorRegistryConcurrency:
 
         # Register 100 different validators concurrently
         with ThreadPoolExecutor(max_workers=20) as executor:
-            futures = [
-                executor.submit(register_numbered_validator, i)
-                for i in range(num_validators)
-            ]
+            futures = [executor.submit(register_numbered_validator, i) for i in range(num_validators)]
             for future in as_completed(futures):
                 future.result()
 
@@ -193,9 +190,7 @@ class TestValidatorRegistryConcurrency:
             for i in range(20):
                 # Each validator gets unregistered by 3 threads
                 for _ in range(3):
-                    futures.append(
-                        executor.submit(unregister_validator_safe, f"removable_{i}")
-                    )
+                    futures.append(executor.submit(unregister_validator_safe, f"removable_{i}"))
 
             for future in as_completed(futures):
                 future.result()
@@ -224,17 +219,13 @@ class TestValidatorRegistryConcurrency:
 
         def register_random_validators() -> None:
             for i in range(10):
-                register_validator(
-                    f"random_{threading.get_ident()}_{i}", _make_simple_validator()
-                )
+                register_validator(f"random_{threading.get_ident()}_{i}", _make_simple_validator())
                 time.sleep(0.001)
 
         # Mix listing and registration operations
         with ThreadPoolExecutor(max_workers=15) as executor:
             list_futures = [executor.submit(list_validators_safe) for _ in range(50)]
-            register_futures = [
-                executor.submit(register_random_validators) for _ in range(5)
-            ]
+            register_futures = [executor.submit(register_random_validators) for _ in range(5)]
 
             for future in as_completed(list_futures + register_futures):
                 future.result()
@@ -276,9 +267,7 @@ class TestValidatorRegistryConcurrency:
 
         # No custom validators should remain
         validators = list_validators()
-        custom_validators = [
-            name for name, vtype in validators.items() if vtype == "custom"
-        ]
+        custom_validators = [name for name, vtype in validators.items() if vtype == "custom"]
         assert len(custom_validators) == 0
 
     def test_stress_test_mixed_operations(self) -> None:

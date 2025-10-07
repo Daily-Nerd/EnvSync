@@ -3,7 +3,7 @@ EnvSync Performance Benchmark Results
 Generated: 2025-10-07 02:31:53
 ==========================================================================================
 
-Benchmark                                     Avg (ms)     Min (ms)     Max (ms)    
+Benchmark                                     Avg (ms)     Min (ms)     Max (ms)
 ------------------------------------------------------------------------------------------
 env.require() with type coercion                  0.0010      0.0009      0.0064
 env.require() with validation                     0.0014      0.0013      0.0360

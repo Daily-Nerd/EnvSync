@@ -306,12 +306,7 @@ def print_results(results: List[Tuple[str, Dict[str, float]]]) -> None:
     print("-" * 90)
 
     for name, result in results:
-        print(
-            f"{name:<45} "
-            f"{result['avg_ms']:>10.4f}  "
-            f"{result['min_ms']:>10.4f}  "
-            f"{result['max_ms']:>10.4f}"
-        )
+        print(f"{name:<45} " f"{result['avg_ms']:>10.4f}  " f"{result['min_ms']:>10.4f}  " f"{result['max_ms']:>10.4f}")
 
     print("=" * 90)
 

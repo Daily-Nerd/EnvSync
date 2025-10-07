@@ -230,9 +230,7 @@ class TestRealWorldScenarios:
 
     def test_cors_origins_list(self):
         """Test parsing CORS origins."""
-        result = coerce_list(
-            "https://example.com, https://www.example.com, https://api.example.com"
-        )
+        result = coerce_list("https://example.com, https://www.example.com, https://api.example.com")
         assert result == [
             "https://example.com",
             "https://www.example.com",
@@ -241,9 +239,7 @@ class TestRealWorldScenarios:
 
     def test_database_replica_urls(self):
         """Test parsing database replica URLs."""
-        result = coerce_list(
-            "postgresql://db1:5432/mydb, postgresql://db2:5432/mydb, postgresql://db3:5432/mydb"
-        )
+        result = coerce_list("postgresql://db1:5432/mydb, postgresql://db2:5432/mydb, postgresql://db3:5432/mydb")
         assert len(result) == 3
         assert all("postgresql://" in url for url in result)
 
@@ -282,9 +278,7 @@ class TestRealWorldScenarios:
 
     def test_server_config_with_mixed_types(self):
         """Test server configuration with mixed types."""
-        result = coerce_dict(
-            'host=0.0.0.0,port=8000,workers=4,reload=true,log_level="info"'
-        )
+        result = coerce_dict('host=0.0.0.0,port=8000,workers=4,reload=true,log_level="info"')
         assert result == {
             "host": "0.0.0.0",
             "port": 8000,

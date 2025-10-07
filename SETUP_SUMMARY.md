@@ -30,13 +30,13 @@ Created the following modules with type-safe stubs:
   - `env` singleton instance
   - Methods: `require()`, `optional()`, `get()`, `has()`, `load()`, `load_files()`
   - Variable registry for documentation generation
-  
+
 - **`validation.py`** - Type coercion and validation:
   - Type coercion functions: `coerce_bool()`, `coerce_int()`, `coerce_float()`, `coerce_list()`, `coerce_dict()`
   - Format validators: `validate_email()`, `validate_url()`, `validate_uuid()`, `validate_ipv4()`, `validate_postgresql_url()`
   - Utility validators: `validate_pattern()`, `validate_range()`, `validate_choices()`
   - `@validator` decorator for custom validators
-  
+
 - **`exceptions.py`** - Custom exception hierarchy:
   - `EnvSyncError` (base)
   - `MissingVariableError`
@@ -45,7 +45,7 @@ Created the following modules with type-safe stubs:
   - `EnvFileNotFoundError`
   - `SecretDetectedError`
   - `DriftError`
-  
+
 - **`cli.py`** - Command-line interface (Click + Rich):
   - `envsync generate` - Generate .env.example
   - `envsync check` - Check for drift
@@ -53,7 +53,7 @@ Created the following modules with type-safe stubs:
   - `envsync scan` - Scan for secrets
   - `envsync validate` - Validate environment
   - `envsync docs` - Generate documentation
-  
+
 - **`py.typed`** - PEP 561 marker for type checking
 
 ### 3. Testing Infrastructure
@@ -67,7 +67,7 @@ Created comprehensive test suite:
   - `sample_env_file` - Pre-populated .env file
   - `sample_env_vars` - Set environment variables
   - `isolated_env` - Clean environment
-  
+
 - **`test_core.py`** - Core functionality tests (30 tests):
   - EnvSync initialization
   - require() method
@@ -78,7 +78,7 @@ Created comprehensive test suite:
   - optional() method
   - get() and has() methods
   - File loading
-  
+
 - **`test_validation.py`** - Validation tests (83 tests):
   - Boolean coercion (all variations)
   - Integer/float coercion

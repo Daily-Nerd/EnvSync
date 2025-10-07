@@ -182,9 +182,7 @@ class EnvFileParser:
 
         return entries
 
-    def _parse_line(
-        self, line: str, line_number: int, comment: Optional[str]
-    ) -> Optional[EnvEntry]:
+    def _parse_line(self, line: str, line_number: int, comment: Optional[str]) -> Optional[EnvEntry]:
         """Parse a single line from .env file.
 
         Args:
@@ -274,9 +272,7 @@ class EnvFileParser:
 
         # Handle quoted values
         if len(value) >= 2:
-            if (value[0] == '"' and value[-1] == '"') or (
-                value[0] == "'" and value[-1] == "'"
-            ):
+            if (value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'"):
                 # Remove quotes and handle escapes
                 quote_char = value[0]
                 inner = value[1:-1]
@@ -325,9 +321,7 @@ def parse_env_file(file_path: Path) -> Dict[str, str]:
     return {key: entry.value for key, entry in entries.items()}
 
 
-def compare_env_files(
-    env_file: Path, example_file: Path
-) -> Tuple[List[str], List[str], List[str]]:
+def compare_env_files(env_file: Path, example_file: Path) -> Tuple[List[str], List[str], List[str]]:
     """Compare .env file against .env.example.
 
     Args:
@@ -447,9 +441,7 @@ def merge_env_files(
         else:
             # Add new entry
             max_line += 1
-            entries[key] = EnvEntry(
-                key=key, value=value, comment=None, line_number=max_line
-            )
+            entries[key] = EnvEntry(key=key, value=value, comment=None, line_number=max_line)
 
     # Format and return
     return format_env_file(entries, include_comments=preserve_comments)

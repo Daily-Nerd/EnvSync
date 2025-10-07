@@ -26,9 +26,9 @@ PORT=8000
     entries = parser.parse_string(content)
 
     assert len(entries) == 3
-    assert entries['API_KEY'].value == 'my-secret-key'
-    assert entries['DEBUG'].value == 'true'
-    assert entries['PORT'].value == '8000'
+    assert entries["API_KEY"].value == "my-secret-key"
+    assert entries["DEBUG"].value == "true"
+    assert entries["PORT"].value == "8000"
 
 
 def test_parse_with_quotes():
@@ -41,9 +41,9 @@ WITH_SPACES="value with spaces"
     parser = EnvFileParser()
     entries = parser.parse_string(content)
 
-    assert entries['SINGLE_QUOTED'].value == 'hello world'
-    assert entries['DOUBLE_QUOTED'].value == 'hello world'
-    assert entries['WITH_SPACES'].value == 'value with spaces'
+    assert entries["SINGLE_QUOTED"].value == "hello world"
+    assert entries["DOUBLE_QUOTED"].value == "hello world"
+    assert entries["WITH_SPACES"].value == "value with spaces"
 
 
 def test_parse_with_comments():
@@ -59,9 +59,9 @@ DEBUG=true  # inline comment
     entries = parser.parse_string(content)
 
     assert len(entries) == 2
-    assert entries['API_KEY'].comment == 'This is a comment'
-    assert entries['API_KEY'].value == 'secret'
-    assert entries['DEBUG'].comment == 'Another comment'
+    assert entries["API_KEY"].comment == "This is a comment"
+    assert entries["API_KEY"].value == "secret"
+    assert entries["DEBUG"].comment == "Another comment"
 
 
 def test_parse_empty_values():
@@ -73,8 +73,8 @@ QUOTED_EMPTY=""
     parser = EnvFileParser()
     entries = parser.parse_string(content)
 
-    assert entries['EMPTY_VAR'].value == ''
-    assert entries['QUOTED_EMPTY'].value == ''
+    assert entries["EMPTY_VAR"].value == ""
+    assert entries["QUOTED_EMPTY"].value == ""
 
 
 def test_parse_with_escapes():
@@ -87,9 +87,9 @@ QUOTE="He said \"hello\""
     parser = EnvFileParser()
     entries = parser.parse_string(content)
 
-    assert entries['NEWLINE'].value == 'line1\nline2'
-    assert entries['TAB'].value == 'col1\tcol2'
-    assert entries['QUOTE'].value == 'He said "hello"'
+    assert entries["NEWLINE"].value == "line1\nline2"
+    assert entries["TAB"].value == "col1\tcol2"
+    assert entries["QUOTE"].value == 'He said "hello"'
 
 
 def test_parse_multiline_behavior():
@@ -103,7 +103,7 @@ VAR3=value3
     entries = parser.parse_string(content)
 
     assert len(entries) == 3
-    assert all(key in entries for key in ['VAR1', 'VAR2', 'VAR3'])
+    assert all(key in entries for key in ["VAR1", "VAR2", "VAR3"])
 
 
 def test_parse_invalid_keys():
@@ -118,10 +118,10 @@ VALID_KEY_2=value2
     entries = parser.parse_string(content)
 
     # Only valid keys should be parsed
-    assert 'VALID_KEY' in entries
-    assert 'VALID_KEY_2' in entries
-    assert '123_INVALID' not in entries
-    assert 'with-dash' not in entries
+    assert "VALID_KEY" in entries
+    assert "VALID_KEY_2" in entries
+    assert "123_INVALID" not in entries
+    assert "with-dash" not in entries
 
 
 def test_parse_file():
@@ -130,7 +130,7 @@ def test_parse_file():
 API_KEY=secret
 DEBUG=true
 """
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.env', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete=False) as f:
         f.write(content)
         f.flush()
         temp_path = Path(f.name)
@@ -140,8 +140,8 @@ DEBUG=true
         entries = parser.parse_file(temp_path)
 
         assert len(entries) == 2
-        assert entries['API_KEY'].value == 'secret'
-        assert entries['DEBUG'].value == 'true'
+        assert entries["API_KEY"].value == "secret"
+        assert entries["DEBUG"].value == "true"
     finally:
         temp_path.unlink()
 
@@ -151,7 +151,7 @@ def test_parse_file_not_found():
     parser = EnvFileParser()
 
     with pytest.raises(FileNotFoundError):
-        parser.parse_file(Path('/nonexistent/file.env'))
+        parser.parse_file(Path("/nonexistent/file.env"))
 
 
 def test_parse_env_file_convenience():
@@ -160,7 +160,7 @@ def test_parse_env_file_convenience():
 KEY1=value1
 KEY2=value2
 """
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.env', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete=False) as f:
         f.write(content)
         f.flush()
         temp_path = Path(f.name)
@@ -169,7 +169,7 @@ KEY2=value2
         result = parse_env_file(temp_path)
 
         assert isinstance(result, dict)
-        assert result == {'KEY1': 'value1', 'KEY2': 'value2'}
+        assert result == {"KEY1": "value1", "KEY2": "value2"}
     finally:
         temp_path.unlink()
 
@@ -180,26 +180,30 @@ def test_compare_env_files():
         tmppath = Path(tmpdir)
 
         # Create .env file
-        env_file = tmppath / '.env'
-        env_file.write_text("""
+        env_file = tmppath / ".env"
+        env_file.write_text(
+            """
 VAR1=value1
 VAR2=value2
 EXTRA=extra_value
-""")
+"""
+        )
 
         # Create .env.example file
-        example_file = tmppath / '.env.example'
-        example_file.write_text("""
+        example_file = tmppath / ".env.example"
+        example_file.write_text(
+            """
 VAR1=
 VAR2=
 VAR3=
-""")
+"""
+        )
 
         missing, extra, common = compare_env_files(env_file, example_file)
 
-        assert missing == ['VAR3']  # In example but not in env
-        assert extra == ['EXTRA']  # In env but not in example
-        assert common == ['VAR1', 'VAR2']  # In both
+        assert missing == ["VAR3"]  # In example but not in env
+        assert extra == ["EXTRA"]  # In env but not in example
+        assert common == ["VAR1", "VAR2"]  # In both
 
 
 def test_compare_env_files_missing_env():
@@ -208,29 +212,29 @@ def test_compare_env_files_missing_env():
         tmppath = Path(tmpdir)
 
         # Only create .env.example
-        example_file = tmppath / '.env.example'
+        example_file = tmppath / ".env.example"
         example_file.write_text("VAR1=\nVAR2=")
 
-        env_file = tmppath / '.env'  # Doesn't exist
+        env_file = tmppath / ".env"  # Doesn't exist
 
         missing, extra, common = compare_env_files(env_file, example_file)
 
-        assert missing == ['VAR1', 'VAR2']
+        assert missing == ["VAR1", "VAR2"]
         assert extra == []
         assert common == []
 
 
 def test_needs_quoting():
     """Test the needs_quoting function."""
-    assert needs_quoting('simple') is False
-    assert needs_quoting('123') is False
-    assert needs_quoting('') is False
+    assert needs_quoting("simple") is False
+    assert needs_quoting("123") is False
+    assert needs_quoting("") is False
 
-    assert needs_quoting('value with spaces') is True
+    assert needs_quoting("value with spaces") is True
     assert needs_quoting('value"quote') is True
     assert needs_quoting("value'quote") is True
-    assert needs_quoting('value#hash') is True
-    assert needs_quoting('value\nwith\nnewline') is True
+    assert needs_quoting("value#hash") is True
+    assert needs_quoting("value\nwith\nnewline") is True
 
 
 def test_format_env_file():
@@ -238,15 +242,15 @@ def test_format_env_file():
     from envsync.parser import EnvEntry
 
     entries = {
-        'API_KEY': EnvEntry(
-            key='API_KEY',
-            value='secret123',
-            comment='API Key for service',
+        "API_KEY": EnvEntry(
+            key="API_KEY",
+            value="secret123",
+            comment="API Key for service",
             line_number=1,
         ),
-        'DEBUG': EnvEntry(
-            key='DEBUG',
-            value='true',
+        "DEBUG": EnvEntry(
+            key="DEBUG",
+            value="true",
             comment=None,
             line_number=2,
         ),
@@ -254,9 +258,9 @@ def test_format_env_file():
 
     output = format_env_file(entries, include_comments=True)
 
-    assert '# API Key for service' in output
-    assert 'API_KEY=secret123' in output
-    assert 'DEBUG=true' in output
+    assert "# API Key for service" in output
+    assert "API_KEY=secret123" in output
+    assert "DEBUG=true" in output
 
 
 def test_format_env_file_with_special_chars():
@@ -264,9 +268,9 @@ def test_format_env_file_with_special_chars():
     from envsync.parser import EnvEntry
 
     entries = {
-        'VALUE': EnvEntry(
-            key='VALUE',
-            value='value with spaces',
+        "VALUE": EnvEntry(
+            key="VALUE",
+            value="value with spaces",
             comment=None,
             line_number=1,
         ),
@@ -283,23 +287,24 @@ def test_merge_env_files():
         tmppath = Path(tmpdir)
 
         # Create existing .env
-        env_file = tmppath / '.env'
-        env_file.write_text("""
+        env_file = tmppath / ".env"
+        env_file.write_text(
+            """
 EXISTING_VAR=existing_value
 """
-)
+        )
 
         # Merge new variables
         new_vars = {
-            'NEW_VAR1': 'new_value1',
-            'NEW_VAR2': 'new_value2',
+            "NEW_VAR1": "new_value1",
+            "NEW_VAR2": "new_value2",
         }
 
         merged = merge_env_files(env_file, new_vars, preserve_existing=True)
 
-        assert 'EXISTING_VAR=existing_value' in merged
-        assert 'NEW_VAR1=new_value1' in merged
-        assert 'NEW_VAR2=new_value2' in merged
+        assert "EXISTING_VAR=existing_value" in merged
+        assert "NEW_VAR1=new_value1" in merged
+        assert "NEW_VAR2=new_value2" in merged
 
 
 def test_merge_env_files_preserve_existing():
@@ -307,15 +312,15 @@ def test_merge_env_files_preserve_existing():
     with tempfile.TemporaryDirectory() as tmpdir:
         tmppath = Path(tmpdir)
 
-        env_file = tmppath / '.env'
-        env_file.write_text('VAR1=original_value\n')
+        env_file = tmppath / ".env"
+        env_file.write_text("VAR1=original_value\n")
 
-        new_vars = {'VAR1': 'new_value'}
+        new_vars = {"VAR1": "new_value"}
 
         # With preserve_existing=True
         merged = merge_env_files(env_file, new_vars, preserve_existing=True)
-        assert 'VAR1=original_value' in merged
-        assert 'VAR1=new_value' not in merged
+        assert "VAR1=original_value" in merged
+        assert "VAR1=new_value" not in merged
 
 
 def test_merge_env_files_no_preserve():
@@ -323,28 +328,28 @@ def test_merge_env_files_no_preserve():
     with tempfile.TemporaryDirectory() as tmpdir:
         tmppath = Path(tmpdir)
 
-        env_file = tmppath / '.env'
-        env_file.write_text('VAR1=original_value\n')
+        env_file = tmppath / ".env"
+        env_file.write_text("VAR1=original_value\n")
 
-        new_vars = {'VAR1': 'new_value'}
+        new_vars = {"VAR1": "new_value"}
 
         # With preserve_existing=False
         merged = merge_env_files(env_file, new_vars, preserve_existing=False)
-        assert 'VAR1=new_value' in merged
+        assert "VAR1=new_value" in merged
 
 
 def test_merge_env_files_nonexistent():
     """Test merging into a non-existent .env file."""
     with tempfile.TemporaryDirectory() as tmpdir:
         tmppath = Path(tmpdir)
-        env_file = tmppath / '.env'  # Doesn't exist
+        env_file = tmppath / ".env"  # Doesn't exist
 
-        new_vars = {'VAR1': 'value1', 'VAR2': 'value2'}
+        new_vars = {"VAR1": "value1", "VAR2": "value2"}
 
         merged = merge_env_files(env_file, new_vars)
 
-        assert 'VAR1=value1' in merged
-        assert 'VAR2=value2' in merged
+        assert "VAR1=value1" in merged
+        assert "VAR2=value2" in merged
 
 
 def test_parse_inline_comments():
@@ -356,8 +361,8 @@ VAR2="value with # hash"  # But this is a comment
     parser = EnvFileParser()
     entries = parser.parse_string(content)
 
-    assert entries['VAR1'].value == 'value1'
-    assert entries['VAR2'].value == 'value with # hash'
+    assert entries["VAR1"].value == "value1"
+    assert entries["VAR2"].value == "value with # hash"
 
 
 def test_parse_equals_in_value():
@@ -369,4 +374,4 @@ CONNECTION_STRING=Server=localhost;User=admin
     entries = parser.parse_string(content)
 
     # Should split on FIRST equals only
-    assert entries['CONNECTION_STRING'].value == 'Server=localhost;User=admin'
+    assert entries["CONNECTION_STRING"].value == "Server=localhost;User=admin"

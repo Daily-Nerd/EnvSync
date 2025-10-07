@@ -175,12 +175,9 @@ def init(project_type: str) -> None:
     #   .env.*   matches .env.local, .env.prod (but NOT .env)
     #   .env     matches .env exactly
     gitignore_lines = [
-        line.strip() for line in gitignore_content.splitlines()
-        if line.strip() and not line.strip().startswith('#')
+        line.strip() for line in gitignore_content.splitlines() if line.strip() and not line.strip().startswith("#")
     ]
-    has_env_entry = any(
-        fnmatch.fnmatch('.env', pattern) for pattern in gitignore_lines
-    )
+    has_env_entry = any(fnmatch.fnmatch(".env", pattern) for pattern in gitignore_lines)
 
     if not has_env_entry:
         with gitignore_path.open("a") as f:
@@ -308,9 +305,7 @@ def generate(output: str, check: bool, force: bool) -> None:
 
     # Check if file exists
     if output_path.exists() and not force:
-        console.print(
-            f"[red]Error:[/red] {output} already exists. Use --force to overwrite."
-        )
+        console.print(f"[red]Error:[/red] {output} already exists. Use --force to overwrite.")
         sys.exit(1)
 
     # Write file
@@ -678,7 +673,9 @@ def validate(env_file: str) -> None:
     required_vars = [v for v in unique_vars.values() if v.required]
     optional_vars = [v for v in unique_vars.values() if not v.required]
 
-    console.print(f"Found {len(unique_vars)} variable(s): {len(required_vars)} required, {len(optional_vars)} optional\n")
+    console.print(
+        f"Found {len(unique_vars)} variable(s): {len(required_vars)} required, {len(optional_vars)} optional\n"
+    )
 
     missing = []
     invalid = []
@@ -793,9 +790,7 @@ def generate_markdown_docs(variables: Dict[str, Any]) -> str:
         "|----------|------|-------------|------------|",
     ]
 
-    required_vars = sorted(
-        [v for v in variables.values() if v.required], key=lambda v: v.name
-    )
+    required_vars = sorted([v for v in variables.values() if v.required], key=lambda v: v.name)
 
     if not required_vars:
         lines.append("| - | - | - | - |")
@@ -824,9 +819,7 @@ def generate_markdown_docs(variables: Dict[str, Any]) -> str:
         ]
     )
 
-    optional_vars = sorted(
-        [v for v in variables.values() if not v.required], key=lambda v: v.name
-    )
+    optional_vars = sorted([v for v in variables.values() if not v.required], key=lambda v: v.name)
 
     if not optional_vars:
         lines.append("| - | - | - | - | - |")
@@ -844,9 +837,7 @@ def generate_markdown_docs(variables: Dict[str, Any]) -> str:
             desc = var.description or "-"
             default_str = format_default_value(var.default) or "-"
 
-            lines.append(
-                f"| `{var.name}` | {var.var_type} | `{default_str}` | {desc} | {validation_str} |"
-            )
+            lines.append(f"| `{var.name}` | {var.var_type} | `{default_str}` | {desc} | {validation_str} |")
 
     lines.extend(
         [
@@ -885,12 +876,8 @@ def generate_html_docs(variables: Dict[str, Any]) -> str:
     """
     from envsync.scanner import format_default_value
 
-    required_vars = sorted(
-        [v for v in variables.values() if v.required], key=lambda v: v.name
-    )
-    optional_vars = sorted(
-        [v for v in variables.values() if not v.required], key=lambda v: v.name
-    )
+    required_vars = sorted([v for v in variables.values() if v.required], key=lambda v: v.name)
+    optional_vars = sorted([v for v in variables.values() if not v.required], key=lambda v: v.name)
 
     html = """<!DOCTYPE html>
 <html>

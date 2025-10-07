@@ -6,11 +6,7 @@ from pathlib import Path
 import pytest
 
 from envsync import EnvSync, env
-from envsync.exceptions import (
-    MissingVariableError,
-    TypeCoercionError,
-    ValidationError,
-)
+from envsync.exceptions import MissingVariableError, TypeCoercionError, ValidationError
 
 
 class TestEnvSyncInit:
@@ -115,9 +111,7 @@ class TestFormatValidation:
         result = env.require("API_URL", format="url")
         assert result == "https://api.example.com"
 
-    def test_postgresql_format_valid(
-        self, sample_env_vars: dict[str, str]
-    ) -> None:
+    def test_postgresql_format_valid(self, sample_env_vars: dict[str, str]) -> None:
         """Test valid PostgreSQL URL format."""
         result = env.require("DATABASE_URL", format="postgresql")
         assert result.startswith("postgresql://")
