@@ -124,7 +124,7 @@ class TestDictCoercion:
     def test_coerce_dict_non_object(self) -> None:
         """Test non-object JSON (array) raises error."""
         # Arrays don't have { } wrapper, so it tries key=value parsing
-        # which fails because "[1" doesn't contain "="
+        # which fails because "[1, 2, 3]" doesn't contain "=" anywhere
         with pytest.raises(ValueError, match="Invalid key=value pair"):
             coerce_dict("[1, 2, 3]")
 
