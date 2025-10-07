@@ -4,6 +4,7 @@ This module provides CLI commands for environment variable management,
 including generation, validation, and team synchronization features.
 """
 
+import secrets
 import sys
 from pathlib import Path
 from typing import Optional
@@ -40,14 +41,20 @@ def init(project_type: str) -> None:
     """
     console.print("\n[bold cyan]Welcome to EnvSync! 🎯[/bold cyan]\n")
 
+    # Generate a secure random key for SECRET_KEY
+    # This provides a safe default even if user forgets to change it
+    random_secret_key = secrets.token_urlsafe(32)
+
     # Project-type-specific starter variables
     starter_vars = {
-        "web": """# Web Application Configuration
+        "web": f"""# Web Application Configuration
 # Database connection
 DATABASE_URL=postgresql://localhost:5432/mydb
 
 # Security
-SECRET_KEY=change-this-to-a-random-secret-key
+# IMPORTANT: Generate a new random key for production!
+# This is a randomly generated key for development only.
+SECRET_KEY={random_secret_key}
 DEBUG=false
 
 # Server configuration
@@ -117,7 +124,11 @@ DEBUG=false
     gitignore_path = Path(".gitignore")
     gitignore_content = gitignore_path.read_text() if gitignore_path.exists() else ""
 
-    if ".env" not in gitignore_content:
+    # Check for exact line match to avoid false positives with .envrc, .env.example, etc.
+    gitignore_lines = {line.strip() for line in gitignore_content.splitlines()}
+    has_env_entry = ".env" in gitignore_lines or ".env.*" in gitignore_lines
+
+    if not has_env_entry:
         with gitignore_path.open("a") as f:
             if gitignore_content and not gitignore_content.endswith("\n"):
                 f.write("\n")
