@@ -172,14 +172,21 @@ DEBUG=false
     gitignore_content = gitignore_path.read_text() if gitignore_path.exists() else ""
 
     # Check for exact line match to avoid false positives with .envrc, .env.example, etc.
+    # Note: .env.* pattern does NOT match plain .env file, so we must check explicitly
     gitignore_lines = {line.strip() for line in gitignore_content.splitlines()}
-    has_env_entry = ".env" in gitignore_lines or ".env.*" in gitignore_lines
+    has_env_entry = ".env" in gitignore_lines
 
     if not has_env_entry:
         with gitignore_path.open("a") as f:
-            if gitignore_content and not gitignore_content.endswith("\n"):
-                f.write("\n")
-            f.write("\n# Environment variables (EnvSync)\n")
+            # Add proper spacing based on whether file exists and has content
+            if gitignore_content:
+                if not gitignore_content.endswith("\n"):
+                    f.write("\n")
+                f.write("\n# Environment variables (EnvSync)\n")
+            else:
+                # New file - no leading newline
+                f.write("# Environment variables (EnvSync)\n")
+
             f.write(".env\n")
             f.write(".env.local\n")
         console.print("[green]✅ Updated .gitignore[/green]")
