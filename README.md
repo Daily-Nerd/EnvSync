@@ -212,8 +212,13 @@ To add missing variables:
 ### Installation
 
 ```bash
-pip install tripwire
+pip install tripwire-py
 ```
+
+> **Note:** The package name on PyPI is `tripwire-py`, but you import and use it as `tripwire`:
+> ```python
+> from tripwire import env  # Import name is 'tripwire'
+> ```
 
 ### Initialize Your Project
 
@@ -858,7 +863,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install TripWire
-        run: pip install tripwire
+        run: pip install tripwire-py
 
       - name: Validate .env.example is up to date
         run: tripwire generate --check
@@ -883,7 +888,7 @@ jobs:
           fetch-depth: 0  # Need full history
 
       - name: Install tripwire
-        run: pip install tripwire
+        run: pip install tripwire-py
 
       - name: Audit all secrets
         run: |

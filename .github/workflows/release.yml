@@ -306,7 +306,7 @@ jobs:
 
           # Retry installation with exponential backoff
           for i in {1..5}; do
-            if pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ tripwire==${{ needs.validate-release.outputs.version }}; then
+            if pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ tripwire-py==${{ needs.validate-release.outputs.version }}; then
               echo "✓ Package installed successfully"
               break
             fi
@@ -432,7 +432,7 @@ jobs:
       id-token: write
     environment:
       name: pypi
-      url: https://pypi.org/p/tripwire
+      url: https://pypi.org/p/tripwire-py
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -443,7 +443,7 @@ jobs:
         run: |
           VERSION="${{ needs.validate-release.outputs.version }}"
           # Check if version exists on PyPI
-          if pip index versions tripwire 2>/dev/null | grep -q "tripwire ($VERSION)"; then
+          if pip index versions tripwire-py 2>/dev/null | grep -q "tripwire-py ($VERSION)"; then
             echo "::error::Version $VERSION already exists on PyPI!"
             echo "::error::PyPI does not allow overwriting versions."
             echo "::error::Please bump the version number and try again."
@@ -477,7 +477,7 @@ jobs:
 
           # Retry installation with exponential backoff
           for i in {1..5}; do
-            if pip install tripwire==${{ needs.validate-release.outputs.version }}; then
+            if pip install tripwire-py==${{ needs.validate-release.outputs.version }}; then
               echo "✓ Package installed from PyPI"
               break
             fi
@@ -539,7 +539,7 @@ jobs:
             echo "## Installation"
             echo
             echo "\`\`\`bash"
-            echo "pip install tripwire==$VERSION"
+            echo "pip install tripwire-py==$VERSION"
             echo "\`\`\`"
             echo
             echo "## Quick Start"
@@ -574,7 +574,7 @@ jobs:
         run: |
           if [ "${{ needs.create-release.result }}" = "success" ]; then
             echo "✅ Release v${{ needs.validate-release.outputs.version }} published."
-            echo "📦 PyPI: https://pypi.org/project/tripwire/${{ needs.validate-release.outputs.version }}/"
+            echo "📦 PyPI: https://pypi.org/project/tripwire-py/${{ needs.validate-release.outputs.version }}/"
             echo "🏷️ GitHub: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.validate-release.outputs.version }}"
           else
             echo "❌ Release failed. Check logs."

@@ -230,7 +230,7 @@ def main():
     push_changes(branch, args.version)
 
     print(f"\n🎉 Successfully released TripWire {args.version}!")
-    print(f"📦 PyPI: https://pypi.org/project/tripwire/{args.version}/")
+    print(f"📦 PyPI: https://pypi.org/project/tripwire-py/{args.version}/")
     print(f"🏷️  GitHub: https://github.com/Daily-Nerd/TripWire/releases/tag/v{args.version}")
     print("\nThe GitHub Actions workflow will now:")
     print("  1. Build the package")
