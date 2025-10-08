@@ -7,17 +7,17 @@ authors = [
 ]
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 keywords = ["environment", "config", "validation", "dotenv", "env", "configuration"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: System :: Systems Administration",
     "Typing :: Typed",
@@ -100,7 +100,7 @@ exclude_lines = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py311"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
@@ -127,7 +127,7 @@ ignore = [
 known-first-party = ["envsync"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.11"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
@@ -157,7 +157,7 @@ ignore_errors = true
 
 [tool.black]
 line-length = 100
-target-version = ["py39", "py310", "py311", "py312"]
+target-version = ["py311", "py312", "py313"]
 include = '\.pyi?$'
 extend-exclude = '''
 /(
