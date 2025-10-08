@@ -45,6 +45,13 @@ jobs:
 
       - name: Set up uv (fast installer/lock support)
         uses: astral-sh/setup-uv@v4
+        with:
+          python-version: "3.12"
+
+      - name: UV Sync
+        run: |
+          uv sync
+          source .venv/bin/activate
 
       - name: Install dev deps
         run: |
