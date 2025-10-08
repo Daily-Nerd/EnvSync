@@ -104,8 +104,8 @@ jobs:
 
       - name: Run tests (unit + type)
         run: |
-          pytest --cov=envsync --cov-report=xml
-          mypy src/envsync
+          uv runpytest --cov=envsync --cov-report=xml
+          uv run mypy src/envsync
 
   tests:
     name: Test Matrix
@@ -146,10 +146,10 @@ jobs:
           uv pip install build twine
 
       - name: Build (sdist + wheel)
-        run: python -m build
+        run: uv run python -m build
 
       - name: Twine check
-        run: twine check dist/*
+        run: uv run twine check dist/*
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
