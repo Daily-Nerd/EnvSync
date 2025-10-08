@@ -53,15 +53,16 @@ jobs:
           uv pip install --system -e ".[dev]" packaging
 
       - name: Run pre-commit
-        # uv run creates ephemeral environments - this is OK for running commands
+        # pre-commit manages its own environments, so uv run is acceptable here
         run: uv run pre-commit run --all-files
 
       - name: Extract & classify version (PEP 440)
         id: version
         shell: bash
-        # uv run creates ephemeral environments - this is OK for running commands
+        # Using direct command (installed via --system) rather than uv run
+        # CI environments are already isolated, no need for additional ephemeral envs
         run: |
-          uv run python - <<'PY'
+          python - <<'PY'
           import os, sys
           from packaging.version import Version, InvalidVersion
 
@@ -125,14 +126,16 @@ jobs:
           fi
 
       - name: Run tests with coverage
-        # uv run creates ephemeral environments - this is OK for running commands
+        # Using direct command (installed via --system) rather than uv run
+        # CI environments are already isolated, no need for additional ephemeral envs
         run: |
-          uv run pytest --cov=envsync --cov-report=xml --cov-report=term
+          pytest --cov=envsync --cov-report=xml --cov-report=term
 
       - name: Check coverage threshold (75%)
-        # uv run creates ephemeral environments - this is OK for running commands
+        # Using direct command (installed via --system) rather than uv run
+        # CI environments are already isolated, no need for additional ephemeral envs
         run: |
-          uv run python - <<'PY'
+          python - <<'PY'
           import sys
           import xml.etree.ElementTree as ET
 
@@ -151,18 +154,21 @@ jobs:
           PY
 
       - name: Run type checking
-        # uv run creates ephemeral environments - this is OK for running commands
-        run: uv run mypy src/envsync
+        # Using direct command (installed via --system) rather than uv run
+        # CI environments are already isolated, no need for additional ephemeral envs
+        run: mypy src/envsync
 
       - name: Security scan with bandit
-        # uv run creates ephemeral environments - this is OK for running commands
-        run: uv run bandit -r src/envsync -ll
+        # Using direct command (installed via --system) rather than uv run
+        # CI environments are already isolated, no need for additional ephemeral envs
+        run: bandit -r src/envsync -ll
 
       - name: Scan for secrets in codebase
-        # uv run creates ephemeral environments - this is OK for running commands
+        # Using direct command (installed via --system) rather than uv run
+        # CI environments are already isolated, no need for additional ephemeral envs
         run: |
           # Use envsync's own secret scanner
-          uv run python - <<'PY'
+          python - <<'PY'
           import sys
           from pathlib import Path
           from envsync.secrets import scan_env_file
@@ -180,8 +186,9 @@ jobs:
           PY
 
       - name: Dependency vulnerability scan
-        # uv run creates ephemeral environments - this is OK for running commands
-        run: uv run pip-audit
+        # Using direct command (installed via --system) rather than uv run
+        # CI environments are already isolated, no need for additional ephemeral envs
+        run: pip-audit
 
   tests:
     name: Test Matrix (Python ${{ matrix.python-version }})
@@ -206,8 +213,9 @@ jobs:
         run: uv pip install --system -e ".[dev]"
 
       - name: Run tests
-        # uv run creates ephemeral environments - this is OK for running commands
-        run: uv run pytest -v
+        # Using direct command (installed via --system) rather than uv run
+        # CI environments are already isolated, no need for additional ephemeral envs
+        run: pytest -v
 
   build-package:
     name: Build Package
@@ -228,12 +236,14 @@ jobs:
         run: uv pip install --system build twine
 
       - name: Build package (sdist + wheel)
-        # uv run creates ephemeral environments - this is OK for running commands
-        run: uv run python -m build
+        # Using direct command (installed via --system) rather than uv run
+        # CI environments are already isolated, no need for additional ephemeral envs
+        run: python -m build
 
       - name: Check package metadata
-        # uv run creates ephemeral environments - this is OK for running commands
-        run: uv run twine check dist/*
+        # Using direct command (installed via --system) rather than uv run
+        # CI environments are already isolated, no need for additional ephemeral envs
+        run: twine check dist/*
 
       - name: Verify package contents
         run: |
@@ -277,8 +287,9 @@ jobs:
         run: |
           # UV in CI: Use --system flag to install into system Python (no venv needed)
           uv pip install --system twine
-          # uv run creates ephemeral environments - this is OK for running commands
-          uv run twine upload --skip-existing dist/*
+          # Using direct command (installed via --system) rather than uv run
+          # CI environments are already isolated, no need for additional ephemeral envs
+          twine upload --skip-existing dist/*
 
       - name: Wait for Test PyPI propagation
         run: sleep 10
