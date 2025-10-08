@@ -32,6 +32,16 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "black>=25.9.0",
+    "mypy>=1.18.2",
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.13.3",
+    "bandit[toml]>=1.7.5",
+    "safety>=2.3.5",
+    "pip-audit>=2.6.1",
+    "semgrep>=1.45.0",
+    "pip-licenses>=4.3.0",
 ]
 
 [project.urls]
@@ -151,11 +161,4 @@ extend-exclude = '''
 )/
 '''
 
-[dependency-groups]
-dev = [
-    "black>=25.9.0",
-    "mypy>=1.18.2",
-    "pytest>=8.4.2",
-    "pytest-cov>=7.0.0",
-    "ruff>=0.13.3",
-]
+# Dependency groups are now in [project.optional-dependencies]

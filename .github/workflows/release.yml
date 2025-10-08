@@ -1,0 +1,276 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Trigger on version tags like v1.0.0
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Is this a prerelease?'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  PYPI_INDEX_URL: https://upload.pypi.org/legacy/
+  TEST_PYPI_INDEX_URL: https://test.pypi.org/legacy/
+
+jobs:
+  validate-release:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_prerelease: ${{ steps.version.outputs.is_prerelease }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+
+    - name: Extract version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+          IS_PRERELEASE="${{ github.event.inputs.prerelease }}"
+        else
+          VERSION=${GITHUB_REF#refs/tags/v}
+          # Check if version contains pre-release identifiers
+          if [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(a|b|rc|alpha|beta|dev)[0-9]*$ ]]; then
+            IS_PRERELEASE="true"
+          else
+            IS_PRERELEASE="false"
+          fi
+        fi
+
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+        echo "Is prerelease: $IS_PRERELEASE"
+
+    - name: Validate version format
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(a|b|rc|alpha|beta|dev)?[0-9]*$ ]]; then
+          echo "Invalid version format: $VERSION"
+          echo "Expected format: X.Y.Z or X.Y.Z[pre-release]"
+          exit 1
+        fi
+
+    - name: Check if version exists
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        # Check if tag already exists
+        if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+          echo "Tag v$VERSION already exists"
+          exit 1
+        fi
+
+    - name: Run tests
+      run: |
+        pytest --cov=envsync --cov-report=xml
+
+    - name: Run linting
+      run: |
+        ruff check .
+        black --check .
+
+    - name: Run type checking
+      run: mypy src/envsync
+
+  build-package:
+    name: Build Package
+    runs-on: ubuntu-latest
+    needs: validate-release
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine
+
+    - name: Build package
+      run: python -m build
+
+    - name: Check package
+      run: twine check dist/*
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dist
+        path: dist/
+
+  test-pypi:
+    name: Test PyPI Upload
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-package]
+    if: github.event_name == 'push' || github.event.inputs.prerelease == 'true'
+    steps:
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: dist
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install twine
+      run: pip install twine
+
+    - name: Upload to Test PyPI
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        TWINE_REPOSITORY_URL: ${{ env.TEST_PYPI_INDEX_URL }}
+      run: |
+        twine upload --skip-existing dist/*
+
+    - name: Test installation from Test PyPI
+      run: |
+        pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ envsync==${{ needs.validate-release.outputs.version }}
+        envsync --version
+
+  pypi:
+    name: PyPI Upload
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-package, test-pypi]
+    if: github.event_name == 'push' && needs.validate-release.outputs.is_prerelease == 'false'
+    steps:
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: dist
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install twine
+      run: pip install twine
+
+    - name: Upload to PyPI
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      run: |
+        twine upload dist/*
+
+    - name: Verify upload
+      run: |
+        pip install envsync==${{ needs.validate-release.outputs.version }}
+        envsync --version
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-package, pypi]
+    if: always() && (needs.pypi.result == 'success' || needs.test-pypi.result == 'success')
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: dist
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        VERSION="${{ needs.validate-release.outputs.version }}"
+        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+        echo "## What's Changed" > CHANGELOG.md
+        echo "" >> CHANGELOG.md
+
+        if [ -n "$PREVIOUS_TAG" ]; then
+          echo "### Full Changelog" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREVIOUS_TAG...v$VERSION" >> CHANGELOG.md
+        else
+          echo "### Initial Release" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "This is the initial release of EnvSync!" >> CHANGELOG.md
+        fi
+
+        echo "" >> CHANGELOG.md
+        echo "## Installation" >> CHANGELOG.md
+        echo "" >> CHANGELOG.md
+        echo "\`\`\`bash" >> CHANGELOG.md
+        echo "pip install envsync==$VERSION" >> CHANGELOG.md
+        echo "\`\`\`" >> CHANGELOG.md
+
+        echo "" >> CHANGELOG.md
+        echo "## Quick Start" >> CHANGELOG.md
+        echo "" >> CHANGELOG.md
+        echo "\`\`\`python" >> CHANGELOG.md
+        echo "from envsync import env" >> CHANGELOG.md
+        echo "" >> CHANGELOG.md
+        echo "# Required variables (fail if missing)" >> CHANGELOG.md
+        echo "API_KEY = env.require('API_KEY')" >> CHANGELOG.md
+        echo "DATABASE_URL = env.require('DATABASE_URL')" >> CHANGELOG.md
+        echo "" >> CHANGELOG.md
+        echo "# Optional with defaults" >> CHANGELOG.md
+        echo "DEBUG = env.optional('DEBUG', default=False, type=bool)" >> CHANGELOG.md
+        echo "\`\`\`" >> CHANGELOG.md
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ needs.validate-release.outputs.version }}
+        name: EnvSync v${{ needs.validate-release.outputs.version }}
+        body_path: CHANGELOG.md
+        draft: false
+        prerelease: ${{ needs.validate-release.outputs.is_prerelease }}
+        files: |
+          dist/envsync-${{ needs.validate-release.outputs.version }}-py3-none-any.whl
+          dist/envsync-${{ needs.validate-release.outputs.version }}.tar.gz
+        generate_release_notes: true
+
+  notify:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [create-release]
+    if: always()
+    steps:
+    - name: Notify on Success
+      if: needs.create-release.result == 'success'
+      run: |
+        echo "✅ Release v${{ needs.validate-release.outputs.version }} published successfully!"
+        echo "📦 PyPI: https://pypi.org/project/envsync/${{ needs.validate-release.outputs.version }}/"
+        echo "🏷️  GitHub: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.validate-release.outputs.version }}"
+
+    - name: Notify on Failure
+      if: needs.create-release.result == 'failure'
+      run: |
+        echo "❌ Release failed!"
+        echo "Check the logs for details."
