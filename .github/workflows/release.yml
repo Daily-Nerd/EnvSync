@@ -332,7 +332,7 @@ jobs:
 
           echo "=== Testing --help ==="
           tripwire --help
-          if ! tripwire --help | grep -q "TripWire - Smart environment variable management"; then
+          if ! tripwire --help | grep -q "TripWire - Catch config errors before they explode"; then
             echo "::error::Help output doesn't match expected format"
             exit 1
           fi
