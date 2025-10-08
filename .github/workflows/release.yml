@@ -182,10 +182,13 @@ jobs:
           name: dist
           path: dist
 
+      - name: Create requirements.txt
+        run: |
+          echo "twine" > requirements.txt
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: 'pip'
 
       - uses: astral-sh/setup-uv@v4
         with:
@@ -193,6 +196,7 @@ jobs:
 
       - name: UV Sync
         run: |
+          uv init --bare
           uv sync
           source .venv/bin/activate
 
