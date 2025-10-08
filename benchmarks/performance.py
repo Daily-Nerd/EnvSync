@@ -1,7 +1,7 @@
-"""Performance benchmarks for EnvSync.
+"""Performance benchmarks for TripWire.
 
 This module provides comprehensive performance benchmarks to measure
-the execution time of various EnvSync operations.
+the execution time of various TripWire operations.
 """
 
 import os
@@ -9,10 +9,10 @@ import time
 from pathlib import Path
 from typing import Callable, Dict, List, Tuple
 
-from envsync import env
-from envsync.config import load_config, parse_config
-from envsync.parser import EnvFileParser, expand_variables
-from envsync.validation import (
+from tripwire import env
+from tripwire.config import load_config, parse_config
+from tripwire.parser import EnvFileParser, expand_variables
+from tripwire.validation import (
     coerce_dict,
     coerce_list,
     register_validator,
@@ -239,7 +239,7 @@ def benchmark_custom_validator_registration() -> Dict[str, float]:
 def benchmark_config_parsing() -> Dict[str, float]:
     """Benchmark configuration parsing."""
     config_data = {
-        "envsync": {
+        "tripwire": {
             "env_file": ".env",
             "strict": True,
             "detect_secrets": True,
@@ -300,7 +300,7 @@ def print_results(results: List[Tuple[str, Dict[str, float]]]) -> None:
         results: List of benchmark results
     """
     print("\n" + "=" * 90)
-    print("EnvSync Performance Benchmark Results")
+    print("TripWire Performance Benchmark Results")
     print("=" * 90)
     print(f"{'Benchmark':<45} {'Avg (ms)':<12} {'Min (ms)':<12} {'Max (ms)':<12}")
     print("-" * 90)
@@ -333,7 +333,7 @@ def generate_performance_report(output_file: str = "benchmarks/results.txt") -> 
 
     with open(output_path, "w") as f:
         f.write("=" * 90 + "\n")
-        f.write("EnvSync Performance Benchmark Results\n")
+        f.write("TripWire Performance Benchmark Results\n")
         f.write(f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write("=" * 90 + "\n\n")
 
@@ -362,7 +362,7 @@ def generate_performance_report(output_file: str = "benchmarks/results.txt") -> 
 
 
 if __name__ == "__main__":
-    print("Starting EnvSync performance benchmarks...\n")
+    print("Starting TripWire performance benchmarks...\n")
     results = run_all_benchmarks()
     print_results(results)
     print("\nGenerating report file...")

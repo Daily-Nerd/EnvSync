@@ -74,7 +74,7 @@ class EnvVarScanner(ast.NodeVisitor):
                 obj_name = node.func.value.id
                 method_name = node.func.attr
 
-                if obj_name in ("env", "EnvSync"):
+                if obj_name in ("env", "TripWire"):
                     if method_name == "require":
                         is_require = True
                     elif method_name == "optional":

@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an idea for EnvSync
+about: Suggest an idea for TripWire
 title: '[FEATURE] '
 labels: enhancement
 assignees: ''
@@ -23,7 +23,7 @@ Describe a specific use case where this feature would be helpful:
 
 ```python
 # Example of how you'd like to use this feature
-from envsync import env
+from tripwire import env
 
 # Your desired usage
 ```

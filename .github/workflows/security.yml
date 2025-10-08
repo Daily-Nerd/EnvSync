@@ -33,7 +33,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -e ".[dev]"
 
-    - name: Run EnvSync secret scan
+    - name: Run TripWire secret scan
       run: |
         # Create a test .env file for scanning
         cat > .env << 'EOF'
@@ -43,12 +43,12 @@ jobs:
         EOF
 
         # Test secret scanning
-        envsync scan --strict || echo "Secret scan completed with findings"
+        tripwire scan --strict || echo "Secret scan completed with findings"
 
     - name: Run git history audit
       run: |
         # Test audit functionality
-        envsync audit --all --json > audit-results.json || echo "Audit completed"
+        tripwire audit --all --json > audit-results.json || echo "Audit completed"
         cat audit-results.json
 
   dependency-scan:
@@ -105,8 +105,8 @@ jobs:
 
     - name: Run Bandit security scan
       run: |
-        bandit -c bandit.yaml -r src/envsync -f json -o bandit-report.json || true
-        bandit -c bandit.yaml -r src/envsync -f txt || true
+        bandit -c bandit.yaml -r src/tripwire -f json -o bandit-report.json || true
+        bandit -c bandit.yaml -r src/tripwire -f txt || true
 
     - name: Upload security reports
       uses: actions/upload-artifact@v4

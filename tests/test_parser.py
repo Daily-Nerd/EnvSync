@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from envsync.parser import (
+from tripwire.parser import (
     EnvFileParser,
     compare_env_files,
     format_env_file,
@@ -239,7 +239,7 @@ def test_needs_quoting():
 
 def test_format_env_file():
     """Test formatting entries back to .env format."""
-    from envsync.parser import EnvEntry
+    from tripwire.parser import EnvEntry
 
     entries = {
         "API_KEY": EnvEntry(
@@ -265,7 +265,7 @@ def test_format_env_file():
 
 def test_format_env_file_with_special_chars():
     """Test formatting values that need quoting."""
-    from envsync.parser import EnvEntry
+    from tripwire.parser import EnvEntry
 
     entries = {
         "VALUE": EnvEntry(

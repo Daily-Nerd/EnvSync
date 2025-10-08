@@ -1,11 +1,11 @@
-# EnvSync Makefile
+# TripWire Makefile
 # Common development tasks
 
 .PHONY: help install install-dev test test-cov lint format type-check security clean build release setup-dev
 
 # Default target
 help:
-	@echo "EnvSync Development Commands"
+	@echo "TripWire Development Commands"
 	@echo "============================"
 	@echo ""
 	@echo "Setup:"
@@ -53,7 +53,7 @@ test:
 	pytest
 
 test-cov:
-	pytest --cov=envsync --cov-report=term-missing --cov-report=html
+	pytest --cov=tripwire --cov-report=term-missing --cov-report=html
 
 test-fast:
 	pytest --no-cov
@@ -66,20 +66,20 @@ format:
 	black .
 
 type-check:
-	mypy src/envsync
+	mypy src/tripwire
 
 check-all: lint format type-check test
 	@echo "✅ All checks passed!"
 
 # Security
 security:
-	bandit -r src/envsync -f json -o bandit-report.json
+	bandit -r src/tripwire -f json -o bandit-report.json
 	safety check --json --output safety-report.json
 	pip-audit --format=json --output=pip-audit-report.json
 	@echo "Security reports generated: bandit-report.json, safety-report.json, pip-audit-report.json"
 
 secret-scan:
-	envsync scan --strict
+	tripwire scan --strict
 
 # Build & Release
 build:
@@ -113,9 +113,9 @@ clean:
 	find . -type f -name "*.pyc" -delete
 
 docs:
-	envsync docs --format markdown > docs/generated.md
-	envsync docs --format html > docs/generated.html
-	envsync docs --format json > docs/generated.json
+	tripwire docs --format markdown > docs/generated.md
+	tripwire docs --format html > docs/generated.html
+	tripwire docs --format json > docs/generated.json
 	@echo "Documentation generated in docs/"
 
 pre-commit:

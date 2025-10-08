@@ -6,8 +6,8 @@ for your specific validation needs.
 
 import re
 
-from envsync import env
-from envsync.validation import register_validator, register_validator_decorator
+from tripwire import env
+from tripwire.validation import register_validator, register_validator_decorator
 
 
 # Method 1: Register a validator using register_validator()

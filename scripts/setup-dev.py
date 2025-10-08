@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Development setup script for EnvSync.
+"""Development setup script for TripWire.
 
 This script sets up the development environment by:
 1. Installing pre-commit hooks
@@ -68,7 +68,7 @@ def setup_git_hooks() -> None:
         pre_push_content = """#!/bin/bash
 # Run tests before pushing
 echo "Running tests before push..."
-python -m pytest --cov=envsync --cov-report=term-missing
+python -m pytest --cov=tripwire --cov-report=term-missing
 if [ $? -ne 0 ]; then
     echo "Tests failed. Push aborted."
     exit 1
@@ -85,7 +85,7 @@ echo "All tests passed. Proceeding with push."
 def run_initial_tests() -> None:
     """Run initial tests to verify setup."""
     print("Running initial tests...")
-    run_command([sys.executable, "-m", "pytest", "--cov=envsync", "--cov-report=term-missing"])
+    run_command([sys.executable, "-m", "pytest", "--cov=tripwire", "--cov-report=term-missing"])
     print("✅ Initial tests passed")
 
 
@@ -94,7 +94,7 @@ def run_linting() -> None:
     print("Running linting...")
     run_command(["ruff", "check", "."])
     run_command(["black", "--check", "."])
-    run_command(["mypy", "src/envsync"])
+    run_command(["mypy", "src/tripwire"])
     print("✅ Linting passed")
 
 
@@ -221,7 +221,7 @@ def create_vscode_settings() -> None:
 
 def main():
     """Main setup function."""
-    print("🚀 Setting up EnvSync development environment...")
+    print("🚀 Setting up TripWire development environment...")
 
     # Check Python version
     check_python_version()
@@ -251,14 +251,14 @@ def main():
     print("\nNext steps:")
     print("  1. Make your changes")
     print("  2. Run tests: pytest")
-    print("  3. Run linting: ruff check . && black . && mypy src/envsync")
+    print("  3. Run linting: ruff check . && black . && mypy src/tripwire")
     print("  4. Commit changes (pre-commit hooks will run automatically)")
     print("  5. Push to trigger CI/CD")
     print("\nUseful commands:")
     print("  - Run tests: pytest")
     print("  - Run linting: ruff check .")
     print("  - Format code: black .")
-    print("  - Type check: mypy src/envsync")
+    print("  - Type check: mypy src/tripwire")
     print("  - Run all checks: pre-commit run --all-files")
     print("  - Release: python scripts/release.py 1.0.0")
 

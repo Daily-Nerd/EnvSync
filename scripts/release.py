@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Release script for EnvSync.
+"""Release script for TripWire.
 
 This script helps automate the release process by:
 1. Validating the current state
@@ -92,7 +92,7 @@ def update_version_in_files(version: str) -> None:
     print(f"Updated version in {pyproject_path} to {version}")
 
     # Update __init__.py
-    init_path = Path("src/envsync/__init__.py")
+    init_path = Path("src/tripwire/__init__.py")
     content = init_path.read_text()
 
     # Replace version in __init__.py
@@ -102,7 +102,7 @@ def update_version_in_files(version: str) -> None:
     print(f"Updated version in {init_path} to {version}")
 
     # Update cli.py
-    cli_path = Path("src/envsync/cli.py")
+    cli_path = Path("src/tripwire/cli.py")
     content = cli_path.read_text()
 
     # Replace version in @click.version_option decorator
@@ -115,7 +115,7 @@ def update_version_in_files(version: str) -> None:
 def run_tests() -> None:
     """Run tests to ensure everything works."""
     print("Running tests...")
-    run_command(["python", "-m", "pytest", "--cov=envsync", "--cov-report=term-missing"])
+    run_command(["python", "-m", "pytest", "--cov=tripwire", "--cov-report=term-missing"])
     print("✅ Tests passed")
 
 
@@ -133,7 +133,7 @@ def commit_changes(version: str, is_prerelease: bool) -> None:
     if is_prerelease:
         commit_msg += " (prerelease)"
 
-    run_command(["git", "add", "pyproject.toml", "src/envsync/__init__.py", "src/envsync/cli.py"])
+    run_command(["git", "add", "pyproject.toml", "src/tripwire/__init__.py", "src/tripwire/cli.py"])
     # Use interactive=True to allow GPG signing prompts to show
     run_command(["git", "commit", "-m", commit_msg], interactive=True)
     print(f"✅ Committed changes: {commit_msg}")
@@ -169,7 +169,7 @@ def push_changes(branch: str, version: str) -> None:
 
 def main():
     """Main release function."""
-    parser = argparse.ArgumentParser(description="Release EnvSync")
+    parser = argparse.ArgumentParser(description="Release TripWire")
     parser.add_argument("version", help="Version to release (e.g., 1.0.0)")
     parser.add_argument("--prerelease", action="store_true", help="Mark as prerelease")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be done without doing it")
@@ -184,7 +184,7 @@ def main():
         print("Expected format: X.Y.Z or X.Y.Z-prerelease")
         sys.exit(1)
 
-    print(f"🚀 Releasing EnvSync {args.version}")
+    print(f"🚀 Releasing TripWire {args.version}")
     if args.prerelease:
         print("📦 This will be a prerelease")
     if args.dry_run:
@@ -229,15 +229,15 @@ def main():
     # Push changes
     push_changes(branch, args.version)
 
-    print(f"\n🎉 Successfully released EnvSync {args.version}!")
-    print(f"📦 PyPI: https://pypi.org/project/envsync/{args.version}/")
-    print(f"🏷️  GitHub: https://github.com/Daily-Nerd/EnvSync/releases/tag/v{args.version}")
+    print(f"\n🎉 Successfully released TripWire {args.version}!")
+    print(f"📦 PyPI: https://pypi.org/project/tripwire/{args.version}/")
+    print(f"🏷️  GitHub: https://github.com/Daily-Nerd/TripWire/releases/tag/v{args.version}")
     print("\nThe GitHub Actions workflow will now:")
     print("  1. Build the package")
     print("  2. Upload to PyPI")
     print("  3. Create a GitHub release")
     print("\nYou can monitor progress at:")
-    print("  https://github.com/Daily-Nerd/EnvSync/actions")
+    print("  https://github.com/Daily-Nerd/TripWire/actions")
 
 
 if __name__ == "__main__":

@@ -79,9 +79,9 @@ class TestAuditAutoDetection:
         This verifies that the auto-detection mode scans the .env file,
         identifies secrets, and audits their git history.
         """
-        # Run envsync audit --all
+        # Run tripwire audit --all
         result = subprocess.run(
-            [sys.executable, "-m", "envsync.cli", "audit", "--all"],
+            [sys.executable, "-m", "tripwire.cli", "audit", "--all"],
             cwd=temp_git_repo_with_env,
             capture_output=True,
             text=True,
@@ -102,9 +102,9 @@ class TestAuditAutoDetection:
         """Test that --all flag works with --json output."""
         import json
 
-        # Run envsync audit --all --json
+        # Run tripwire audit --all --json
         result = subprocess.run(
-            [sys.executable, "-m", "envsync.cli", "audit", "--all", "--json"],
+            [sys.executable, "-m", "tripwire.cli", "audit", "--all", "--json"],
             cwd=temp_git_repo_with_env,
             capture_output=True,
             text=True,
@@ -139,9 +139,9 @@ class TestAuditAutoDetection:
         repo_path.mkdir()
         subprocess.run(["git", "init"], cwd=repo_path, check=True, capture_output=True)
 
-        # Run envsync audit --all
+        # Run tripwire audit --all
         result = subprocess.run(
-            [sys.executable, "-m", "envsync.cli", "audit", "--all"],
+            [sys.executable, "-m", "tripwire.cli", "audit", "--all"],
             cwd=repo_path,
             capture_output=True,
             text=True,
@@ -167,9 +167,9 @@ LOG_LEVEL=INFO
         env_file = repo_path / ".env"
         env_file.write_text(env_content)
 
-        # Run envsync audit --all
+        # Run tripwire audit --all
         result = subprocess.run(
-            [sys.executable, "-m", "envsync.cli", "audit", "--all"],
+            [sys.executable, "-m", "tripwire.cli", "audit", "--all"],
             cwd=repo_path,
             capture_output=True,
             text=True,
@@ -181,9 +181,9 @@ LOG_LEVEL=INFO
 
     def test_audit_requires_secret_name_or_all_flag(self, temp_git_repo_with_env: Path) -> None:
         """Test that audit command requires either SECRET_NAME or --all flag."""
-        # Run envsync audit without arguments
+        # Run tripwire audit without arguments
         result = subprocess.run(
-            [sys.executable, "-m", "envsync.cli", "audit"],
+            [sys.executable, "-m", "tripwire.cli", "audit"],
             cwd=temp_git_repo_with_env,
             capture_output=True,
             text=True,
@@ -195,9 +195,9 @@ LOG_LEVEL=INFO
 
     def test_audit_cannot_use_both_name_and_all(self, temp_git_repo_with_env: Path) -> None:
         """Test that audit command cannot use both SECRET_NAME and --all flag."""
-        # Run envsync audit AWS_ACCESS_KEY_ID --all
+        # Run tripwire audit AWS_ACCESS_KEY_ID --all
         result = subprocess.run(
-            [sys.executable, "-m", "envsync.cli", "audit", "AWS_ACCESS_KEY_ID", "--all"],
+            [sys.executable, "-m", "tripwire.cli", "audit", "AWS_ACCESS_KEY_ID", "--all"],
             cwd=temp_git_repo_with_env,
             capture_output=True,
             text=True,
@@ -213,9 +213,9 @@ class TestAuditVisualTimeline:
 
     def test_combined_timeline_display(self, temp_git_repo_with_env: Path) -> None:
         """Test that combined visual timeline is displayed for multiple secrets."""
-        # Run envsync audit --all
+        # Run tripwire audit --all
         result = subprocess.run(
-            [sys.executable, "-m", "envsync.cli", "audit", "--all"],
+            [sys.executable, "-m", "tripwire.cli", "audit", "--all"],
             cwd=temp_git_repo_with_env,
             capture_output=True,
             text=True,
@@ -230,9 +230,9 @@ class TestAuditVisualTimeline:
 
     def test_single_secret_timeline_display(self, temp_git_repo_with_env: Path) -> None:
         """Test that single secret timeline is displayed properly."""
-        # Run envsync audit for a specific secret
+        # Run tripwire audit for a specific secret
         result = subprocess.run(
-            [sys.executable, "-m", "envsync.cli", "audit", "AWS_ACCESS_KEY_ID"],
+            [sys.executable, "-m", "tripwire.cli", "audit", "AWS_ACCESS_KEY_ID"],
             cwd=temp_git_repo_with_env,
             capture_output=True,
             text=True,

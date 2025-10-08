@@ -1,4 +1,4 @@
-"""EnvSync Basic Usage - Complete Feature Tour
+"""TripWire Basic Usage - Complete Feature Tour
 
 ⚠️  IMPORTANT: This example demonstrates ALL features and requires many environment variables.
     If this is your first time, try quickstart.py instead!
@@ -56,7 +56,7 @@ if DEMO_MODE:
         }
     )
 
-from envsync import env
+from tripwire import env
 
 # Example 1: Required string variable
 # This will raise MissingVariableError if API_KEY is not set
@@ -131,7 +131,7 @@ API_TOKEN: str = env.require(
 )
 
 # Example 10: Custom validator
-from envsync import validator
+from tripwire import validator
 
 
 @validator
@@ -174,7 +174,7 @@ TIMEOUT: float = env.optional(
 
 def main() -> None:
     """Main function demonstrating the loaded configuration."""
-    print("EnvSync Basic Usage Example")
+    print("TripWire Basic Usage Example")
     print("=" * 50)
     print(f"API_KEY: {API_KEY[:10]}... (truncated)")
     print(f"DATABASE_URL: {DATABASE_URL}")

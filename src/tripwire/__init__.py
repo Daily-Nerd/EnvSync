@@ -1,39 +1,39 @@
-"""EnvSync - Smart environment variable management for Python.
+"""TripWire - Catch config errors before they explode.
 
-EnvSync provides import-time validation of environment variables with type safety,
-format validation, and team synchronization features.
+TripWire provides import-time validation of environment variables with type safety,
+format validation, secret detection, and git audit capabilities.
 
 Basic usage:
-    >>> from envsync import env
+    >>> from tripwire import env
     >>> API_KEY = env.require("API_KEY")
     >>> DEBUG = env.optional("DEBUG", default=False, type=bool)
 
 Advanced usage:
-    >>> from envsync import EnvSync
-    >>> custom_env = EnvSync(env_file=".env.production")
+    >>> from tripwire import TripWire
+    >>> custom_env = TripWire(env_file=".env.production")
     >>> db_url = custom_env.require("DATABASE_URL", format="postgresql")
 """
 
-from envsync.core import EnvSync, env
-from envsync.exceptions import (
+from tripwire.core import TripWire, env
+from tripwire.exceptions import (
     DriftError,
     EnvFileNotFoundError,
-    EnvSyncError,
     MissingVariableError,
     SecretDetectedError,
+    TripWireError,
     TypeCoercionError,
     ValidationError,
 )
-from envsync.validation import validator
+from tripwire.validation import validator
 
-__version__ = "0.1.4"
+__version__ = "0.2.0"
 
 __all__ = [
     # Core
-    "EnvSync",
+    "TripWire",
     "env",
     # Exceptions
-    "EnvSyncError",
+    "TripWireError",
     "MissingVariableError",
     "ValidationError",
     "TypeCoercionError",

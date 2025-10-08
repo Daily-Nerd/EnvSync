@@ -1,6 +1,6 @@
-"""Core EnvSync functionality.
+"""Core TripWire functionality.
 
-This module contains the main EnvSync class and the module-level singleton
+This module contains the main TripWire class and the module-level singleton
 instance used for environment variable management.
 """
 
@@ -10,12 +10,12 @@ from typing import Any, Dict, List, Optional, TypeVar, Union
 
 from dotenv import load_dotenv
 
-from envsync.exceptions import (
+from tripwire.exceptions import (
     EnvFileNotFoundError,
     MissingVariableError,
     ValidationError,
 )
-from envsync.validation import (
+from tripwire.validation import (
     ValidatorFunc,
     coerce_type,
     get_validator,
@@ -27,7 +27,7 @@ from envsync.validation import (
 T = TypeVar("T")
 
 
-class EnvSync:
+class TripWire:
     """Main class for environment variable management with validation.
 
     This class provides methods to load, validate, and retrieve environment
@@ -41,7 +41,7 @@ class EnvSync:
         strict: bool = False,
         detect_secrets: bool = False,
     ) -> None:
-        """Initialize EnvSync.
+        """Initialize TripWire.
 
         Args:
             env_file: Path to .env file to load (default: .env)
@@ -353,4 +353,4 @@ class EnvSync:
 
 
 # Module-level singleton instance for convenient usage
-env = EnvSync()
+env = TripWire()

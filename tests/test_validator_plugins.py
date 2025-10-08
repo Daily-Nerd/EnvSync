@@ -4,7 +4,7 @@ import re
 
 import pytest
 
-from envsync.validation import (
+from tripwire.validation import (
     clear_custom_validators,
     get_validator,
     list_validators,
@@ -380,11 +380,11 @@ class TestValidatorIntegration:
         assert version_validator("1.0") is False
         assert version_validator("v1.0.0") is False
 
-    def test_validator_with_envsync_core(self):
-        """Test using custom validators with EnvSync.require()."""
+    def test_validator_with_tripwire_core(self):
+        """Test using custom validators with TripWire.require()."""
         import os
 
-        from envsync import env
+        from tripwire import env
 
         @register_validator_decorator("phone")
         def validate_phone(value: str) -> bool:
@@ -405,8 +405,8 @@ class TestValidatorIntegration:
         """Test that using unknown format raises appropriate error."""
         import os
 
-        from envsync import env
-        from envsync.exceptions import ValidationError
+        from tripwire import env
+        from tripwire.exceptions import ValidationError
 
         os.environ["TEST_VAR"] = "value"
 

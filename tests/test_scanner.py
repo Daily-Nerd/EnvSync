@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from envsync.scanner import (
+from tripwire.scanner import (
     EnvVarInfo,
     deduplicate_variables,
     format_default_value,
@@ -18,7 +18,7 @@ from envsync.scanner import (
 def test_scan_file_basic_require():
     """Test scanning a file with env.require() call."""
     code = """
-from envsync import env
+from tripwire import env
 
 API_KEY = env.require('API_KEY', description='API key for service')
 """
@@ -42,7 +42,7 @@ API_KEY = env.require('API_KEY', description='API key for service')
 def test_scan_file_optional_with_default():
     """Test scanning a file with env.optional() call."""
     code = """
-from envsync import env
+from tripwire import env
 
 DEBUG = env.optional('DEBUG', default=False, type=bool, description='Enable debug mode')
 """
@@ -67,7 +67,7 @@ DEBUG = env.optional('DEBUG', default=False, type=bool, description='Enable debu
 def test_scan_file_with_validation():
     """Test scanning a file with validation parameters."""
     code = """
-from envsync import env
+from tripwire import env
 
 EMAIL = env.require(
     'EMAIL',
@@ -117,7 +117,7 @@ ENV = env.require(
 def test_scan_file_multiple_variables():
     """Test scanning a file with multiple env calls."""
     code = """
-from envsync import env
+from tripwire import env
 
 API_KEY = env.require('API_KEY')
 DEBUG = env.optional('DEBUG', default=False, type=bool)
@@ -154,14 +154,14 @@ def test_scan_directory():
         # Create multiple Python files
         (tmppath / "app.py").write_text(
             """
-from envsync import env
+from tripwire import env
 API_KEY = env.require('API_KEY')
 """
         )
 
         (tmppath / "config.py").write_text(
             """
-from envsync import env
+from tripwire import env
 DEBUG = env.optional('DEBUG', default=False, type=bool)
 DATABASE_URL = env.require('DATABASE_URL')
 """
@@ -172,7 +172,7 @@ DATABASE_URL = env.require('DATABASE_URL')
         subdir.mkdir()
         (subdir / "helpers.py").write_text(
             """
-from envsync import env
+from tripwire import env
 SECRET_KEY = env.require('SECRET_KEY', secret=True)
 """
         )
@@ -194,7 +194,7 @@ def test_scan_directory_exclude_tests():
         # Create normal file
         (tmppath / "app.py").write_text(
             """
-from envsync import env
+from tripwire import env
 API_KEY = env.require('API_KEY')
 """
         )
@@ -202,7 +202,7 @@ API_KEY = env.require('API_KEY')
         # Create test file (should be excluded)
         (tmppath / "test_app.py").write_text(
             """
-from envsync import env
+from tripwire import env
 TEST_VAR = env.require('TEST_VAR')
 """
         )

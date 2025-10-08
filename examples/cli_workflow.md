@@ -1,6 +1,6 @@
-# EnvSync CLI Workflow Guide
+# TripWire CLI Workflow Guide
 
-This guide demonstrates the complete EnvSync CLI workflow for managing environment variables in your project.
+This guide demonstrates the complete TripWire CLI workflow for managing environment variables in your project.
 
 ## Initial Setup
 
@@ -8,7 +8,7 @@ This guide demonstrates the complete EnvSync CLI workflow for managing environme
 
 ```bash
 # Create initial .env, .env.example, and update .gitignore
-envsync init --project-type web
+tripwire init --project-type web
 ```
 
 This creates:
@@ -22,7 +22,7 @@ This creates:
 
 ```python
 # app.py
-from envsync import env
+from tripwire import env
 
 # Required variables
 API_KEY = env.require(
@@ -59,7 +59,7 @@ PORT = env.optional(
 
 ```bash
 # Scan your code and generate .env.example
-envsync generate --force
+tripwire generate --force
 ```
 
 This scans all Python files, finds `env.require()` and `env.optional()` calls, and generates a comprehensive `.env.example` file with:
@@ -72,13 +72,13 @@ This scans all Python files, finds `env.require()` and `env.optional()` calls, a
 
 ```bash
 # Compare .env against .env.example
-envsync check
+tripwire check
 
 # Strict mode (exit with error if drift detected)
-envsync check --strict
+tripwire check --strict
 
 # JSON output for CI/CD
-envsync check --json
+tripwire check --json
 ```
 
 This detects:
@@ -89,13 +89,13 @@ This detects:
 
 ```bash
 # Preview changes
-envsync sync --dry-run
+tripwire sync --dry-run
 
 # Apply changes
-envsync sync
+tripwire sync
 
 # Interactive mode (confirm each change)
-envsync sync --interactive
+tripwire sync --interactive
 ```
 
 This adds missing variables to your `.env` file while preserving existing values.
@@ -106,13 +106,13 @@ This adds missing variables to your `.env` file while preserving existing values
 
 ```bash
 # Scan .env file for exposed secrets
-envsync scan
+tripwire scan
 
 # Also scan git history
-envsync scan --depth 100
+tripwire scan --depth 100
 
 # Strict mode (fail CI if secrets found)
-envsync scan --strict
+tripwire scan --strict
 ```
 
 Detects:
@@ -126,10 +126,10 @@ Detects:
 
 ```bash
 # Validate .env file before deploying
-envsync validate
+tripwire validate
 
 # Validate specific file
-envsync validate --env-file .env.production
+tripwire validate --env-file .env.production
 ```
 
 Ensures all required variables are set before running your application.
@@ -140,16 +140,16 @@ Ensures all required variables are set before running your application.
 
 ```bash
 # Markdown docs (for README or wiki)
-envsync docs --format markdown
+tripwire docs --format markdown
 
 # Save to file
-envsync docs --format markdown --output docs/environment.md
+tripwire docs --format markdown --output docs/environment.md
 
 # HTML docs (for internal documentation)
-envsync docs --format html --output docs/environment.html
+tripwire docs --format html --output docs/environment.html
 
 # JSON (for automation/tools)
-envsync docs --format json
+tripwire docs --format json
 ```
 
 ## CI/CD Integration
@@ -171,19 +171,19 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install EnvSync
-        run: pip install envsync
+      - name: Install TripWire
+        run: pip install tripwire
 
       - name: Check .env.example is up to date
-        run: envsync generate --check
+        run: tripwire generate --check
 
       - name: Scan for secrets
-        run: envsync scan --strict
+        run: tripwire scan --strict
 
       - name: Validate environment structure
         run: |
           cp .env.example .env
-          envsync validate
+          tripwire validate
 ```
 
 ## Team Collaboration
@@ -202,7 +202,7 @@ cp .env.example .env
 # Edit .env with your editor
 
 # 4. Validate configuration
-envsync validate
+tripwire validate
 ```
 
 ### When Adding New Variables
@@ -210,20 +210,20 @@ envsync validate
 ```bash
 # 1. Add env.require() or env.optional() in code
 # 2. Update .env.example
-envsync generate --force
+tripwire generate --force
 
 # 3. Commit the updated .env.example
 git add .env.example
 git commit -m "Add new environment variables"
 
 # 4. Team members sync their .env
-envsync sync
+tripwire sync
 ```
 
 ### Code Review Checklist
 
-- [ ] `.env.example` is updated (run `envsync generate --check`)
-- [ ] No secrets in git history (run `envsync scan`)
+- [ ] `.env.example` is updated (run `tripwire generate --check`)
+- [ ] No secrets in git history (run `tripwire scan`)
 - [ ] All required variables documented
 - [ ] Validation rules are appropriate
 
@@ -231,26 +231,26 @@ envsync sync
 
 1. **Never commit .env** - Always in `.gitignore`
 2. **Always commit .env.example** - Template for team
-3. **Use envsync generate** - Keep .env.example in sync with code
-4. **Run envsync check in CI** - Prevent configuration drift
-5. **Scan for secrets regularly** - `envsync scan --strict`
+3. **Use tripwire generate** - Keep .env.example in sync with code
+4. **Run tripwire check in CI** - Prevent configuration drift
+5. **Scan for secrets regularly** - `tripwire scan --strict`
 6. **Document variables** - Use the `description` parameter
-7. **Validate before deploy** - `envsync validate` in deployment scripts
+7. **Validate before deploy** - `tripwire validate` in deployment scripts
 
 ## Troubleshooting
 
 ### "No environment variables found in code"
-- Ensure you're using `from envsync import env`
+- Ensure you're using `from tripwire import env`
 - Check that `.py` files aren't excluded by default patterns
 - Verify you're calling `env.require()` or `env.optional()`
 
 ### "File already exists"
-- Use `--force` flag to overwrite: `envsync generate --force`
+- Use `--force` flag to overwrite: `tripwire generate --force`
 
 ### Drift detected but .env seems correct
-- Run `envsync sync --dry-run` to see what would change
+- Run `tripwire sync --dry-run` to see what would change
 - Check for typos in variable names
-- Ensure .env.example is up to date: `envsync generate --force`
+- Ensure .env.example is up to date: `tripwire generate --force`
 
 ## Advanced Usage
 

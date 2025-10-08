@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from envsync.cli import main
+from tripwire.cli import main
 
 
 @pytest.fixture
@@ -48,7 +48,7 @@ def test_generate_workflow(temp_project):
     app_py = Path("app.py")
     app_py.write_text(
         """
-from envsync import env
+from tripwire import env
 
 API_KEY = env.require('API_KEY', description='API key for service')
 DEBUG = env.optional('DEBUG', default=False, type=bool, description='Debug mode')
@@ -184,7 +184,7 @@ def test_validate_workflow(temp_project):
     # Create app with env requirements
     Path("app.py").write_text(
         """
-from envsync import env
+from tripwire import env
 
 API_KEY = env.require('API_KEY')
 DEBUG = env.optional('DEBUG', default=False, type=bool)
@@ -211,7 +211,7 @@ def test_validate_missing_required(temp_project):
 
     Path("app.py").write_text(
         """
-from envsync import env
+from tripwire import env
 API_KEY = env.require('API_KEY')
 """
     )
@@ -250,7 +250,7 @@ def test_docs_markdown(temp_project):
 
     Path("app.py").write_text(
         """
-from envsync import env
+from tripwire import env
 
 API_KEY = env.require('API_KEY', description='API key')
 DEBUG = env.optional('DEBUG', default=False, type=bool, description='Debug mode')
@@ -271,7 +271,7 @@ def test_docs_json(temp_project):
 
     Path("app.py").write_text(
         """
-from envsync import env
+from tripwire import env
 API_KEY = env.require('API_KEY')
 """
     )
@@ -289,7 +289,7 @@ def test_docs_output_file(temp_project):
 
     Path("app.py").write_text(
         """
-from envsync import env
+from tripwire import env
 API_KEY = env.require('API_KEY')
 """
     )
@@ -314,7 +314,7 @@ def test_complete_workflow(temp_project):
     # Step 2: Create app code
     Path("app.py").write_text(
         """
-from envsync import env
+from tripwire import env
 
 API_KEY = env.require('API_KEY', description='API key')
 DATABASE_URL = env.require('DATABASE_URL', format='postgresql')
@@ -347,7 +347,7 @@ def test_generate_check_mode(temp_project):
 
     Path("app.py").write_text(
         """
-from envsync import env
+from tripwire import env
 VAR1 = env.require('VAR1')
 """
     )
@@ -364,7 +364,7 @@ VAR1 = env.require('VAR1')
     # Modify code
     Path("app.py").write_text(
         """
-from envsync import env
+from tripwire import env
 VAR1 = env.require('VAR1')
 VAR2 = env.require('VAR2')
 """

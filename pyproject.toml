@@ -1,7 +1,7 @@
 [project]
-name = "envsync"
-version = "0.1.4"
-description = "Smart environment variable management for Python with import-time validation, type safety, and team synchronization"
+name = "tripwire"
+version = "0.2.0"
+description = "Catch config errors before they explode - Python environment variable management with import-time validation, type safety, and secret detection"
 authors = [
     { name = "kibukx" }
 ]
@@ -45,13 +45,13 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Daily-Nerd/EnvSync"
-Documentation = "https://github.com/Daily-Nerd/EnvSync/tree/main/docs"
-Repository = "https://github.com/Daily-Nerd/EnvSync"
-Issues = "https://github.com/Daily-Nerd/EnvSync/issues"
+Homepage = "https://github.com/Daily-Nerd/TripWire"
+Documentation = "https://github.com/Daily-Nerd/TripWire/tree/main/docs"
+Repository = "https://github.com/Daily-Nerd/TripWire"
+Issues = "https://github.com/Daily-Nerd/TripWire/issues"
 
 [project.scripts]
-envsync = "envsync.cli:main"
+tripwire = "tripwire.cli:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -66,7 +66,7 @@ python_functions = ["test_*"]
 addopts = [
     "--strict-markers",
     "--strict-config",
-    "--cov=envsync",
+    "--cov=tripwire",
     "--cov-report=term-missing",
     "--cov-report=html",
 ]
@@ -76,7 +76,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["src/envsync"]
+source = ["src/tripwire"]
 branch = true
 omit = [
     "*/tests/*",
@@ -123,7 +123,7 @@ ignore = [
 "tests/**/*" = ["ARG", "S101"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["envsync"]
+known-first-party = ["tripwire"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -146,11 +146,11 @@ disallow_untyped_defs = false
 
 [[tool.mypy.overrides]]
 module = [
-  "envsync.secrets",
-  "envsync.scanner",
-  "envsync.validation",
-  "envsync.cli",
-  "envsync.core",
+  "tripwire.secrets",
+  "tripwire.scanner",
+  "tripwire.validation",
+  "tripwire.cli",
+  "tripwire.core",
 ]
 ignore_errors = true
 

@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
-from envsync.exceptions import GitAuditError, GitCommandError, NotGitRepositoryError
+from tripwire.exceptions import GitAuditError, GitCommandError, NotGitRepositoryError
 
 
 @dataclass
@@ -637,7 +637,7 @@ def generate_remediation_steps(
             title="Install pre-commit hooks",
             description="Prevent future leaks by scanning commits before they're pushed.",
             urgency="LOW",
-            command="envsync install-hooks  # Coming soon!",
+            command="tripwire install-hooks  # Coming soon!",
         )
     )
 

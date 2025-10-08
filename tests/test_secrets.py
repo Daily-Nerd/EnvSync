@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from envsync.secrets import (
+from tripwire.secrets import (
     SecretType,
     calculate_entropy,
     detect_generic_credential,

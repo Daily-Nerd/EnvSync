@@ -1,6 +1,6 @@
 # Git Audit - Secret Leak Timeline
 
-The **Secret Leak Timeline** is EnvSync's flagship feature for detecting and remediating secret leaks in git history. It provides a complete forensic timeline showing exactly when, where, and by whom a secret was committed to git.
+The **Secret Leak Timeline** is TripWire's flagship feature for detecting and remediating secret leaks in git history. It provides a complete forensic timeline showing exactly when, where, and by whom a secret was committed to git.
 
 ## Why This Matters
 
@@ -16,20 +16,20 @@ When secrets are accidentally committed to git, simply removing them from the cu
 
 ```bash
 # Auto-detect and audit ALL secrets in .env file (recommended)
-envsync audit --all
+tripwire audit --all
 
 # Audit a specific secret by name
-envsync audit AWS_SECRET_ACCESS_KEY
+tripwire audit AWS_SECRET_ACCESS_KEY
 
 # Audit with the actual secret value (more accurate)
-envsync audit API_KEY --value "sk-proj-abc123..."
+tripwire audit API_KEY --value "sk-proj-abc123..."
 
 # Output as JSON for CI/CD integration
-envsync audit DATABASE_URL --json
-envsync audit --all --json
+tripwire audit DATABASE_URL --json
+tripwire audit --all --json
 
 # Analyze more commits
-envsync audit SECRET_KEY --max-commits 5000
+tripwire audit SECRET_KEY --max-commits 5000
 ```
 
 ## How It Works
@@ -131,7 +131,7 @@ For automation and CI/CD integration, use `--json`:
 Automatically detect all secrets in your .env file and audit each one.
 
 ```bash
-envsync audit --all
+tripwire audit --all
 ```
 
 **What it does:**
@@ -143,7 +143,7 @@ envsync audit --all
 
 **Example output:**
 ```bash
-$ envsync audit --all
+$ tripwire audit --all
 
 🔍 Auto-detecting secrets in .env file...
 
@@ -194,7 +194,7 @@ Detected Secrets
 
 **JSON output:**
 ```bash
-$ envsync audit --all --json
+$ tripwire audit --all --json
 
 {
   "total_secrets_found": 3,
@@ -221,7 +221,7 @@ $ envsync audit --all --json
 The name of the environment variable to search for.
 
 ```bash
-envsync audit AWS_SECRET_ACCESS_KEY
+tripwire audit AWS_SECRET_ACCESS_KEY
 ```
 
 The tool searches for patterns like:
@@ -239,7 +239,7 @@ The tool searches for patterns like:
 Provide the actual secret value for more accurate detection.
 
 ```bash
-envsync audit API_KEY --value "sk-proj-abc123def456"
+tripwire audit API_KEY --value "sk-proj-abc123def456"
 ```
 
 **When to use:**
@@ -254,7 +254,7 @@ envsync audit API_KEY --value "sk-proj-abc123def456"
 Maximum number of commits to analyze (default: 1000).
 
 ```bash
-envsync audit SECRET_KEY --max-commits 5000
+tripwire audit SECRET_KEY --max-commits 5000
 ```
 
 **Performance notes:**
@@ -267,7 +267,7 @@ envsync audit SECRET_KEY --max-commits 5000
 Output results as JSON for programmatic processing.
 
 ```bash
-envsync audit DATABASE_URL --json
+tripwire audit DATABASE_URL --json
 ```
 
 **Use cases:**
@@ -431,7 +431,7 @@ repos:
 1. **Act immediately** - Don't wait
 2. **Rotate first** - Always rotate before cleaning
 3. **Communicate** - Tell your team before force pushing
-4. **Verify** - Run `envsync audit` again after cleanup
+4. **Verify** - Run `tripwire audit` again after cleanup
 5. **Learn** - Update processes to prevent recurrence
 
 ### For Organizations
@@ -459,8 +459,8 @@ jobs:
         with:
           fetch-depth: 0  # Need full history
 
-      - name: Install envsync
-        run: pip install envsync
+      - name: Install tripwire
+        run: pip install tripwire
 
       - name: Audit all secrets
         run: |
@@ -472,7 +472,7 @@ jobs:
           EOF
 
           # Run comprehensive audit
-          envsync audit --all --json > audit_results.json
+          tripwire audit --all --json > audit_results.json
 
           # Check if any secrets leaked
           if jq -e '.secrets[] | select(.status == "LEAKED")' audit_results.json; then
@@ -488,7 +488,7 @@ jobs:
 secret_audit:
   stage: security
   script:
-    - pip install envsync
+    - pip install tripwire
     - |
       # Create temporary .env for auto-detection
       cat > .env << EOF
@@ -498,7 +498,7 @@ secret_audit:
       EOF
 
       # Run comprehensive audit
-      envsync audit --all --json | tee audit_all_results.json
+      tripwire audit --all --json | tee audit_all_results.json
 
       # Check for any leaks
       if jq -e '.secrets[] | select(.status == "LEAKED")' audit_all_results.json; then
@@ -532,7 +532,7 @@ pipeline {
 
                     // Run comprehensive audit
                     def result = sh(
-                        script: "envsync audit --all --json",
+                        script: "tripwire audit --all --json",
                         returnStdout: true
                     ).trim()
 
@@ -561,13 +561,13 @@ pipeline {
 1. **Use `--value` for faster search**
    ```bash
    # Much faster than name-based search
-   envsync audit SECRET_KEY --value "actual-secret-123"
+   tripwire audit SECRET_KEY --value "actual-secret-123"
    ```
 
 2. **Limit commit depth**
    ```bash
    # Only check recent commits
-   envsync audit SECRET_KEY --max-commits 1000
+   tripwire audit SECRET_KEY --max-commits 1000
    ```
 
 3. **Use shallow clones in CI/CD**
@@ -625,7 +625,7 @@ Error: Not a git repository: /path/to/dir
 **Solution:** Run from inside a git repository:
 ```bash
 cd /path/to/git/repo
-envsync audit SECRET_KEY
+tripwire audit SECRET_KEY
 ```
 
 ### No Secrets Found (False Negative)
@@ -639,19 +639,19 @@ envsync audit SECRET_KEY
 1. **Secret name doesn't match**
    ```bash
    # Try different patterns
-   envsync audit SECRET_KEY
-   envsync audit API_KEY
-   envsync audit "SECRET.*KEY"
+   tripwire audit SECRET_KEY
+   tripwire audit API_KEY
+   tripwire audit "SECRET.*KEY"
    ```
 
 2. **Use actual value**
    ```bash
-   envsync audit SECRET_KEY --value "actual-secret-123"
+   tripwire audit SECRET_KEY --value "actual-secret-123"
    ```
 
 3. **Check older commits**
    ```bash
-   envsync audit SECRET_KEY --max-commits 10000
+   tripwire audit SECRET_KEY --max-commits 10000
    ```
 
 ### Too Many Results (False Positives)
@@ -664,7 +664,7 @@ Found in 500 commits
 
 1. **Use exact value**
    ```bash
-   envsync audit KEY --value "sk-exact-value"
+   tripwire audit KEY --value "sk-exact-value"
    ```
 
 2. **Check if variable name is too generic**
@@ -681,12 +681,12 @@ Found in 500 commits
 
 1. **Reduce max commits**
    ```bash
-   envsync audit SECRET_KEY --max-commits 500
+   tripwire audit SECRET_KEY --max-commits 500
    ```
 
 2. **Use value-based search**
    ```bash
-   envsync audit SECRET_KEY --value "actual-value"
+   tripwire audit SECRET_KEY --value "actual-value"
    ```
 
 3. **Shallow clone in CI/CD**
@@ -701,7 +701,7 @@ Found in 500 commits
 **Recommended approach - Use `--all` flag:**
 ```bash
 # Automatically detect and audit all secrets
-envsync audit --all --json > audit_results.json
+tripwire audit --all --json > audit_results.json
 ```
 
 **Alternative - Manual specification:**
@@ -720,7 +720,7 @@ SECRETS=(
 
 for secret in "${SECRETS[@]}"; do
   echo "Auditing $secret..."
-  envsync audit "$secret" --json > "audit_${secret}.json"
+  tripwire audit "$secret" --json > "audit_${secret}.json"
 
   status=$(jq -r '.status' "audit_${secret}.json")
   if [ "$status" == "LEAKED" ]; then
@@ -746,7 +746,7 @@ import sys
 def audit_secret(secret_name: str) -> dict:
     """Audit a secret and return results."""
     result = subprocess.run(
-        ["envsync", "audit", secret_name, "--json"],
+        ["tripwire", "audit", secret_name, "--json"],
         capture_output=True,
         text=True,
     )
@@ -778,7 +778,7 @@ if __name__ == "__main__":
 
 ### Q: Will this find secrets in submodules?
 
-**A:** No, git submodules must be audited separately. Navigate to each submodule directory and run `envsync audit` there.
+**A:** No, git submodules must be audited separately. Navigate to each submodule directory and run `tripwire audit` there.
 
 ### Q: Can I audit a remote repository without cloning?
 
@@ -793,7 +793,7 @@ if __name__ == "__main__":
 **A:** Run the audit after force-pushing to verify the secret is gone:
 ```bash
 git fetch origin --force
-envsync audit SECRET_KEY
+tripwire audit SECRET_KEY
 ```
 
 ### Q: Can this recover the actual secret value?
@@ -808,15 +808,15 @@ envsync audit SECRET_KEY
 
 **A:**
 - **GitHub secret scanning**: Automatic, specific patterns, limited to GitHub
-- **EnvSync audit**: Manual, custom variables, works anywhere, detailed timeline
+- **TripWire audit**: Manual, custom variables, works anywhere, detailed timeline
 
 Use both for comprehensive security!
 
 ## See Also
 
-- [EnvSync Documentation](https://envsync.dev)
-- [Secret Management Best Practices](https://envsync.dev/best-practices)
-- [CI/CD Integration Guide](https://envsync.dev/ci-cd)
+- [TripWire Documentation](https://tripwire.dev)
+- [Secret Management Best Practices](https://tripwire.dev/best-practices)
+- [CI/CD Integration Guide](https://tripwire.dev/ci-cd)
 - [BFG Repo-Cleaner](https://rtyley.github.io/bfg-repo-cleaner/) - Alternative for large repos
 - [git-filter-repo](https://github.com/newren/git-filter-repo) - Modern alternative to filter-branch
 
@@ -824,6 +824,6 @@ Use both for comprehensive security!
 
 Found a bug or want to improve secret detection? Contributions welcome!
 
-- [GitHub Issues](https://github.com/Daily-Nerd/EnvSync/issues)
-- [Pull Requests](https://github.com/Daily-Nerd/EnvSync/pulls)
-- [Discussion Forum](https://github.com/Daily-Nerd/EnvSync/discussions)
+- [GitHub Issues](https://github.com/Daily-Nerd/TripWire/issues)
+- [Pull Requests](https://github.com/Daily-Nerd/TripWire/pulls)
+- [Discussion Forum](https://github.com/Daily-Nerd/TripWire/discussions)

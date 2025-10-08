@@ -2,8 +2,8 @@
 
 import pytest
 
-from envsync.exceptions import TypeCoercionError
-from envsync.validation import coerce_dict, coerce_list, coerce_type
+from tripwire.exceptions import TypeCoercionError
+from tripwire.validation import coerce_dict, coerce_list, coerce_type
 
 
 class TestCoerceListImproved:
