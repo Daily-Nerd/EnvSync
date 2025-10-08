@@ -5,7 +5,7 @@
 > Catch missing/invalid environment variables at import time (not runtime) with type validation, secret detection, and git history auditing.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
 ---
 
@@ -967,7 +967,7 @@ We welcome contributions! Here's how to get started:
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/envsync.git
+git clone https://github.com/Daily-Nerd/EnvSync.git
 cd envsync
 
 # Create virtual environment
@@ -1025,8 +1025,8 @@ Built with:
 
 ## Support
 
-- **GitHub**: [github.com/yourusername/envsync](https://github.com/yourusername/envsync)
-- **Issues**: [github.com/yourusername/envsync/issues](https://github.com/yourusername/envsync/issues)
+- **GitHub**: [github.com/Daily-Nerd/EnvSync](https://github.com/Daily-Nerd/EnvSync)
+- **Issues**: [github.com/Daily-Nerd/EnvSync/issues](https://github.com/Daily-Nerd/EnvSync/issues)
 
 ---
 

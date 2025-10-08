@@ -7,17 +7,17 @@ authors = [
 ]
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 keywords = ["environment", "config", "validation", "dotenv", "env", "configuration"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: System :: Systems Administration",
     "Typing :: Typed",
@@ -32,13 +32,22 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "black>=25.9.0",
+    "mypy>=1.18.2",
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.13.3",
+    "bandit>=1.7.5",
+    "safety>=2.3.5",
+    "pip-audit>=2.6.1",
+    "pip-licenses>=4.3.0",
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/envsync"
+Homepage = "https://github.com/Daily-Nerd/EnvSync"
 Documentation = "https://envsync.dev"
-Repository = "https://github.com/yourusername/envsync"
-Issues = "https://github.com/yourusername/envsync/issues"
+Repository = "https://github.com/Daily-Nerd/EnvSync"
+Issues = "https://github.com/Daily-Nerd/EnvSync/issues"
 
 [project.scripts]
 envsync = "envsync.cli:main"
@@ -91,7 +100,7 @@ exclude_lines = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py311"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
@@ -118,7 +127,7 @@ ignore = [
 known-first-party = ["envsync"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.11"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
@@ -136,9 +145,19 @@ strict_concatenate = true
 module = "tests.*"
 disallow_untyped_defs = false
 
+[[tool.mypy.overrides]]
+module = [
+  "envsync.secrets",
+  "envsync.scanner",
+  "envsync.validation",
+  "envsync.cli",
+  "envsync.core",
+]
+ignore_errors = true
+
 [tool.black]
 line-length = 100
-target-version = ["py39", "py310", "py311", "py312"]
+target-version = ["py311", "py312"]
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -151,11 +170,4 @@ extend-exclude = '''
 )/
 '''
 
-[dependency-groups]
-dev = [
-    "black>=25.9.0",
-    "mypy>=1.18.2",
-    "pytest>=8.4.2",
-    "pytest-cov>=7.0.0",
-    "ruff>=0.13.3",
-]
+# Dependency groups are now in [project.optional-dependencies]

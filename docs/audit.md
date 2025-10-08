@@ -824,6 +824,6 @@ Use both for comprehensive security!
 
 Found a bug or want to improve secret detection? Contributions welcome!
 
-- [GitHub Issues](https://github.com/yourusername/envsync/issues)
-- [Pull Requests](https://github.com/yourusername/envsync/pulls)
-- [Discussion Forum](https://github.com/yourusername/envsync/discussions)
+- [GitHub Issues](https://github.com/Daily-Nerd/EnvSync/issues)
+- [Pull Requests](https://github.com/Daily-Nerd/EnvSync/pulls)
+- [Discussion Forum](https://github.com/Daily-Nerd/EnvSync/discussions)
