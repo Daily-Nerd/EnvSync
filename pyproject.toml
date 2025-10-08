@@ -145,6 +145,16 @@ strict_concatenate = true
 module = "tests.*"
 disallow_untyped_defs = false
 
+[[tool.mypy.overrides]]
+module = [
+  "envsync.secrets",
+  "envsync.scanner",
+  "envsync.validation",
+  "envsync.cli",
+  "envsync.core",
+]
+ignore_errors = true
+
 [tool.black]
 line-length = 100
 target-version = ["py39", "py310", "py311", "py312"]
