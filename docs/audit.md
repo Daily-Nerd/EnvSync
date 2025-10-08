@@ -15,6 +15,9 @@ When secrets are accidentally committed to git, simply removing them from the cu
 ## Quick Start
 
 ```bash
+# Auto-detect and audit ALL secrets in .env file (recommended)
+envsync audit --all
+
 # Audit a specific secret by name
 envsync audit AWS_SECRET_ACCESS_KEY
 
@@ -23,6 +26,7 @@ envsync audit API_KEY --value "sk-proj-abc123..."
 
 # Output as JSON for CI/CD integration
 envsync audit DATABASE_URL --json
+envsync audit --all --json
 
 # Analyze more commits
 envsync audit SECRET_KEY --max-commits 5000
@@ -122,7 +126,97 @@ For automation and CI/CD integration, use `--json`:
 
 ## Command Options
 
-### `secret_name` (required)
+### `--all` - Auto-detect All Secrets (RECOMMENDED)
+
+Automatically detect all secrets in your .env file and audit each one.
+
+```bash
+envsync audit --all
+```
+
+**What it does:**
+1. Scans your .env file for potential secrets using 45+ detection patterns
+2. Detects generic credentials (PASSWORD, TOKEN, SECRET, ENCRYPTION_KEY)
+3. Audits git history for each detected secret
+4. Generates a combined visual timeline showing blast radius
+5. Provides individual detailed audits for each secret
+
+**Example output:**
+```bash
+$ envsync audit --all
+
+🔍 Auto-detecting secrets in .env file...
+
+⚠️  Found 3 potential secret(s) in .env file
+
+Detected Secrets
+┌──────────────────────┬─────────────────┬──────────┐
+│ Variable             │ Type            │ Severity │
+├──────────────────────┼─────────────────┼──────────┤
+│ AWS_SECRET_ACCESS_KEY│ AWS Secret Key  │ CRITICAL │
+│ STRIPE_SECRET_KEY    │ Stripe API Key  │ CRITICAL │
+│ DATABASE_PASSWORD    │ Generic Password│ CRITICAL │
+└──────────────────────┴─────────────────┴──────────┘
+
+📊 Secret Leak Blast Radius
+═════════════════════════════════════════════
+
+🔍 Repository Secret Exposure
+├─ 🔴 🚨 AWS_SECRET_ACCESS_KEY (47 occurrence(s))
+│  ├─ Branches affected:
+│  │  ├─ origin/main (47 total commits)
+│  │  └─ origin/develop (47 total commits)
+│  └─ Files affected:
+│     └─ .env
+├─ 🟡 ⚠️ STRIPE_SECRET_KEY (12 occurrence(s))
+│  ├─ Branches affected:
+│  │  └─ origin/main (12 total commits)
+│  └─ Files affected:
+│     └─ .env
+└─ 🟢 DATABASE_PASSWORD (0 occurrence(s))
+
+📈 Summary
+╭────────────────────────────────────────╮
+│ Leaked: 2                              │
+│ Clean: 1                               │
+│ Total commits affected: 59             │
+╰────────────────────────────────────────╯
+
+[... followed by detailed audit for each secret ...]
+```
+
+**When to use:**
+- First time auditing a repository
+- Comprehensive security check
+- CI/CD pipelines
+- After inheriting a project
+- Regular security audits
+
+**JSON output:**
+```bash
+$ envsync audit --all --json
+
+{
+  "total_secrets_found": 3,
+  "secrets": [
+    {
+      "variable_name": "AWS_SECRET_ACCESS_KEY",
+      "secret_type": "AWS Secret Key",
+      "severity": "critical",
+      "status": "LEAKED",
+      "first_seen": "2024-09-15T10:30:00Z",
+      "last_seen": "2024-10-01T14:22:00Z",
+      "commits_affected": 47,
+      "files_affected": [".env"],
+      "branches_affected": ["origin/main", "origin/develop"],
+      "is_public": true,
+      "is_current": true
+    }
+  ]
+}
+```
+
+### `secret_name` - Audit Specific Secret
 
 The name of the environment variable to search for.
 
@@ -134,6 +228,11 @@ The tool searches for patterns like:
 - `AWS_SECRET_ACCESS_KEY=value`
 - `AWS_SECRET_ACCESS_KEY: value`
 - `"AWS_SECRET_ACCESS_KEY": "value"`
+
+**When to use:**
+- Auditing a specific known secret
+- Re-checking after remediation
+- Focused investigation
 
 ### `--value`
 
@@ -363,21 +462,24 @@ jobs:
       - name: Install envsync
         run: pip install envsync
 
-      - name: Audit for secrets
+      - name: Audit all secrets
         run: |
-          SECRETS=("AWS_SECRET_ACCESS_KEY" "DATABASE_URL" "API_KEY")
+          # Create temporary .env for auto-detection
+          cat > .env << EOF
+          AWS_SECRET_ACCESS_KEY=placeholder
+          DATABASE_URL=placeholder
+          API_KEY=placeholder
+          EOF
 
-          for secret in "${SECRETS[@]}"; do
-            echo "Auditing $secret..."
-            result=$(envsync audit "$secret" --json)
-            status=$(echo "$result" | jq -r '.status')
+          # Run comprehensive audit
+          envsync audit --all --json > audit_results.json
 
-            if [ "$status" == "LEAKED" ]; then
-              echo "::error::Secret leak detected: $secret"
-              echo "$result" | jq .
-              exit 1
-            fi
-          done
+          # Check if any secrets leaked
+          if jq -e '.secrets[] | select(.status == "LEAKED")' audit_results.json; then
+            echo "::error::Secret leak detected in git history!"
+            jq . audit_results.json
+            exit 1
+          fi
 ```
 
 ### GitLab CI
@@ -388,16 +490,24 @@ secret_audit:
   script:
     - pip install envsync
     - |
-      for secret in AWS_SECRET_ACCESS_KEY DATABASE_URL API_KEY; do
-        envsync audit "$secret" --json | tee audit_${secret}.json
-        if [ $(jq -r '.status' audit_${secret}.json) == "LEAKED" ]; then
-          echo "Secret leak detected: $secret"
-          exit 1
-        fi
-      done
+      # Create temporary .env for auto-detection
+      cat > .env << EOF
+      AWS_SECRET_ACCESS_KEY=placeholder
+      DATABASE_URL=placeholder
+      API_KEY=placeholder
+      EOF
+
+      # Run comprehensive audit
+      envsync audit --all --json | tee audit_all_results.json
+
+      # Check for any leaks
+      if jq -e '.secrets[] | select(.status == "LEAKED")' audit_all_results.json; then
+        echo "Secret leak detected!"
+        exit 1
+      fi
   artifacts:
     paths:
-      - audit_*.json
+      - audit_all_results.json
     when: always
 ```
 
@@ -411,18 +521,27 @@ pipeline {
         stage('Secret Audit') {
             steps {
                 script {
-                    def secrets = ['AWS_SECRET_ACCESS_KEY', 'DATABASE_URL', 'API_KEY']
+                    // Create temporary .env for auto-detection
+                    sh '''
+                        cat > .env << EOF
+                        AWS_SECRET_ACCESS_KEY=placeholder
+                        DATABASE_URL=placeholder
+                        API_KEY=placeholder
+                        EOF
+                    '''
 
-                    secrets.each { secret ->
-                        def result = sh(
-                            script: "envsync audit ${secret} --json",
-                            returnStdout: true
-                        ).trim()
+                    // Run comprehensive audit
+                    def result = sh(
+                        script: "envsync audit --all --json",
+                        returnStdout: true
+                    ).trim()
 
-                        def json = readJSON text: result
-                        if (json.status == 'LEAKED') {
-                            error("Secret leak detected: ${secret}")
-                        }
+                    def json = readJSON text: result
+
+                    // Check if any secrets leaked
+                    def leaked = json.secrets.findAll { it.status == 'LEAKED' }
+                    if (leaked.size() > 0) {
+                        error("Secret leak detected: ${leaked*.variable_name.join(', ')}")
                     }
                 }
             }
@@ -579,9 +698,16 @@ Found in 500 commits
 
 ### Auditing Multiple Secrets
 
+**Recommended approach - Use `--all` flag:**
+```bash
+# Automatically detect and audit all secrets
+envsync audit --all --json > audit_results.json
+```
+
+**Alternative - Manual specification:**
 ```bash
 #!/bin/bash
-# audit_all_secrets.sh
+# audit_specific_secrets.sh
 
 SECRETS=(
   "AWS_SECRET_ACCESS_KEY"

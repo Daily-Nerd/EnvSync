@@ -2,21 +2,21 @@
 
 **Smart Environment Variable Management for Python**
 
-> Catch missing/invalid environment variables at import time (not runtime) with automatic .env sync, type validation, and team collaboration features.
+> Catch missing/invalid environment variables at import time (not runtime) with type validation, secret detection, and git history auditing.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
 ---
 
-## 🎯 The Problem
+## The Problem
 
 Every Python developer has experienced this:
 
 ```python
 # Your code
 import os
-API_KEY = os.getenv("API_KEY")  # Typo: should be "API_KEY" not "APIKEY"
+API_KEY = os.getenv("API_KEY")  # Returns None - no error yet
 
 # 2 hours later in production...
 response = requests.get(url, headers={"Authorization": f"Bearer {API_KEY}"})
@@ -29,19 +29,12 @@ response = requests.get(url, headers={"Authorization": f"Bearer {API_KEY}"})
 - Environment variables fail at **runtime**, not at startup
 - No validation (wrong types, missing values, invalid formats)
 - `.env` files drift across team members
-- New developers don't know what env vars they need
 - Secrets accidentally committed to git
 - No type safety for configuration
 
-**The cost:**
-- Production crashes
-- Hours of debugging
-- Security vulnerabilities
-- Team frustration
-
 ---
 
-## ✨ The Solution: EnvSync
+## The Solution: EnvSync
 
 EnvSync validates environment variables **at import time** and keeps your team in sync.
 
@@ -61,7 +54,7 @@ from envsync import env
 
 # Import fails immediately if vars missing/invalid
 DATABASE_URL: str = env.require("DATABASE_URL", format="postgresql")
-PORT: int = env.require("PORT", type=int, range=(1, 65535))
+PORT: int = env.require("PORT", type=int, min_val=1, max_val=65535)
 DEBUG: bool = env.optional("DEBUG", default=False, type=bool)
 
 # Your app won't even start with bad config!
@@ -72,17 +65,160 @@ DEBUG: bool = env.optional("DEBUG", default=False, type=bool)
 - ✅ **Type safety** - Automatic type coercion with validation
 - ✅ **Team sync** - Keep `.env` files consistent across team
 - ✅ **Auto-documentation** - Generate `.env.example` from code
-- ✅ **Secret detection** - Warn before committing secrets
+- ✅ **Secret detection** - 45+ platform-specific patterns (AWS, GitHub, Stripe, etc.)
+- ✅ **Git history auditing** - Find when secrets were leaked and generate remediation steps
 - ✅ **Great error messages** - Know exactly what's wrong and how to fix it
 
 ---
 
-## 🚀 Quick Start
+## Visual Examples
+
+### Secret Detection in Action
+
+**Auto-detect all secrets:**
+```bash
+$ envsync audit --all
+
+🔍 Auto-detecting secrets in .env file...
+
+⚠️  Found 3 potential secret(s) in .env file
+
+Detected Secrets
+┌──────────────────────┬─────────────────┬──────────┐
+│ Variable             │ Type            │ Severity │
+├──────────────────────┼─────────────────┼──────────┤
+│ AWS_SECRET_ACCESS_KEY│ AWS Secret Key  │ CRITICAL │
+│ STRIPE_SECRET_KEY    │ Stripe API Key  │ CRITICAL │
+│ DATABASE_PASSWORD    │ Generic Password│ CRITICAL │
+└──────────────────────┴─────────────────┴──────────┘
+
+📊 Secret Leak Blast Radius
+═════════════════════════════════════════════
+
+🔍 Repository Secret Exposure
+├─ 🔴 🚨 AWS_SECRET_ACCESS_KEY (47 occurrence(s))
+│  ├─ Branches affected:
+│  │  ├─ origin/main (47 total commits)
+│  │  └─ origin/develop (47 total commits)
+│  └─ Files affected:
+│     └─ .env
+├─ 🟡 ⚠️ STRIPE_SECRET_KEY (12 occurrence(s))
+│  ├─ Branches affected:
+│  │  └─ origin/main (12 total commits)
+│  └─ Files affected:
+│     └─ .env
+└─ 🟢 DATABASE_PASSWORD (0 occurrence(s))
+
+📈 Summary
+╭────────────────────────────────────────╮
+│ Leaked: 2                              │
+│ Clean: 1                               │
+│ Total commits affected: 59             │
+╰────────────────────────────────────────╯
+```
+
+**Detailed secret audit timeline:**
+```bash
+$ envsync audit AWS_SECRET_ACCESS_KEY
+
+Secret Leak Timeline for: AWS_SECRET_ACCESS_KEY
+══════════════════════════════════════════════════════════════════════
+
+Timeline:
+
+📅 2024-09-15
+   Commit: abc123de - Initial setup
+   Author: @alice <alice@company.com>
+   📁 .env:15
+
+⚠️  Still in git history (as of HEAD)
+   Affects 47 commit(s)
+   Found in 1 file(s)
+   Branches: origin/main, origin/develop
+
+╭──────────────── 🚨 Security Impact ────────────────╮
+│ Severity: CRITICAL                                 │
+│ Exposure: PUBLIC repository                        │
+│ Duration: 16 days                                  │
+│ Commits affected: 47                               │
+│ Files affected: 1                                  │
+╰────────────────────────────────────────────────────╯
+
+🔧 Remediation Steps:
+
+1. Rotate the secret IMMEDIATELY
+   Urgency: CRITICAL
+
+   aws iam create-access-key --user-name <username>
+
+   ⚠️  Do not skip this step - the secret is exposed!
+
+2. Remove from git history (using git-filter-repo)
+   Urgency: HIGH
+
+   git filter-repo --path .env --invert-paths --force
+
+   ⚠️  This will rewrite git history. Coordinate with your team!
+```
+
+**Import-time validation:**
+```python
+from envsync import env
+
+# ✅ This validates IMMEDIATELY when Python imports the module
+DATABASE_URL: str = env.require("DATABASE_URL", format="postgresql")
+PORT: int = env.require("PORT", type=int, min_val=1, max_val=65535)
+DEBUG: bool = env.optional("DEBUG", default=False, type=bool)
+
+# Your app won't even start if config is invalid!
+```
+
+**Drift detection:**
+```bash
+$ envsync check
+
+Comparing .env against .env.example
+
+Missing Variables
+┌─────────────┬───────────────────┐
+│ Variable    │ Status            │
+├─────────────┼───────────────────┤
+│ NEW_VAR     │ Not set in .env   │
+└─────────────┴───────────────────┘
+
+Found 1 missing and 0 extra variable(s)
+
+To add missing variables:
+  envsync sync
+```
+
+---
+
+## Quick Start
 
 ### Installation
 
 ```bash
 pip install envsync
+```
+
+### Initialize Your Project
+
+```bash
+$ envsync init
+
+Welcome to EnvSync! 🎯
+
+✅ Created .env
+✅ Created .env.example
+✅ Updated .gitignore
+
+Setup complete! ✅
+
+Next steps:
+  1. Edit .env with your configuration values
+  2. Import in your code: from envsync import env
+  3. Use variables: API_KEY = env.require('API_KEY')
 ```
 
 ### Basic Usage
@@ -103,44 +239,13 @@ MAX_RETRIES: int = env.optional("MAX_RETRIES", default=3, type=int)
 EMAIL: str = env.require("ADMIN_EMAIL", format="email")
 REDIS_URL: str = env.require("REDIS_URL", format="url")
 
-# Now use them safely
+# Now use them safely - guaranteed to be valid!
 print(f"Connecting to {DATABASE_URL}")
-```
-
-### Create `.env` file
-
-```bash
-# .env
-API_KEY=sk-1234567890abcdef
-DATABASE_URL=postgresql://localhost/mydb
-ADMIN_EMAIL=admin@example.com
-REDIS_URL=redis://localhost:6379
-DEBUG=true
-MAX_RETRIES=5
-```
-
-### Run your app
-
-```bash
-$ python app.py
-
-# If env vars missing:
-❌ EnvSync Validation Failed!
-
-Missing required environment variables:
-  - API_KEY
-  - DATABASE_URL
-
-To fix, add to .env:
-  API_KEY=your-api-key-here
-  DATABASE_URL=postgresql://user:pass@localhost/dbname
-
-Or run: envsync generate
 ```
 
 ---
 
-## 🎨 Core Features
+## Core Features
 
 ### 1. Import-Time Validation
 
@@ -155,26 +260,6 @@ API_KEY = env.require("API_KEY")
 # No more runtime surprises!
 ```
 
-**Traditional approach (runtime failure):**
-```python
-import os
-API_KEY = os.getenv("API_KEY")  # None - no error yet
-
-# Later, deep in your code...
-def call_api():
-    headers = {"Authorization": f"Bearer {API_KEY}"}  # 💥 Crash!
-```
-
-**EnvSync approach (import-time failure):**
-```python
-from envsync import env
-API_KEY = env.require("API_KEY")  # 💥 ImportError immediately if missing!
-
-# Never reaches here with bad config
-def call_api():
-    headers = {"Authorization": f"Bearer {API_KEY}"}  # Always works!
-```
-
 ### 2. Type Coercion & Validation
 
 Automatic type conversion with validation.
@@ -186,25 +271,26 @@ from envsync import env
 API_KEY: str = env.require("API_KEY")
 
 # Integers with range validation
-PORT: int = env.require("PORT", type=int, range=(1, 65535))
-MAX_CONNECTIONS: int = env.optional("MAX_CONNECTIONS", default=100, type=int, min=1)
+PORT: int = env.require("PORT", type=int, min_val=1, max_val=65535)
+MAX_CONNECTIONS: int = env.optional("MAX_CONNECTIONS", default=100, type=int, min_val=1)
 
-# Booleans (handles "true", "True", "1", "yes", etc.)
+# Booleans (handles "true", "True", "1", "yes", "on", etc.)
 DEBUG: bool = env.optional("DEBUG", default=False, type=bool)
-ENABLE_CACHE: bool = env.require("ENABLE_CACHE", type=bool)
 
 # Floats
 TIMEOUT: float = env.optional("TIMEOUT", default=30.0, type=float)
 
-# Lists (comma-separated)
-ALLOWED_HOSTS: list[str] = env.require("ALLOWED_HOSTS", type=list)
+# Lists (comma-separated or JSON)
+ALLOWED_HOSTS: list = env.require("ALLOWED_HOSTS", type=list)
 # .env: ALLOWED_HOSTS=localhost,example.com,api.example.com
+# Or: ALLOWED_HOSTS=["localhost", "example.com"]
 
-# Dictionaries (JSON)
+# Dictionaries (JSON or key=value pairs)
 FEATURE_FLAGS: dict = env.optional("FEATURE_FLAGS", default={}, type=dict)
-# .env: FEATURE_FLAGS={"new_ui": true, "beta_features": false}
+# .env: FEATURE_FLAGS={"new_ui": true, "beta": false}
+# Or: FEATURE_FLAGS=new_ui=true,beta=false
 
-# Enums/Choices
+# Choices/Enums
 ENVIRONMENT: str = env.require(
     "ENVIRONMENT",
     choices=["development", "staging", "production"]
@@ -220,26 +306,18 @@ from envsync import env
 
 # Email validation
 ADMIN_EMAIL: str = env.require("ADMIN_EMAIL", format="email")
-# Valid: admin@example.com
-# Invalid: not-an-email
 
 # URL validation
 API_BASE_URL: str = env.require("API_BASE_URL", format="url")
-# Valid: https://api.example.com
-# Invalid: not a url
 
 # Database URL validation
 DATABASE_URL: str = env.require("DATABASE_URL", format="postgresql")
-# Valid: postgresql://user:pass@localhost:5432/dbname
-# Invalid: mysql://... (wrong protocol)
 
 # UUID validation
 SERVICE_ID: str = env.require("SERVICE_ID", format="uuid")
-# Valid: 550e8400-e29b-41d4-a716-446655440000
 
 # IP address
 SERVER_IP: str = env.require("SERVER_IP", format="ipv4")
-# Valid: 192.168.1.1
 
 # Custom regex
 API_KEY: str = env.require("API_KEY", pattern=r"^sk-[a-zA-Z0-9]{32}$")
@@ -275,117 +353,365 @@ PORT: int = env.require(
 )
 ```
 
-### 5. Automatic `.env.example` Generation
+---
 
-EnvSync scans your code and generates `.env.example` automatically.
+## CLI Commands
 
-```python
-# app.py
-from envsync import env
+### `envsync init` - Initialize Project
 
-API_KEY: str = env.require("API_KEY", description="OpenAI API key")
-DATABASE_URL: str = env.require("DATABASE_URL", description="PostgreSQL connection string")
-DEBUG: bool = env.optional("DEBUG", default=False, description="Enable debug mode")
+Create .env files and update .gitignore.
+
+```bash
+$ envsync init --project-type web
+
+Options:
+  --project-type [web|cli|data|other]  Type of project (affects starter variables)
+
+Examples:
+  envsync init                    # Initialize with default template
+  envsync init --project-type web # Web application with DATABASE_URL, etc.
 ```
+
+### `envsync generate` - Generate .env.example
+
+Scans your code and generates .env.example automatically.
 
 ```bash
 $ envsync generate
 
-Created: .env.example
+Scanning Python files for environment variables...
+Found 5 unique environment variable(s)
+✓ Generated .env.example with 5 variable(s)
+  - 3 required
+  - 2 optional
 
-# .env.example (generated):
-# OpenAI API key
-API_KEY=
+Options:
+  --output FILE    Output file (default: .env.example)
+  --check          Check if .env.example is up to date (CI mode)
+  --force          Overwrite existing file
 
-# PostgreSQL connection string
-DATABASE_URL=
-
-# Enable debug mode (default: False)
-DEBUG=false
+Examples:
+  envsync generate                    # Create .env.example
+  envsync generate --check            # Validate in CI
+  envsync generate --output .env.dev  # Custom output
 ```
 
-**Share with team:**
-```bash
-git add .env.example
-git commit -m "Add environment variable documentation"
+### `envsync check` - Check for Drift
 
-# New team member:
-cp .env.example .env
-# Fill in values, start working immediately!
-```
-
-### 6. Team Synchronization
-
-Detect when your `.env` is out of sync with the team.
+Compare your .env against .env.example.
 
 ```bash
 $ envsync check
 
-Checking .env against .env.example...
+Comparing .env against .env.example
 
-✅ API_KEY (present)
-✅ DATABASE_URL (present)
-❌ NEW_FEATURE_FLAG (missing in your .env)
-⚠️  DEPRECATED_VAR (in your .env but not in .env.example)
+Missing Variables
+┌─────────────┬───────────────────┐
+│ Variable    │ Status            │
+├─────────────┼───────────────────┤
+│ NEW_VAR     │ Not set in .env   │
+└─────────────┴───────────────────┘
 
-Missing variables:
-  NEW_FEATURE_FLAG=true
+Found 1 missing and 0 extra variable(s)
 
-Extra variables (safe to remove):
-  DEPRECATED_VAR
+To add missing variables:
+  envsync sync
 
-Run: envsync sync
+Options:
+  --env-file FILE   .env file to check (default: .env)
+  --example FILE    .env.example to compare against
+  --strict          Exit 1 if differences found
+  --json            Output as JSON
+
+Examples:
+  envsync check                       # Check .env vs .env.example
+  envsync check --strict              # Exit 1 if differences
+  envsync check --env-file .env.prod  # Check production env
 ```
+
+### `envsync sync` - Synchronize .env
+
+Update your .env to match .env.example.
 
 ```bash
 $ envsync sync
 
-Syncing .env with .env.example...
+Synchronizing .env with .env.example
 
-Added to .env:
-  + NEW_FEATURE_FLAG=true
+Will add 1 missing variable(s):
+  + NEW_VAR
 
-Removed from .env:
-  - DEPRECATED_VAR
+✓ Synchronized .env
+  Added 1 variable(s)
 
-✅ Your .env is now up to date!
+Note: Fill in values for new variables in .env
+
+Options:
+  --env-file FILE   .env file to sync (default: .env)
+  --example FILE    .env.example to sync from
+  --dry-run         Show changes without applying
+  --interactive     Confirm each change
+
+Examples:
+  envsync sync                        # Sync .env
+  envsync sync --dry-run              # Preview changes
+  envsync sync --interactive          # Confirm each change
 ```
 
-### 7. Secret Detection
+### `envsync scan` - Scan for Secrets
 
-Prevent accidentally committing secrets.
-
-```python
-from envsync import env
-
-# Mark as secret
-AWS_SECRET_KEY: str = env.require("AWS_SECRET_KEY", secret=True)
-STRIPE_SECRET: str = env.require("STRIPE_SECRET", secret=True)
-```
+Detect potential secrets in .env file and git history.
 
 ```bash
 $ envsync scan
 
-Scanning for secrets in git history...
+Scanning for secrets...
 
-⚠️  Warning: Potential secrets detected!
+Scanning .env file...
+✓ No secrets found in .env
 
-File: config.py (committed 2024-01-15)
-  Line 12: AWS_SECRET_KEY = "AKIAIOSFODNN7EXAMPLE"
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-           This looks like an AWS access key!
+Scanning last 100 commits in git history...
+✓ No secrets found in git history
 
-File: .env (in staging area)
-  Line 3: STRIPE_SECRET=sk_test_1234567890
-          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-          This looks like a Stripe secret key!
+✓ No secrets detected
+Your environment files appear secure
 
-❌ Aborting commit. Remove secrets before committing.
+Options:
+  --strict    Exit 1 if secrets found
+  --depth N   Number of git commits to scan (default: 100)
 
-To ignore: git commit --no-verify
+Examples:
+  envsync scan               # Scan for secrets
+  envsync scan --strict      # Fail on secrets (CI)
+  envsync scan --depth 500   # Scan more commits
 ```
 
-### 8. Multi-Environment Support
+**Detects 45+ types of secrets:**
+- Cloud: AWS, Azure, Google Cloud, DigitalOcean, Heroku, Alibaba, IBM
+- CI/CD: GitHub, GitLab, CircleCI, Travis, Jenkins, Bitbucket, Docker Hub, Terraform
+- Communication: Slack, Discord, Twilio, SendGrid
+- Payments: Stripe, PayPal, Square, Shopify, Coinbase
+- Email/SMS: Mailgun, Mailchimp, Postmark
+- Databases: MongoDB, Redis, Firebase
+- Services: Datadog, New Relic, PagerDuty, Sentry, Algolia, Cloudflare
+- Package Managers: NPM, PyPI
+- Generic: PASSWORD, TOKEN, SECRET, ENCRYPTION_KEY patterns
+
+### `envsync audit` - Audit Git History for Secret Leaks
+
+**FLAGSHIP FEATURE** - Find when and where secrets were leaked in git history.
+
+```bash
+# Audit a specific secret
+$ envsync audit AWS_SECRET_ACCESS_KEY
+
+Analyzing git history for: AWS_SECRET_ACCESS_KEY
+
+Secret Leak Timeline for: AWS_SECRET_ACCESS_KEY
+══════════════════════════════════════════════════════════════════════
+
+Timeline:
+
+📅 2024-09-15
+   Commit: abc123de - Initial setup
+   Author: @alice <alice@company.com>
+   📁 .env:15
+
+⚠️  Still in git history (as of HEAD)
+   Affects 47 commit(s)
+   Found in 1 file(s)
+   Branches: origin/main, origin/develop
+
+╭──────────────── 🚨 Security Impact ────────────────╮
+│ Severity: CRITICAL                                 │
+│ Exposure: PUBLIC repository                        │
+│ Duration: 16 days                                  │
+│ Commits affected: 47                               │
+│ Files affected: 1                                  │
+╰────────────────────────────────────────────────────╯
+
+🔧 Remediation Steps:
+
+1. Rotate the secret IMMEDIATELY
+   Urgency: CRITICAL
+   Generate a new secret and update all systems.
+
+   aws iam create-access-key --user-name <username>
+
+   ⚠️  Do not skip this step - the secret is exposed!
+
+2. Remove from git history (using git-filter-repo)
+   Urgency: HIGH
+   Rewrite git history to remove the secret from 47 commit(s).
+
+   git filter-repo --path .env --invert-paths --force
+
+   ⚠️  This will rewrite git history. Coordinate with your team!
+
+[... additional steps ...]
+```
+
+**Auto-detect all secrets in .env:**
+
+```bash
+$ envsync audit --all
+
+🔍 Auto-detecting secrets in .env file...
+
+⚠️  Found 3 potential secret(s) in .env file
+
+Detected Secrets
+┌──────────────────────┬─────────────────┬──────────┐
+│ Variable             │ Type            │ Severity │
+├──────────────────────┼─────────────────┼──────────┤
+│ AWS_SECRET_ACCESS_KEY│ AWS Secret Key  │ CRITICAL │
+│ STRIPE_SECRET_KEY    │ Stripe API Key  │ CRITICAL │
+│ DATABASE_PASSWORD    │ Generic Password│ CRITICAL │
+└──────────────────────┴─────────────────┴──────────┘
+
+════════════════════════════════════════════════════════════
+Auditing: AWS_SECRET_ACCESS_KEY
+════════════════════════════════════════════════════════════
+
+[... full audit for each secret ...]
+
+📊 Secret Leak Blast Radius
+═════════════════════════════════════════════
+
+🔍 Repository Secret Exposure
+├─ 🔴 🚨 AWS_SECRET_ACCESS_KEY (47 occurrence(s))
+│  ├─ Branches affected:
+│  │  ├─ origin/main (47 total commits)
+│  │  └─ origin/develop (47 total commits)
+│  └─ Files affected:
+│     └─ .env
+├─ 🟡 ⚠️ STRIPE_SECRET_KEY (12 occurrence(s))
+│  ├─ Branches affected:
+│  │  └─ origin/main (12 total commits)
+│  └─ Files affected:
+│     └─ .env
+└─ 🟢 DATABASE_PASSWORD (0 occurrence(s))
+
+📈 Summary
+╭────────────────────────────────────────╮
+│ Leaked: 2                              │
+│ Clean: 1                               │
+│ Total commits affected: 59             │
+╰────────────────────────────────────────╯
+```
+
+**Command options:**
+
+```bash
+# Audit specific secret
+envsync audit SECRET_NAME
+
+# Auto-detect and audit all secrets in .env
+envsync audit --all
+
+# Provide actual secret value for exact matching
+envsync audit API_KEY --value "sk-abc123..."
+
+# Control commit depth
+envsync audit SECRET_KEY --max-commits 5000
+
+# JSON output for CI/CD
+envsync audit --all --json
+
+Options:
+  SECRET_NAME         Name of secret to audit (or use --all)
+  --all               Auto-detect and audit all secrets in .env
+  --value TEXT        Actual secret value (more accurate)
+  --max-commits INT   Maximum commits to analyze (default: 1000)
+  --json              Output as JSON
+
+Examples:
+  envsync audit AWS_SECRET_ACCESS_KEY       # Audit specific secret
+  envsync audit --all                       # Auto-detect and audit all
+  envsync audit API_KEY --value "sk-..."    # Exact value matching
+  envsync audit DATABASE_URL --json         # JSON output
+```
+
+**What it analyzes:**
+- 📅 **Timeline** - When the secret first/last appeared
+- 📁 **Files** - Which files contained the secret
+- 👤 **Authors** - Who committed it
+- 🔢 **Commits** - How many commits are affected
+- 🌿 **Branches** - Which branches contain the secret
+- 🌍 **Public/Private** - Whether repo is public
+- 🚨 **Severity** - CRITICAL/HIGH/MEDIUM/LOW
+- 🔧 **Remediation** - Step-by-step fix instructions
+
+See [docs/audit.md](/Users/kibukx/Documents/python_projects/project_ideas/docs/audit.md) for complete documentation.
+
+### `envsync validate` - Validate Without Running App
+
+Check that your .env file has all required variables.
+
+```bash
+$ envsync validate
+
+Validating .env...
+
+Scanning code for environment variable requirements...
+Found 5 variable(s): 3 required, 2 optional
+
+✓ All required variables are set
+  3 required variable(s) validated
+  2 optional variable(s) available
+
+Options:
+  --env-file FILE   .env file to validate (default: .env)
+
+Examples:
+  envsync validate                    # Validate current .env
+  envsync validate --env-file .env.prod
+```
+
+### `envsync docs` - Generate Documentation
+
+Create documentation for environment variables.
+
+```bash
+$ envsync docs
+
+Scanning code for environment variables...
+Found 5 unique variable(s)
+
+# Environment Variables
+
+This document describes all environment variables used in this project.
+
+## Required Variables
+
+| Variable | Type | Description | Validation |
+|----------|------|-------------|------------|
+| `API_KEY` | string | OpenAI API key | Pattern: `^sk-[a-zA-Z0-9]{32}$` |
+| `DATABASE_URL` | string | PostgreSQL connection | Format: postgresql |
+| `REDIS_URL` | string | Redis connection | Format: url |
+
+## Optional Variables
+
+| Variable | Type | Default | Description | Validation |
+|----------|------|---------|-------------|------------|
+| `DEBUG` | bool | `False` | Enable debug mode | - |
+| `MAX_RETRIES` | int | `3` | Max retry attempts | - |
+
+Options:
+  --format [markdown|html|json]  Output format (default: markdown)
+  --output FILE                  Output file (default: stdout)
+
+Examples:
+  envsync docs                         # Markdown to stdout
+  envsync docs --format html > doc.html
+  envsync docs --output ENV_VARS.md
+```
+
+---
+
+## Advanced Usage
+
+### Multi-Environment Support
 
 Load different env files for different environments.
 
@@ -397,8 +723,6 @@ env.load(".env")
 
 # Override with environment-specific settings
 env.load(".env.local", override=True)  # Local development
-env.load(".env.test", override=True)   # Testing
-env.load(".env.production", override=True)  # Production
 
 # Or use environment detection
 import os
@@ -412,238 +736,7 @@ env.load(f".env.{environment}", override=True)
 .env.example          # Documentation (committed)
 .env.local            # Local overrides (gitignored)
 .env.test             # Test environment (committed)
-.env.production       # Production (gitignored, managed by deployment)
-```
-
-### 9. Helpful Error Messages
-
-EnvSync gives you actionable error messages.
-
-```bash
-$ python app.py
-
-❌ EnvSync Validation Failed!
-
-Missing required environment variable: API_KEY
-
-Expected:
-  Type: string
-  Description: OpenAI API key
-  Format: Must match pattern ^sk-[a-zA-Z0-9]{32}$
-
-To fix:
-  1. Add to .env:
-     API_KEY=sk-your-api-key-here
-
-  2. Or set in environment:
-     export API_KEY=sk-your-api-key-here
-
-  3. Or generate .env.example:
-     envsync generate
-
-Did you mean?
-  - API_SECRET (similar name in .env.example)
-  - API_TOKEN (similar name in .env.example)
-
-For help: envsync --help
-```
-
-### 10. CI/CD Integration
-
-Validate environment in CI pipelines.
-
-```yaml
-# .github/workflows/validate-env.yml
-name: Validate Environment
-
-on: [pull_request]
-
-jobs:
-  validate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Install EnvSync
-        run: pip install envsync
-
-      - name: Validate .env.example is up to date
-        run: |
-          envsync generate --check
-          # Fails if .env.example is out of sync with code
-
-      - name: Check for secrets in git
-        run: envsync scan --strict
-```
-
----
-
-## 📚 CLI Reference
-
-### `envsync generate`
-
-Generate `.env.example` from your code.
-
-```bash
-$ envsync generate
-
-Options:
-  --output FILE        Output file (default: .env.example)
-  --check              Check if .env.example is up to date (CI mode)
-  --force              Overwrite existing .env.example
-  --format json|yaml   Output format (default: dotenv)
-
-Examples:
-  envsync generate                    # Create .env.example
-  envsync generate --check            # Validate in CI
-  envsync generate --output .env.dev  # Custom output
-```
-
-### `envsync check`
-
-Check your `.env` for missing/extra variables.
-
-```bash
-$ envsync check
-
-Options:
-  --env-file FILE      .env file to check (default: .env)
-  --example FILE       .env.example to compare against
-  --strict             Fail if any differences found
-  --json               Output as JSON
-
-Examples:
-  envsync check                       # Check .env vs .env.example
-  envsync check --strict              # Exit 1 if differences
-  envsync check --env-file .env.prod  # Check production env
-```
-
-### `envsync sync`
-
-Synchronize your `.env` with `.env.example`.
-
-```bash
-$ envsync sync
-
-Options:
-  --env-file FILE      .env file to sync (default: .env)
-  --example FILE       .env.example to sync from
-  --dry-run            Show what would change without applying
-  --interactive        Ask before each change
-
-Examples:
-  envsync sync                        # Sync .env
-  envsync sync --dry-run              # Preview changes
-  envsync sync --interactive          # Confirm each change
-```
-
-### `envsync scan`
-
-Scan for secrets in git history.
-
-```bash
-$ envsync scan
-
-Options:
-  --strict             Fail if secrets found
-  --depth N            Scan N commits deep (default: 100)
-  --fix                Offer to remove secrets from git history
-
-Examples:
-  envsync scan                        # Scan for secrets
-  envsync scan --strict               # Fail on secrets (CI)
-  envsync scan --fix                  # Remove secrets from git
-```
-
-### `envsync validate`
-
-Validate environment variables without running app.
-
-```bash
-$ envsync validate
-
-Options:
-  --env-file FILE      .env file to validate (default: .env)
-  --app MODULE         Python module to validate
-
-Examples:
-  envsync validate                    # Validate current .env
-  envsync validate --app myapp.config # Validate specific module
-```
-
-### `envsync docs`
-
-Generate documentation for environment variables.
-
-```bash
-$ envsync docs
-
-Options:
-  --format markdown|html|json
-  --output FILE
-
-Examples:
-  envsync docs > ENV_VARS.md          # Markdown table
-  envsync docs --format html > docs/env.html
-```
-
-**Example output:**
-
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| API_KEY | string | Yes | - | OpenAI API key |
-| DATABASE_URL | string | Yes | - | PostgreSQL connection |
-| DEBUG | boolean | No | false | Enable debug mode |
-| MAX_RETRIES | integer | No | 3 | Maximum retry attempts |
-
----
-
-## 🎓 Advanced Usage
-
-### Configuration File
-
-Create `envsync.toml` for project-wide settings.
-
-```toml
-# envsync.toml
-[envsync]
-# Env files to load (in order)
-env_files = [".env", ".env.local"]
-
-# Validation strictness
-strict = true  # Fail on warnings
-
-# Secret detection
-detect_secrets = true
-secret_patterns = [
-    "sk-[a-zA-Z0-9]{32}",  # OpenAI
-    "AKIA[0-9A-Z]{16}",    # AWS
-    "ghp_[a-zA-Z0-9]{36}"  # GitHub PAT
-]
-
-# Team sync
-auto_sync = true  # Sync on startup
-
-# Error handling
-on_error = "raise"  # or "warn", "ignore"
-
-[envsync.defaults]
-# Default values for all environments
-LOG_LEVEL = "INFO"
-TIMEOUT = 30
-
-[envsync.development]
-# Development-specific defaults
-DEBUG = true
-LOG_LEVEL = "DEBUG"
-
-[envsync.production]
-# Production-specific defaults
-DEBUG = false
-LOG_LEVEL = "WARNING"
+.env.production       # Production (gitignored)
 ```
 
 ### Programmatic Usage
@@ -652,43 +745,28 @@ LOG_LEVEL = "WARNING"
 from envsync import EnvSync
 
 # Create custom instance
-env = EnvSync(
+custom_env = EnvSync(
     env_file=".env.custom",
     auto_load=True,
-    strict=True,
-    detect_secrets=True
+    strict=False,
+    detect_secrets=False
 )
 
 # Load multiple files
-env.load_files([".env", ".env.local", ".env.production"])
+custom_env.load_files([".env", ".env.local"])
 
-# Get variable with validation
-api_key = env.get(
-    "API_KEY",
-    required=True,
-    type=str,
-    pattern=r"^sk-[a-zA-Z0-9]{32}$"
-)
+# Get variable
+api_key = custom_env.require("API_KEY", pattern=r"^sk-[a-zA-Z0-9]{32}$")
 
 # Check if variable exists
-if env.has("FEATURE_FLAG"):
-    feature_enabled = env.get("FEATURE_FLAG", type=bool)
+if custom_env.has("FEATURE_FLAG"):
+    feature_enabled = custom_env.get("FEATURE_FLAG", type=bool)
 
 # Get all variables
-all_vars = env.all()  # Dict of all env vars
-
-# Validate all
-try:
-    env.validate()
-    print("✅ All environment variables valid")
-except EnvSyncError as e:
-    print(f"❌ Validation failed: {e}")
-
-# Generate .env.example
-env.generate_example(output=".env.example")
+all_vars = custom_env.all()  # Dict of all env vars
 ```
 
-### Framework Integrations
+### Framework Integration Examples
 
 #### FastAPI
 
@@ -696,7 +774,7 @@ env.generate_example(output=".env.example")
 from fastapi import FastAPI
 from envsync import env
 
-# Load env vars at module level
+# Load env vars at module level (fail-fast)
 DATABASE_URL: str = env.require("DATABASE_URL")
 REDIS_URL: str = env.require("REDIS_URL")
 SECRET_KEY: str = env.require("SECRET_KEY", secret=True)
@@ -749,108 +827,74 @@ app.config['SECRET_KEY'] = SECRET_KEY
 app.config['DEBUG'] = DEBUG
 ```
 
-### Testing
+---
 
-```python
-# tests/test_config.py
-import pytest
-from envsync import env, EnvSyncError
+## CI/CD Integration
 
-def test_required_env_vars_present(monkeypatch):
-    """Test that all required env vars are set."""
-    monkeypatch.setenv("API_KEY", "test-key")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://localhost/test")
+### GitHub Actions - Validate Environment
 
-    # Should not raise
-    from myapp import config
+```yaml
+name: Validate Environment
 
-def test_missing_env_var_raises_error(monkeypatch):
-    """Test that missing env vars raise ImportError."""
-    monkeypatch.delenv("API_KEY", raising=False)
+on: [push, pull_request]
 
-    with pytest.raises(ImportError, match="Missing required.*API_KEY"):
-        from myapp import config
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
 
-def test_invalid_type_raises_error(monkeypatch):
-    """Test that invalid types raise errors."""
-    monkeypatch.setenv("PORT", "not-a-number")
+      - name: Install EnvSync
+        run: pip install envsync
 
-    with pytest.raises(EnvSyncError, match="Invalid type.*PORT"):
-        PORT = env.require("PORT", type=int)
+      - name: Validate .env.example is up to date
+        run: envsync generate --check
 
-# Test with temporary .env file
-def test_with_temp_env(tmp_path):
-    """Test with temporary .env file."""
-    env_file = tmp_path / ".env"
-    env_file.write_text("API_KEY=test-key\nDEBUG=true\n")
+      - name: Check for secrets in git
+        run: envsync scan --strict
+```
 
-    temp_env = EnvSync(env_file=str(env_file))
-    assert temp_env.get("API_KEY") == "test-key"
-    assert temp_env.get("DEBUG", type=bool) is True
+### GitHub Actions - Audit for Secret Leaks
+
+```yaml
+name: Secret Audit
+
+on: [push, pull_request]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Need full history
+
+      - name: Install envsync
+        run: pip install envsync
+
+      - name: Audit all secrets
+        run: |
+          # Create temporary .env for detection
+          cat > .env << EOF
+          AWS_SECRET_ACCESS_KEY=placeholder
+          DATABASE_URL=placeholder
+          API_KEY=placeholder
+          EOF
+
+          # Run audit
+          envsync audit --all --json > audit_results.json
+
+          # Check if any secrets leaked
+          if jq -e '.secrets[] | select(.status == "LEAKED")' audit_results.json; then
+            echo "::error::Secret leak detected in git history!"
+            jq . audit_results.json
+            exit 1
+          fi
 ```
 
 ---
 
-## 🔧 Configuration Options
-
-### Environment Variable Loading
-
-```python
-from envsync import env
-
-# Basic loading
-env.load(".env")  # Load .env file
-
-# Multiple files (last wins)
-env.load_files([".env", ".env.local"])
-
-# Override existing values
-env.load(".env.production", override=True)
-
-# Don't override existing OS environment variables
-env.load(".env", override=False)  # Default
-
-# Interpolation
-env.load(".env", interpolate=True)
-# Supports: DATABASE_URL=postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
-```
-
-### Validation Options
-
-```python
-# Strict mode (warnings become errors)
-env = EnvSync(strict=True)
-
-# Custom error handling
-env = EnvSync(
-    on_error="warn"  # "raise", "warn", "ignore"
-)
-
-# Validate on load
-env = EnvSync(validate_on_load=True)
-
-# Require .env file
-env = EnvSync(require_env_file=True)
-```
-
-### Secret Detection
-
-```python
-env = EnvSync(
-    detect_secrets=True,
-    secret_patterns=[
-        r"sk-[a-zA-Z0-9]{32}",         # OpenAI
-        r"AKIA[0-9A-Z]{16}",           # AWS Access Key
-        r"ghp_[a-zA-Z0-9]{36}",        # GitHub PAT
-        r"xoxb-[0-9]{11}-[0-9]{11}",   # Slack Bot Token
-    ],
-    on_secret_found="warn"  # "raise", "warn", "ignore"
-)
-```
-
----
-
-## 📊 Comparison with Alternatives
+## Comparison with Alternatives
 
 | Feature | EnvSync | python-decouple | environs | pydantic-settings | python-dotenv |
 |---------|---------|-----------------|----------|-------------------|---------------|
@@ -859,11 +903,11 @@ env = EnvSync(
 | Format validators | ✅ | ❌ | ⚠️ Limited | ✅ | ❌ |
 | .env.example generation | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Team sync (drift detection) | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Secret detection | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Secret detection (45+ patterns) | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Git history auditing | ✅ | ❌ | ❌ | ❌ | ❌ |
 | CLI tools | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Helpful error messages | ✅ | ⚠️ | ✅ | ✅ | ❌ |
 | Multi-environment | ✅ | ⚠️ | ✅ | ✅ | ⚠️ |
-| Zero dependencies | ❌ | ✅ | ❌ | ❌ | ✅ |
 
 **Why EnvSync?**
 
@@ -872,55 +916,50 @@ env = EnvSync(
 - **environs**: Good validation, but verbose API and no team sync
 - **pydantic-settings**: Requires Pydantic models (overkill for simple configs)
 
-**EnvSync combines the best features** and adds unique capabilities (import-time validation, team sync, secret detection).
+**EnvSync combines the best features** and adds unique capabilities like git history auditing and 45+ secret detection patterns.
 
 ---
 
-## 🛠️ Development Roadmap
+## Development Roadmap
 
-### Phase 1: Core MVP (Weeks 1-6) ✅
+### Implemented Features ✅
+
 - [x] Environment variable loading
 - [x] Import-time validation
 - [x] Type coercion (str, int, bool, float, list, dict)
-- [x] Format validators (email, URL, UUID, IP)
+- [x] Format validators (email, url, uuid, ipv4, postgresql)
 - [x] Custom validators
 - [x] Required vs optional variables
 - [x] Helpful error messages
-
-### Phase 2: Team Features (Weeks 7-10) ✅
-- [x] `.env.example` generation
+- [x] `.env.example` generation from code
 - [x] Drift detection (`check` command)
 - [x] Team sync (`sync` command)
-- [x] CLI implementation
 - [x] Multi-environment support
-- [x] Documentation generation
+- [x] Documentation generation (`docs` command)
+- [x] Secret detection (45+ platform-specific patterns)
+- [x] Generic credential detection (PASSWORD, TOKEN, SECRET, etc.)
+- [x] Git history scanning for secrets (`scan` command)
+- [x] **Git audit with timeline and remediation** (`audit` command)
+- [x] **Auto-detect and audit all secrets** (`audit --all`)
+- [x] CLI implementation with rich output
+- [x] Project initialization (`init` command)
 
-### Phase 3: Security & Polish (Weeks 11-12) 🚧
-- [ ] Secret detection
-- [ ] Git integration (pre-commit hook)
-- [ ] Performance optimization
-- [ ] Comprehensive test suite
-- [ ] Documentation website
+### Planned Features 📋
 
-### Phase 4: Integrations (Months 4-6) 📋
+- [ ] Pre-commit hooks (`install-hooks` command)
+- [ ] Configuration file support (`envsync.toml`)
 - [ ] VS Code extension (env var autocomplete)
 - [ ] PyCharm plugin
-- [ ] GitHub Actions integration
-- [ ] Docker integration
-- [ ] Cloud secrets support (AWS, GCP, Azure)
-- [ ] 1Password/Vault integration
-
-### Phase 5: Advanced Features (Future) 💡
-- [ ] Web UI for team env management
+- [ ] Cloud secrets support (AWS Secrets Manager, Vault, etc.)
 - [ ] Encrypted .env files
+- [ ] Web UI for team env management
 - [ ] Environment variable versioning
 - [ ] Audit logging
-- [ ] RBAC for secret access
 - [ ] Compliance reports (SOC2, HIPAA)
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Here's how to get started:
 
@@ -959,66 +998,23 @@ pytest --cov=envsync --cov-report=html
 
 # Run specific test file
 pytest tests/test_validation.py
-
-# Run specific test
-pytest tests/test_validation.py::test_import_time_validation
 ```
-
-### Project Structure
-
-```
-envsync/
-├── envsync/
-│   ├── __init__.py          # Public API
-│   ├── core.py              # Core EnvSync class
-│   ├── validation.py        # Validators
-│   ├── cli.py               # CLI commands
-│   ├── scanner.py           # Secret scanning
-│   ├── sync.py              # Team sync features
-│   └── exceptions.py        # Custom exceptions
-├── tests/
-│   ├── test_core.py
-│   ├── test_validation.py
-│   ├── test_cli.py
-│   └── test_sync.py
-├── docs/
-│   ├── index.md
-│   ├── quickstart.md
-│   └── api-reference.md
-├── examples/
-│   ├── fastapi_app/
-│   ├── django_app/
-│   └── flask_app/
-├── pyproject.toml
-├── README.md
-└── LICENSE
-```
-
-### Areas for Contribution
-
-- 🐛 **Bug fixes**: Check [issues](https://github.com/yourusername/envsync/issues)
-- 🎨 **New validators**: Add format validators for common patterns
-- 🔌 **Framework integrations**: Django, FastAPI, Flask plugins
-- 📚 **Documentation**: Examples, tutorials, guides
-- 🧪 **Tests**: Improve test coverage
-- 🌍 **Internationalization**: Error messages in other languages
 
 ---
 
-## 📄 License
+## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 Inspired by:
 - [python-dotenv](https://github.com/theskumar/python-dotenv) - .env file loading
 - [python-decouple](https://github.com/henriquebastos/python-decouple) - Config management
 - [environs](https://github.com/sloria/environs) - Environment variable parsing
 - [pydantic-settings](https://github.com/pydantic/pydantic-settings) - Settings management
-- [direnv](https://direnv.net/) - Environment management inspiration
 
 Built with:
 - [click](https://click.palletsprojects.com/) - CLI framework
@@ -1027,21 +1023,10 @@ Built with:
 
 ---
 
-## 📞 Support & Community
+## Support
 
-- **Documentation**: [envsync.dev](https://envsync.dev)
 - **GitHub**: [github.com/yourusername/envsync](https://github.com/yourusername/envsync)
 - **Issues**: [github.com/yourusername/envsync/issues](https://github.com/yourusername/envsync/issues)
-- **Discord**: [discord.gg/envsync](https://discord.gg/envsync)
-- **Twitter**: [@envsync](https://twitter.com/envsync)
-
----
-
-## ⭐ Star History
-
-If EnvSync helps you, please give it a star on GitHub!
-
-[![Star History](https://api.star-history.com/svg?repos=yourusername/envsync&type=Date)](https://star-history.com/#yourusername/envsync&Date)
 
 ---
 
