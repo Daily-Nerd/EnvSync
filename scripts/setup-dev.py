@@ -33,8 +33,8 @@ def run_command(cmd: list[str], check: bool = True) -> subprocess.CompletedProce
 
 def check_python_version() -> None:
     """Check Python version."""
-    if sys.version_info < (3, 9):
-        print("Error: Python 3.9 or higher is required")
+    if sys.version_info < (3, 11):
+        print("Error: Python 3.11 or higher is required")
         sys.exit(1)
 
     print(f"✅ Python {sys.version.split()[0]} detected")
