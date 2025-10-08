@@ -71,7 +71,10 @@ jobs:
 
           ev = os.environ.get("GITHUB_EVENT_NAME")
           if ev == "workflow_dispatch":
-              raw = os.environ["INPUT_VERSION"]
+              raw = os.environ.get("INPUT_VERSION", "")
+              if not raw:
+                  print("::error::INPUT_VERSION not provided for workflow_dispatch")
+                  sys.exit(1)
           else:
               # refs/tags/v1.2.3
               raw = os.environ["GITHUB_REF"].split("/")[-1]
