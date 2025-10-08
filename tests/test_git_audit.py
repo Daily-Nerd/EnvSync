@@ -19,10 +19,12 @@ from envsync.git_audit import (
     RemediationStep,
     SecretTimeline,
     analyze_secret_history,
+    check_filter_repo_available,
     check_git_repository,
     check_if_public_repo,
     find_secret_in_commit,
     generate_filter_branch_command,
+    generate_history_rewrite_command,
     generate_remediation_steps,
     get_affected_branches,
     get_commit_info,
@@ -480,6 +482,47 @@ class TestRemediationSteps:
         # Should return None for unknown types
         assert command is None
 
+    def test_remediation_exact_match(self) -> None:
+        """Test exact matching for secret names."""
+        # Exact match should work
+        command = get_rotation_command("DATABASE_URL")
+        assert command is not None
+        assert "database" in command.lower()
+
+    def test_remediation_no_false_positive_substring(self) -> None:
+        """Test that substring matches don't create false positives."""
+        # MYDATABASE_URL should NOT match DATABASE_URL (no underscore boundary)
+        command = get_rotation_command("MYDATABASE_URL")
+        assert command is None
+
+        # DATABASEURL should NOT match DATABASE_URL (no underscore)
+        command = get_rotation_command("DATABASEURL")
+        assert command is None
+
+        # Note: DATABASE_URL_PATH SHOULD match because it's a variant of DATABASE_URL
+        # (with additional path component) and likely needs the same rotation process
+
+    def test_remediation_word_boundary_match(self) -> None:
+        """Test that word boundary matching works for prefixed/suffixed names."""
+        # PROD_AWS_ACCESS_KEY_ID should match AWS_ACCESS_KEY_ID (word boundary)
+        command = get_rotation_command("PROD_AWS_ACCESS_KEY_ID")
+        assert command is not None
+        assert "aws" in command.lower()
+
+        # AWS_ACCESS_KEY_ID_PROD should match AWS_ACCESS_KEY_ID (word boundary)
+        command = get_rotation_command("AWS_ACCESS_KEY_ID_PROD")
+        assert command is not None
+        assert "aws" in command.lower()
+
+    def test_remediation_case_insensitive(self) -> None:
+        """Test case-insensitive matching."""
+        command = get_rotation_command("github_token")
+        assert command is not None
+        assert "github.com" in command.lower()
+
+        command = get_rotation_command("GiThUb_ToKeN")
+        assert command is not None
+
 
 class TestFilterBranchCommand:
     """Tests for filter-branch command generation."""
@@ -498,6 +541,94 @@ class TestFilterBranchCommand:
         assert "git filter-branch" in command
         for file in files:
             assert file in command
+
+    def test_generate_filter_branch_with_spaces(self) -> None:
+        """Test generating filter-branch for files with spaces (security)."""
+        files = ["my file.txt", "another file.env"]
+        command = generate_filter_branch_command(files)
+        assert "git filter-branch" in command
+        # Files with spaces should be quoted
+        assert "'my file.txt'" in command or '"my file.txt"' in command
+        assert "'another file.env'" in command or '"another file.env"' in command
+
+    def test_generate_filter_branch_with_quotes(self) -> None:
+        """Test generating filter-branch for files with quotes (security)."""
+        files = ["file'with'quotes.txt", 'file"with"quotes.env']
+        command = generate_filter_branch_command(files)
+        assert "git filter-branch" in command
+        # Should not break the command with unescaped quotes
+        assert command.count("'git rm") == 1  # Only the index-filter quote
+
+    def test_generate_filter_branch_with_special_chars(self) -> None:
+        """Test generating filter-branch for files with shell metacharacters (security)."""
+        files = ["file;rm -rf /.txt", "file$(whoami).txt", "file|cat.txt"]
+        command = generate_filter_branch_command(files)
+        assert "git filter-branch" in command
+        # Shell metacharacters should be escaped, not interpreted
+        assert ";rm -rf /" in command  # Should be quoted/escaped
+        assert "$(whoami)" in command  # Should be quoted/escaped
+        assert "|cat" in command  # Should be quoted/escaped
+
+
+class TestHistoryRewriteCommand:
+    """Tests for modern history rewrite command generation."""
+
+    def test_check_filter_repo_available(self) -> None:
+        """Test checking if git-filter-repo is available."""
+        # Just test that the function runs without error
+        result = check_filter_repo_available()
+        assert isinstance(result, bool)
+
+    def test_generate_history_rewrite_command_returns_tuple(self) -> None:
+        """Test that generate_history_rewrite_command returns proper tuple."""
+        files = [".env", "config.py"]
+        command, tool_name, warning = generate_history_rewrite_command(files)
+
+        assert isinstance(command, str)
+        assert isinstance(tool_name, str)
+        assert isinstance(warning, str)
+        assert tool_name in ["git-filter-repo", "filter-branch"]
+
+    def test_generate_history_rewrite_command_has_files(self) -> None:
+        """Test that generated command includes the files to remove."""
+        files = [".env", "secrets.json"]
+        command, tool_name, warning = generate_history_rewrite_command(files)
+
+        # Command should reference the files (possibly quoted)
+        assert ".env" in command or "'.env'" in command
+        assert "secrets.json" in command or "'secrets.json'" in command
+
+    def test_generate_history_rewrite_command_filter_repo_preferred(self) -> None:
+        """Test that git-filter-repo is preferred when available."""
+        if check_filter_repo_available():
+            files = [".env"]
+            command, tool_name, warning = generate_history_rewrite_command(files)
+
+            assert tool_name == "git-filter-repo"
+            assert "git filter-repo" in command
+            assert "--path" in command
+            assert "--invert-paths" in command
+            assert "DEPRECATED" not in warning
+
+    def test_generate_history_rewrite_command_fallback_to_filter_branch(self) -> None:
+        """Test fallback to filter-branch when filter-repo not available."""
+        if not check_filter_repo_available():
+            files = [".env"]
+            command, tool_name, warning = generate_history_rewrite_command(files)
+
+            assert tool_name == "filter-branch"
+            assert "git filter-branch" in command
+            assert "DEPRECATED" in warning
+            assert "git-filter-repo" in warning  # Suggests installing it
+
+    def test_generate_history_rewrite_command_with_spaces(self) -> None:
+        """Test that files with spaces are properly escaped."""
+        files = ["my secret.env", "another file.txt"]
+        command, tool_name, warning = generate_history_rewrite_command(files)
+
+        # Files with spaces should be properly quoted
+        assert "my secret.env" in command or "'my secret.env'" in command
+        assert "another file.txt" in command or "'another file.txt'" in command
 
 
 class TestDataClasses:

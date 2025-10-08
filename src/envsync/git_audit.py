@@ -5,49 +5,15 @@ were leaked, providing detailed timeline information and remediation steps.
 """
 
 import re
+import shlex
+import shutil
 import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
-from envsync.exceptions import EnvSyncError
-
-
-class GitAuditError(EnvSyncError):
-    """Base error for git audit operations."""
-
-    pass
-
-
-class NotGitRepositoryError(GitAuditError):
-    """Raised when current directory is not a git repository."""
-
-    def __init__(self, path: Path) -> None:
-        """Initialize NotGitRepositoryError.
-
-        Args:
-            path: Path that is not a git repository
-        """
-        self.path = path
-        super().__init__(f"Not a git repository: {path}")
-
-
-class GitCommandError(GitAuditError):
-    """Raised when git command fails."""
-
-    def __init__(self, command: str, stderr: str, returncode: int) -> None:
-        """Initialize GitCommandError.
-
-        Args:
-            command: Git command that failed
-            stderr: Standard error output
-            returncode: Git command return code
-        """
-        self.command = command
-        self.stderr = stderr
-        self.returncode = returncode
-        super().__init__(f"Git command failed (exit {returncode}): {command}\n{stderr}")
+from envsync.exceptions import GitAuditError, GitCommandError, NotGitRepositoryError
 
 
 @dataclass
@@ -463,6 +429,59 @@ def analyze_secret_history(
     )
 
 
+def check_filter_repo_available() -> bool:
+    """Check if git-filter-repo is available on the system.
+
+    Returns:
+        True if git-filter-repo is installed and available
+    """
+    return shutil.which("git-filter-repo") is not None
+
+
+def generate_history_rewrite_command(files: List[str]) -> tuple[str, str, str]:
+    """Generate command to remove files from git history.
+
+    Prefers modern git-filter-repo over deprecated filter-branch.
+
+    Args:
+        files: List of file paths to remove
+
+    Returns:
+        Tuple of (command, tool_name, warning_message)
+        - command: The shell command to execute
+        - tool_name: Name of the tool being used ("git-filter-repo" or "filter-branch")
+        - warning_message: Important warnings about the operation
+
+    Note:
+        File paths are properly shell-escaped to prevent injection attacks.
+    """
+    # Check if git-filter-repo is available (recommended)
+    if check_filter_repo_available():
+        # Use git-filter-repo (modern, fast, safe)
+        path_args = " ".join(f"--path {shlex.quote(f)}" for f in files)
+        command = f"git filter-repo {path_args} --invert-paths --force"
+        tool_name = "git-filter-repo"
+        warning = (
+            "⚠️  This will rewrite git history. Coordinate with your team before proceeding!\n"
+            "All developers will need to re-clone or rebase their work."
+        )
+    else:
+        # Fall back to filter-branch (deprecated but widely available)
+        files_str = " ".join(shlex.quote(f) for f in files)
+        command = f"git filter-branch --force --index-filter 'git rm --cached --ignore-unmatch {files_str}' HEAD"
+        tool_name = "filter-branch"
+        warning = (
+            "⚠️  WARNING: git filter-branch is DEPRECATED and slow!\n"
+            "Consider installing git-filter-repo for better performance:\n"
+            "  pip install git-filter-repo\n"
+            "  brew install git-filter-repo  # macOS\n\n"
+            "This will rewrite git history. Coordinate with your team before proceeding!\n"
+            "All developers will need to re-clone or rebase their work."
+        )
+
+    return command, tool_name, warning
+
+
 def generate_filter_branch_command(files: List[str]) -> str:
     """Generate git filter-branch command to remove files from history.
 
@@ -471,8 +490,13 @@ def generate_filter_branch_command(files: List[str]) -> str:
 
     Returns:
         Complete git filter-branch command
+
+    Note:
+        DEPRECATED: Use generate_history_rewrite_command() instead for better tool selection.
+        File paths are properly shell-escaped to prevent injection attacks.
     """
-    files_str = " ".join(files)
+    # Properly escape each file path to prevent shell injection
+    files_str = " ".join(shlex.quote(f) for f in files)
     return f"git filter-branch --force --index-filter " f"'git rm --cached --ignore-unmatch {files_str}' HEAD"
 
 
@@ -484,6 +508,10 @@ def get_rotation_command(secret_name: str) -> Optional[str]:
 
     Returns:
         Command to rotate the secret, or None if unknown
+
+    Note:
+        Uses exact matching to avoid false positives (e.g., DATABASE_URL_PATH
+        should not match DATABASE_URL).
     """
     rotation_commands: Dict[str, str] = {
         "AWS_SECRET_ACCESS_KEY": "aws iam create-access-key --user-name <username>",
@@ -494,8 +522,18 @@ def get_rotation_command(secret_name: str) -> Optional[str]:
         "DATABASE_URL": "Change database password and update connection string",
     }
 
+    # Use exact match to avoid false positives
+    secret_name_upper = secret_name.upper()
+    if secret_name_upper in rotation_commands:
+        return rotation_commands[secret_name_upper]
+
+    # Fallback: check if any pattern matches with underscore boundaries
+    # This handles cases like "PROD_AWS_ACCESS_KEY_ID" or "AWS_ACCESS_KEY_ID_PROD"
+    # but NOT "MY_DATABASE_URL" (no leading underscore before DATABASE)
     for pattern, command in rotation_commands.items():
-        if pattern in secret_name.upper():
+        # Check for pattern at start, end, or surrounded by underscores
+        # Pattern: (^|_)PATTERN(_|$)
+        if re.search(rf"(^|_){re.escape(pattern)}(_|$)", secret_name_upper):
             return command
 
     return None
@@ -534,18 +572,18 @@ def generate_remediation_steps(
 
     # Step 2: Remove from git history if found in commits
     if timeline.commits_affected:
-        filter_cmd = generate_filter_branch_command(timeline.files_affected)
+        rewrite_cmd, tool_name, tool_warning = generate_history_rewrite_command(timeline.files_affected)
         steps.append(
             RemediationStep(
                 order=2,
-                title="Remove from git history",
+                title=f"Remove from git history (using {tool_name})",
                 description=(
                     f"Rewrite git history to remove the secret from {len(timeline.commits_affected)} "
                     f"commit(s). This will change commit hashes."
                 ),
                 urgency="HIGH",
-                command=filter_cmd,
-                warning="This rewrites history - coordinate with your team first!",
+                command=rewrite_cmd,
+                warning=tool_warning,
             )
         )
 

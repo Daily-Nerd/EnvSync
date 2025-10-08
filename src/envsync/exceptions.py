@@ -4,7 +4,8 @@ This module defines all custom exception types used throughout EnvSync for
 precise error handling and reporting.
 """
 
-from typing import Any, List, Optional
+from pathlib import Path
+from typing import Any, List, Optional, Union
 
 
 class EnvSyncError(Exception):
@@ -192,7 +193,7 @@ class GitAuditError(EnvSyncError):
 class NotGitRepositoryError(GitAuditError):
     """Raised when current directory is not a git repository."""
 
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: Union[Path, str]) -> None:
         """Initialize NotGitRepositoryError.
 
         Args:

@@ -662,8 +662,8 @@ def _display_combined_timeline(
         if timeline.branches_affected:
             branches_node = secret_node.add("[cyan]Branches affected:[/cyan]")
             for branch in timeline.branches_affected[:5]:
-                commit_count = sum(1 for occ in timeline.occurrences if branch in getattr(occ, "branches", []))
-                branches_node.add(f"├─ {branch} ([yellow]{len(timeline.commits_affected)} commits[/yellow])")
+                # Note: Showing total commits across all branches since we don't track per-branch
+                branches_node.add(f"├─ {branch} ([yellow]{len(timeline.commits_affected)} total commits[/yellow])")
 
         # Add files
         if timeline.files_affected:
