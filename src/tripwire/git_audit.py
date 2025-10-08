@@ -462,7 +462,7 @@ def generate_history_rewrite_command(files: List[str]) -> tuple[str, str, str]:
         command = f"git filter-repo {path_args} --invert-paths --force"
         tool_name = "git-filter-repo"
         warning = (
-            "⚠️  This will rewrite git history. Coordinate with your team before proceeding!\n"
+            "[!] This will rewrite git history. Coordinate with your team before proceeding!\n"
             "All developers will need to re-clone or rebase their work."
         )
     else:
@@ -471,7 +471,7 @@ def generate_history_rewrite_command(files: List[str]) -> tuple[str, str, str]:
         command = f"git filter-branch --force --index-filter 'git rm --cached --ignore-unmatch {files_str}' HEAD"
         tool_name = "filter-branch"
         warning = (
-            "⚠️  WARNING: git filter-branch is DEPRECATED and slow!\n"
+            "[!] WARNING: git filter-branch is DEPRECATED and slow!\n"
             "Consider installing git-filter-repo for better performance:\n"
             "  pip install git-filter-repo\n"
             "  brew install git-filter-repo  # macOS\n\n"

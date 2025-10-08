@@ -29,7 +29,7 @@ class MissingVariableError(TripWireError):
 
         # Build multi-line helpful message
         lines = [
-            f"\n❌ Missing required environment variable: {variable_name}",
+            f"\n[X] Missing required environment variable: {variable_name}",
             "",
         ]
 
@@ -50,7 +50,7 @@ class MissingVariableError(TripWireError):
                 "  3. Copy from example (if available):",
                 "     cp .env.example .env",
                 "",
-                "💡 Tip: Run 'tripwire init' to create starter files",
+                "[Tip] Run 'tripwire init' to create starter files",
                 "",
             ]
         )
