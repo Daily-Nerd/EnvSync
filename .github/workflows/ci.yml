@@ -22,6 +22,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ["3.11", "3.12", "3.13"]
+    env:
+      # Force UTF-8 encoding on Windows for proper Unicode handling
+      PYTHONIOENCODING: utf-8
 
     steps:
     - name: Checkout code
