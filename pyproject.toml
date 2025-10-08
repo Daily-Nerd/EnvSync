@@ -45,7 +45,7 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/Daily-Nerd/EnvSync"
-Documentation = "https://envsync.dev"
+Documentation = "https://github.com/Daily-Nerd/EnvSync/docs"
 Repository = "https://github.com/Daily-Nerd/EnvSync"
 Issues = "https://github.com/Daily-Nerd/EnvSync/issues"
 
