@@ -107,11 +107,7 @@ def update_version_in_files(version: str) -> None:
     content = cli_path.read_text()
 
     # Replace version in @click.version_option decorator
-    content = re.sub(
-        r'@click\.version_option\(version="[^"]*"',
-        f'@click.version_option(version="{version}"',
-        content
-    )
+    content = re.sub(r'@click\.version_option\(version="[^"]*"', f'@click.version_option(version="{version}"', content)
 
     cli_path.write_text(content)
     print(f"Updated version in {cli_path} to {version}")
