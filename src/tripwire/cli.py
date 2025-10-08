@@ -311,14 +311,14 @@ def generate(output: str, check: bool, force: bool) -> None:
     if check:
         console.print("[yellow]Checking if .env.example is up to date...[/yellow]")
         if not output_path.exists():
-            console.print(f"[red]✗[/red] {output} does not exist")
+            console.print(f"[red][X][/red] {output} does not exist")
             sys.exit(1)
 
         existing_content = output_path.read_text()
         if existing_content.strip() == generated_content.strip():
-            console.print("[green]✓[/green] .env.example is up to date")
+            console.print("[green][OK][/green] .env.example is up to date")
         else:
-            console.print("[red]✗[/red] .env.example is out of date")
+            console.print("[red][X][/red] .env.example is out of date")
             console.print("Run 'tripwire generate --force' to update it")
             sys.exit(1)
         return
@@ -330,7 +330,7 @@ def generate(output: str, check: bool, force: bool) -> None:
 
     # Write file
     output_path.write_text(generated_content)
-    console.print(f"[green]✓[/green] Generated {output} with {len(unique_vars)} variable(s)")
+    console.print(f"[green][OK][/green] Generated {output} with {len(unique_vars)} variable(s)")
 
     # Show breakdown
     if required_vars:
@@ -539,7 +539,7 @@ def sync(env_file: str, example: str, dry_run: bool, interactive: bool) -> None:
     # Write updated file
     env_path.write_text(merged_content)
 
-    console.print(f"[green]✓[/green] Synchronized {env_file}")
+    console.print(f"[green][OK][/green] Synchronized {env_file}")
     console.print(f"  Added {len(missing)} variable(s)")
     console.print("\n[yellow]Note:[/yellow] Fill in values for new variables in .env")
 
@@ -709,7 +709,7 @@ def _display_combined_timeline(
         f"[bold red]Leaked:[/bold red] {total_leaked}\n"
         f"[bold green]Clean:[/bold green] {total_clean}\n"
         f"[bold yellow]Total commits affected:[/bold yellow] {total_commits}\n",
-        title="📈 Summary",
+        title="[Chart] Summary",
         border_style="yellow",
     )
 
@@ -853,11 +853,11 @@ def _display_single_audit_result(
 
     # Final recommendations
     console.print("[bold cyan][Tip] Prevention Tips:[/bold cyan]")
-    console.print("  • Always add .env files to .gitignore")
-    console.print("  • Use environment variable scanning tools")
-    console.print("  • Never commit secrets to version control")
-    console.print("  • Use a secret manager for production")
-    console.print("  • Enable pre-commit hooks to scan for secrets")
+    console.print("  - Always add .env files to .gitignore")
+    console.print("  - Use environment variable scanning tools")
+    console.print("  - Never commit secrets to version control")
+    console.print("  - Use a secret manager for production")
+    console.print("  - Enable pre-commit hooks to scan for secrets")
     console.print()
 
 
@@ -1210,7 +1210,7 @@ def docs(format: str, output: Optional[str]) -> None:
     if output:
         output_path = Path(output)
         output_path.write_text(doc_content)
-        console.print(f"[green]✓[/green] Documentation written to {output}")
+        console.print(f"[green][OK][/green] Documentation written to {output}")
     else:
         if format == "markdown":
             # Use rich for nice terminal rendering
