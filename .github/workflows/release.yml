@@ -136,6 +136,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: dist
+        path: dist
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -152,6 +153,11 @@ jobs:
         TWINE_REPOSITORY_URL: ${{ env.TEST_PYPI_INDEX_URL }}
       run: |
         twine upload --skip-existing dist/*
+
+    - name: Show downloaded artifacts (test-pypi)
+      run: |
+        echo "Listing dist/ contents:"
+        ls -la dist || true
 
     - name: Test installation from Test PyPI
       run: |
@@ -183,6 +189,11 @@ jobs:
         TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
       run: |
         twine upload dist/*
+
+    - name: Show downloaded artifacts (pypi)
+      run: |
+        echo "Listing dist/ contents:"
+        ls -la dist || true
 
     - name: Verify upload
       run: |
