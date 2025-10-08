@@ -26,7 +26,7 @@ from envsync.exceptions import (
 )
 from envsync.validation import validator
 
-__version__ = "0.1.3"
+__version__ = "0.1.4"
 
 __all__ = [
     # Core

@@ -1,6 +1,6 @@
 [project]
 name = "envsync"
-version = "0.1.3"
+version = "0.1.4"
 description = "Smart environment variable management for Python with import-time validation, type safety, and team synchronization"
 authors = [
     { name = "kibukx" }
