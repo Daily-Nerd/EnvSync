@@ -121,7 +121,7 @@ jobs:
       run: twine check dist/*
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: dist
         path: dist/
@@ -133,7 +133,7 @@ jobs:
     if: github.event_name == 'push' || github.event.inputs.prerelease == 'true'
     steps:
     - name: Download build artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: dist
 
@@ -165,7 +165,7 @@ jobs:
     if: github.event_name == 'push' && needs.validate-release.outputs.is_prerelease == 'false'
     steps:
     - name: Download build artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: dist
 
@@ -201,7 +201,7 @@ jobs:
         fetch-depth: 0
 
     - name: Download build artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: dist
 
