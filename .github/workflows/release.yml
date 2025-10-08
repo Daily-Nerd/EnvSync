@@ -104,7 +104,7 @@ jobs:
 
       - name: Run tests (unit + type)
         run: |
-          uv runpytest --cov=envsync --cov-report=xml
+          uv run pytest --cov=envsync --cov-report=xml
           uv run mypy src/envsync
 
   tests:
