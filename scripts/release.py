@@ -19,7 +19,6 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
 
 
 def run_command(cmd: list[str], check: bool = True, interactive: bool = False) -> subprocess.CompletedProcess:
@@ -121,12 +120,10 @@ def run_tests() -> None:
 
 
 def run_linting() -> None:
-    """Run linting checks."""
-    print("Running linting...")
-    # Use UV to run tools from the project environment
-    run_command(["uv", "run", "ruff", "check", "."])
-    run_command(["uv", "run", "black", "--check", "."])
-    run_command(["uv", "run", "mypy", "src/envsync"])
+    """Run linting checks using pre-commit (same as CI)."""
+    print("Running linting with pre-commit...")
+    # Use pre-commit which manages its own tool environments
+    run_command(["pre-commit", "run", "--all-files"])
     print("✅ Linting passed")
 
 
