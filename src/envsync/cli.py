@@ -8,7 +8,7 @@ import fnmatch
 import secrets
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import click
 from rich.console import Console
@@ -623,6 +623,427 @@ def scan(strict: bool, depth: int) -> None:
     else:
         console.print("[green]✓[/green] No secrets detected")
         console.print("Your environment files appear secure")
+
+
+def _display_combined_timeline(
+    results: List[Tuple[Any, Any]],
+    console: Console,
+) -> None:
+    """Display combined visual timeline for multiple secrets.
+
+    Args:
+        results: List of (SecretMatch, SecretTimeline) tuples
+        console: Rich console instance
+    """
+    from rich.panel import Panel
+    from rich.tree import Tree
+
+    console.print("\n[bold cyan]📊 Secret Leak Blast Radius[/bold cyan]")
+    console.print("═" * 70)
+    console.print()
+
+    # Create visual tree
+    tree = Tree("🔍 [bold yellow]Repository Secret Exposure[/bold yellow]")
+
+    for secret_match, timeline in results:
+        if timeline.total_occurrences == 0:
+            continue
+
+        # Determine status symbol
+        status_symbol = "🔴" if timeline.is_currently_in_git else "🟡"
+        severity_symbol = "🚨" if timeline.severity == "CRITICAL" else "⚠️"
+
+        secret_node = tree.add(
+            f"{status_symbol} {severity_symbol} [yellow]{secret_match.variable_name}[/yellow] "
+            f"([red]{timeline.total_occurrences} occurrence(s)[/red])"
+        )
+
+        # Add branches
+        if timeline.branches_affected:
+            branches_node = secret_node.add("[cyan]Branches affected:[/cyan]")
+            for branch in timeline.branches_affected[:5]:
+                # Note: Showing total commits across all branches since we don't track per-branch
+                branches_node.add(f"├─ {branch} ([yellow]{len(timeline.commits_affected)} total commits[/yellow])")
+
+        # Add files
+        if timeline.files_affected:
+            files_node = secret_node.add("[cyan]Files affected:[/cyan]")
+            for file_path in timeline.files_affected[:5]:
+                files_node.add(f"├─ [red]{file_path}[/red]")
+
+    console.print(tree)
+    console.print()
+
+    # Summary statistics
+    total_leaked = sum(1 for _, timeline in results if timeline.total_occurrences > 0)
+    total_clean = len(results) - total_leaked
+    total_commits = sum(len(timeline.commits_affected) for _, timeline in results)
+
+    stats_panel = Panel(
+        f"[bold red]Leaked:[/bold red] {total_leaked}\n"
+        f"[bold green]Clean:[/bold green] {total_clean}\n"
+        f"[bold yellow]Total commits affected:[/bold yellow] {total_commits}\n",
+        title="📈 Summary",
+        border_style="yellow",
+    )
+
+    console.print(stats_panel)
+    console.print()
+
+
+def _display_single_audit_result(
+    secret_name: str,
+    timeline: Any,
+    console: Console,
+) -> None:
+    """Display audit results for a single secret.
+
+    Args:
+        secret_name: Name of the secret
+        timeline: SecretTimeline object
+        console: Rich console instance
+    """
+    from collections import defaultdict
+
+    from rich.panel import Panel
+    from rich.syntax import Syntax
+
+    from envsync.git_audit import generate_remediation_steps
+
+    # No leaks found
+    if timeline.total_occurrences == 0:
+        console.print(f"[green]✓[/green] No leaks found for {secret_name}")
+        console.print("This secret does not appear in git history.")
+        return
+
+    # Display timeline header
+    console.print(f"[bold cyan]Secret Leak Timeline for: {secret_name}[/bold cyan]")
+    console.print("═" * 70)
+    console.print()
+
+    # Display timeline events
+    if timeline.occurrences:
+        console.print("[bold yellow]Timeline:[/bold yellow]\n")
+
+        # Group occurrences by date
+        by_date: Dict[str, List[Any]] = defaultdict(list)
+        for occ in timeline.occurrences:
+            date_str = occ.commit_date.strftime("%Y-%m-%d")
+            by_date[date_str].append(occ)
+
+        for date_str in sorted(by_date.keys()):
+            occs = by_date[date_str]
+            first_occ = occs[0]
+
+            # Date header
+            console.print(f"[bold]📅 {date_str}[/bold]")
+
+            # Show commit info
+            console.print(f"   Commit: [cyan]{first_occ.commit_hash[:8]}[/cyan] - {first_occ.commit_message[:60]}")
+            console.print(f"   Author: [yellow]@{first_occ.author}[/yellow] <{first_occ.author_email}>")
+
+            # Show files
+            for occ in occs:
+                console.print(f"   📁 [red]{occ.file_path}[/red]:{occ.line_number}")
+
+            console.print()
+
+        # Show current status
+        if timeline.is_currently_in_git:
+            console.print("[bold red]⚠️  Still in git history (as of HEAD)[/bold red]")
+        else:
+            console.print("[green]✓[/green] Removed from current HEAD")
+
+        console.print(f"   Affects [yellow]{len(timeline.commits_affected)}[/yellow] commit(s)")
+        console.print(f"   Found in [yellow]{len(timeline.files_affected)}[/yellow] file(s)")
+
+        if timeline.branches_affected:
+            branches_str = ", ".join(timeline.branches_affected[:5])
+            if len(timeline.branches_affected) > 5:
+                branches_str += f", +{len(timeline.branches_affected) - 5} more"
+            console.print(f"   Branches: [cyan]{branches_str}[/cyan]")
+
+        console.print()
+
+    # Security impact panel
+    severity_color = {
+        "CRITICAL": "red",
+        "HIGH": "yellow",
+        "MEDIUM": "blue",
+        "LOW": "green",
+    }.get(timeline.severity, "white")
+
+    impact_lines = [
+        f"[bold]Severity:[/bold] [{severity_color}]{timeline.severity}[/{severity_color}]",
+        f"[bold]Exposure:[/bold] {'PUBLIC repository' if timeline.is_in_public_repo else 'Private repository'}",
+        f"[bold]Duration:[/bold] {timeline.exposure_duration_days} days",
+        f"[bold]Commits affected:[/bold] {len(timeline.commits_affected)}",
+        f"[bold]Files affected:[/bold] {len(timeline.files_affected)}",
+    ]
+
+    if timeline.is_in_public_repo:
+        impact_lines.append("")
+        impact_lines.append("[bold red]⚠️  CRITICAL: Found in PUBLIC repository![/bold red]")
+
+    console.print(
+        Panel(
+            "\n".join(impact_lines),
+            title="🚨 Security Impact",
+            border_style="red" if timeline.severity == "CRITICAL" else "yellow",
+        )
+    )
+    console.print()
+
+    # Generate and display remediation steps
+    steps = generate_remediation_steps(timeline, secret_name)
+
+    console.print("[bold yellow]🔧 Remediation Steps:[/bold yellow]\n")
+
+    for step in steps:
+        urgency_color = {
+            "CRITICAL": "red",
+            "HIGH": "yellow",
+            "MEDIUM": "blue",
+            "LOW": "green",
+        }.get(step.urgency, "white")
+
+        console.print(f"[bold]{step.order}. {step.title}[/bold]")
+        console.print(f"   Urgency: [{urgency_color}]{step.urgency}[/{urgency_color}]")
+        console.print(f"   {step.description}")
+
+        if step.command:
+            console.print()
+            # Syntax highlight the command
+            syntax = Syntax(step.command, "bash", theme="monokai", line_numbers=False)
+            console.print("   ", syntax)
+
+        if step.warning:
+            console.print(f"   [red]⚠️  {step.warning}[/red]")
+
+        console.print()
+
+    # Final recommendations
+    console.print("[bold cyan]💡 Prevention Tips:[/bold cyan]")
+    console.print("  • Always add .env files to .gitignore")
+    console.print("  • Use environment variable scanning tools")
+    console.print("  • Never commit secrets to version control")
+    console.print("  • Use a secret manager for production")
+    console.print("  • Enable pre-commit hooks to scan for secrets")
+    console.print()
+
+
+@main.command()
+@click.argument("secret_name", required=False)
+@click.option(
+    "--all",
+    "scan_all",
+    is_flag=True,
+    help="Auto-detect and audit all secrets in current .env file",
+)
+@click.option(
+    "--value",
+    help="Actual secret value to search for (more accurate)",
+)
+@click.option(
+    "--max-commits",
+    default=1000,
+    type=int,
+    help="Maximum commits to analyze",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output as JSON",
+)
+def audit(
+    secret_name: Optional[str],
+    scan_all: bool,
+    value: Optional[str],
+    max_commits: int,
+    output_json: bool,
+) -> None:
+    """Audit git history for secret leaks.
+
+    Shows when a secret was added, committed, pushed, and provides
+    remediation steps to remove it from git history.
+
+    Examples:
+
+        envsync audit --all
+
+        envsync audit AWS_SECRET_ACCESS_KEY
+
+        envsync audit API_KEY --value "sk-abc123..."
+
+        envsync audit DATABASE_URL --json
+    """
+    import json
+
+    from rich.table import Table
+
+    from envsync.git_audit import (
+        GitAuditError,
+        analyze_secret_history,
+        generate_remediation_steps,
+    )
+    from envsync.secrets import scan_env_file
+
+    # Validate arguments
+    if not scan_all and not secret_name:
+        console.print("[red]Error:[/red] Must provide SECRET_NAME or use --all flag")
+        console.print("Try: envsync audit --help")
+        sys.exit(1)
+
+    if scan_all and secret_name:
+        console.print("[red]Error:[/red] Cannot use both SECRET_NAME and --all flag")
+        console.print("Use either 'envsync audit SECRET_NAME' or 'envsync audit --all'")
+        sys.exit(1)
+
+    # Auto-detection mode
+    if scan_all:
+        if not output_json:
+            console.print("\n[bold cyan]🔍 Auto-detecting secrets in .env file...[/bold cyan]\n")
+
+        env_file = Path.cwd() / ".env"
+        if not env_file.exists():
+            console.print("[red]Error:[/red] .env file not found in current directory")
+            console.print("Run 'envsync init' to create one, or specify a secret name to audit.")
+            sys.exit(1)
+
+        # Scan .env file for secrets
+        detected_secrets = scan_env_file(env_file)
+
+        if not detected_secrets:
+            console.print("[green]✓[/green] No secrets detected in .env file")
+            console.print("Your environment file appears secure")
+            return
+
+        # Display detected secrets summary (only in non-JSON mode)
+        if not output_json:
+            console.print(f"[yellow]⚠️  Found {len(detected_secrets)} potential secret(s) in .env file[/yellow]\n")
+
+            summary_table = Table(title="Detected Secrets", show_header=True, header_style="bold cyan")
+            summary_table.add_column("Variable", style="yellow")
+            summary_table.add_column("Type", style="cyan")
+            summary_table.add_column("Severity", style="red")
+
+            for secret in detected_secrets:
+                summary_table.add_row(
+                    secret.variable_name,
+                    secret.secret_type.value,
+                    secret.severity.upper(),
+                )
+
+            console.print(summary_table)
+            console.print()
+
+        # Audit each detected secret
+        all_results = []
+        for secret in detected_secrets:
+            if not output_json:
+                console.print(f"\n[bold cyan]{'=' * 70}[/bold cyan]")
+                console.print(f"[bold cyan]Auditing: {secret.variable_name}[/bold cyan]")
+                console.print(f"[bold cyan]{'=' * 70}[/bold cyan]\n")
+
+            try:
+                timeline = analyze_secret_history(
+                    secret_name=secret.variable_name,
+                    secret_value=None,  # Don't pass value for privacy
+                    repo_path=Path.cwd(),
+                    max_commits=max_commits,
+                )
+                all_results.append((secret, timeline))
+
+            except GitAuditError as e:
+                if not output_json:
+                    console.print(f"[red]Error auditing {secret.variable_name}:[/red] {e}")
+                continue
+
+        # JSON output mode (skip visual output)
+        if output_json:
+            json_output = {
+                "total_secrets_found": len(detected_secrets),
+                "secrets": [
+                    {
+                        "variable_name": secret.variable_name,
+                        "secret_type": secret.secret_type.value,
+                        "severity": secret.severity,
+                        "status": "LEAKED" if timeline.total_occurrences > 0 else "CLEAN",
+                        "first_seen": timeline.first_seen.isoformat() if timeline.first_seen else None,
+                        "last_seen": timeline.last_seen.isoformat() if timeline.last_seen else None,
+                        "commits_affected": len(timeline.commits_affected),
+                        "files_affected": timeline.files_affected,
+                        "branches_affected": timeline.branches_affected,
+                        "is_public": timeline.is_in_public_repo,
+                        "is_current": timeline.is_currently_in_git,
+                    }
+                    for secret, timeline in all_results
+                ],
+            }
+            print(json.dumps(json_output, indent=2))
+            return
+
+        # Display combined visual timeline first
+        if all_results:
+            _display_combined_timeline(all_results, console)
+
+        # Then display individual results
+        for secret, timeline in all_results:
+            _display_single_audit_result(secret.variable_name, timeline, console)
+
+        return
+
+    # Single secret mode
+    try:
+        console.print(f"\n[bold cyan]Analyzing git history for: {secret_name}[/bold cyan]\n")
+        console.print("[yellow]This may take a moment...[/yellow]\n")
+
+        timeline = analyze_secret_history(
+            secret_name=secret_name,
+            secret_value=value,
+            repo_path=Path.cwd(),
+            max_commits=max_commits,
+        )
+
+    except GitAuditError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
+
+    # JSON output mode
+    if output_json:
+        remediation_steps = generate_remediation_steps(timeline, secret_name)
+
+        result = {
+            "secret_name": secret_name,
+            "status": "LEAKED" if timeline.total_occurrences > 0 else "CLEAN",
+            "first_seen": timeline.first_seen.isoformat() if timeline.first_seen else None,
+            "last_seen": timeline.last_seen.isoformat() if timeline.last_seen else None,
+            "exposure_duration_days": timeline.exposure_duration_days,
+            "commits_affected": len(timeline.commits_affected),
+            "files_affected": timeline.files_affected,
+            "is_public": timeline.is_in_public_repo,
+            "is_current": timeline.is_currently_in_git,
+            "severity": timeline.severity,
+            "branches_affected": timeline.branches_affected,
+            "remediation_steps": [
+                {
+                    "order": step.order,
+                    "title": step.title,
+                    "description": step.description,
+                    "urgency": step.urgency,
+                    "command": step.command,
+                    "warning": step.warning,
+                }
+                for step in remediation_steps
+            ],
+        }
+
+        print(json.dumps(result, indent=2))
+        return
+
+    # Display single secret result using helper function
+    _display_single_audit_result(secret_name, timeline, console)
 
 
 @main.command()

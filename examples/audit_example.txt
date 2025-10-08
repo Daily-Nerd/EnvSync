@@ -1,0 +1,299 @@
+Secret Leak Timeline - Example Output
+=====================================
+
+This file demonstrates the output of the `envsync audit` command when a secret
+has been leaked to git history.
+
+Example 1: Critical Leak (Public Repository)
+---------------------------------------------
+
+$ envsync audit AWS_SECRET_ACCESS_KEY
+
+Analyzing git history for: AWS_SECRET_ACCESS_KEY
+
+This may take a moment...
+
+Secret Leak Timeline for: AWS_SECRET_ACCESS_KEY
+══════════════════════════════════════════════════════════════════════
+
+Timeline:
+
+📅 2024-09-15
+   Commit: abc123de - Initial setup
+   Author: @alice <alice@company.com>
+   📁 .env:15
+   📁 config/settings.py:42
+
+📅 2024-09-18
+   Commit: def456gh - Fix configuration bug
+   Author: @bob <bob@company.com>
+   📁 config/settings.py:42
+   📁 backend/config.py:28
+
+📅 2024-09-20
+   Commit: jkl789mn - Deploy to production
+   Author: @charlie <charlie@company.com>
+   📁 .env:15
+   📁 config/settings.py:42
+
+⚠️  Still in git history (as of HEAD)
+   Affects 47 commit(s)
+   Found in 3 file(s)
+   Branches: origin/main, origin/develop, feature/auth, +2 more
+
+╭──────────────── 🚨 Security Impact ────────────────╮
+│ Severity: CRITICAL                                 │
+│ Exposure: PUBLIC repository                        │
+│ Duration: 16 days                                  │
+│ Commits affected: 47                               │
+│ Files affected: 3                                  │
+│                                                    │
+│ ⚠️  CRITICAL: Found in PUBLIC repository!         │
+╰────────────────────────────────────────────────────╯
+
+🔧 Remediation Steps:
+
+1. Rotate the secret IMMEDIATELY
+   Urgency: CRITICAL
+   The secret is compromised and must be replaced. Generate a new secret and
+   update all systems using it.
+
+   aws iam create-access-key --user-name <username>
+
+   ⚠️  Do not skip this step - the secret is exposed!
+
+2. Remove from git history
+   Urgency: HIGH
+   Rewrite git history to remove the secret from 47 commit(s). This will change
+   commit hashes.
+
+   git filter-branch --force --index-filter 'git rm --cached --ignore-unmatch .env config/settings.py backend/config.py' HEAD
+
+   ⚠️  This rewrites history - coordinate with your team first!
+
+3. Force push to update remote(s)
+   Urgency: HIGH
+   Update remote repositories to remove the secret from public history. All team
+   members will need to rebase their branches.
+
+   git push origin --force --all
+
+   ⚠️  Coordinate with team - force push affects all developers!
+
+4. Update .gitignore
+   Urgency: MEDIUM
+   Ensure .env and other secret files are in .gitignore to prevent future
+   accidental commits.
+
+   echo '.env
+   .env.local' >> .gitignore
+
+5. Use a secret manager (recommended)
+   Urgency: MEDIUM
+   Move to a proper secret management solution like AWS Secrets Manager, HashiCorp
+   Vault, or your cloud provider's secret store.
+
+   # Example: aws secretsmanager create-secret --name MySecret --secret-string ...
+
+6. Install pre-commit hooks
+   Urgency: LOW
+   Prevent future leaks by scanning commits before they're pushed.
+
+   envsync install-hooks  # Coming soon!
+
+💡 Prevention Tips:
+  • Always add .env files to .gitignore
+  • Use environment variable scanning tools
+  • Never commit secrets to version control
+  • Use a secret manager for production
+  • Enable pre-commit hooks to scan for secrets
+
+
+Example 2: No Leak Found (Clean Repository)
+--------------------------------------------
+
+$ envsync audit DATABASE_PASSWORD
+
+Analyzing git history for: DATABASE_PASSWORD
+
+This may take a moment...
+
+✓ No leaks found for DATABASE_PASSWORD
+This secret does not appear in git history.
+
+
+Example 3: Leak Removed (Fixed)
+--------------------------------
+
+$ envsync audit STRIPE_SECRET_KEY
+
+Analyzing git history for: STRIPE_SECRET_KEY
+
+This may take a moment...
+
+Secret Leak Timeline for: STRIPE_SECRET_KEY
+══════════════════════════════════════════════════════════════════════
+
+Timeline:
+
+📅 2024-10-01
+   Commit: xyz789ab - Add payment integration
+   Author: @david <david@company.com>
+   📁 payments/stripe_config.py:12
+
+📅 2024-10-02
+   Commit: abc456cd - Remove hardcoded keys
+   Author: @david <david@company.com>
+   📁 payments/stripe_config.py:12
+
+✓ Removed from current HEAD
+   Affects 2 commit(s)
+   Found in 1 file(s)
+   Branches: origin/main
+
+╭──────────────── 🚨 Security Impact ────────────────╮
+│ Severity: MEDIUM                                   │
+│ Exposure: Private repository                       │
+│ Duration: 1 days                                   │
+│ Commits affected: 2                                │
+│ Files affected: 1                                  │
+╰────────────────────────────────────────────────────╯
+
+🔧 Remediation Steps:
+
+1. Rotate the secret IMMEDIATELY
+   Urgency: CRITICAL
+   The secret is compromised and must be replaced. Generate a new secret and
+   update all systems using it.
+
+   Visit https://dashboard.stripe.com/apikeys to rotate key
+
+   ⚠️  Do not skip this step - the secret is exposed!
+
+2. Remove from git history
+   Urgency: HIGH
+   Rewrite git history to remove the secret from 2 commit(s). This will change
+   commit hashes.
+
+   git filter-branch --force --index-filter 'git rm --cached --ignore-unmatch payments/stripe_config.py' HEAD
+
+   ⚠️  This rewrites history - coordinate with your team first!
+
+[... additional steps ...]
+
+
+Example 4: JSON Output (for CI/CD)
+-----------------------------------
+
+$ envsync audit AWS_SECRET_ACCESS_KEY --json
+
+{
+  "secret_name": "AWS_SECRET_ACCESS_KEY",
+  "status": "LEAKED",
+  "first_seen": "2024-09-15T10:30:00Z",
+  "last_seen": "2024-10-01T14:22:00Z",
+  "exposure_duration_days": 16,
+  "commits_affected": 47,
+  "files_affected": [
+    ".env",
+    "config/settings.py",
+    "backend/config.py"
+  ],
+  "is_public": true,
+  "is_current": true,
+  "severity": "CRITICAL",
+  "branches_affected": [
+    "origin/main",
+    "origin/develop",
+    "feature/auth",
+    "feature/payments",
+    "hotfix/security"
+  ],
+  "remediation_steps": [
+    {
+      "order": 1,
+      "title": "Rotate the secret IMMEDIATELY",
+      "description": "The secret is compromised and must be replaced. Generate a new secret and update all systems using it.",
+      "urgency": "CRITICAL",
+      "command": "aws iam create-access-key --user-name <username>",
+      "warning": "Do not skip this step - the secret is exposed!"
+    },
+    {
+      "order": 2,
+      "title": "Remove from git history",
+      "description": "Rewrite git history to remove the secret from 47 commit(s). This will change commit hashes.",
+      "urgency": "HIGH",
+      "command": "git filter-branch --force --index-filter 'git rm --cached --ignore-unmatch .env config/settings.py backend/config.py' HEAD",
+      "warning": "This rewrites history - coordinate with your team first!"
+    }
+  ]
+}
+
+
+Example 5: Using with Actual Secret Value
+------------------------------------------
+
+For more accurate detection, you can provide the actual secret value:
+
+$ envsync audit API_KEY --value "sk-proj-abc123def456..."
+
+Analyzing git history for: API_KEY
+
+This may take a moment...
+
+Secret Leak Timeline for: API_KEY
+══════════════════════════════════════════════════════════════════════
+
+Timeline:
+
+📅 2024-09-25
+   Commit: aaa111bb - Add API integration
+   Author: @eve <eve@company.com>
+   📁 src/api/client.py:8
+
+[... timeline continues ...]
+
+
+CI/CD Integration Example
+--------------------------
+
+Use the JSON output in your CI/CD pipeline:
+
+# .github/workflows/security-audit.yml
+name: Security Audit
+
+on: [push]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0  # Full history for audit
+
+      - name: Install envsync
+        run: pip install envsync
+
+      - name: Audit for API keys
+        run: |
+          envsync audit API_KEY --json > audit_result.json
+
+          # Check if any leaks found
+          status=$(jq -r '.status' audit_result.json)
+          if [ "$status" == "LEAKED" ]; then
+            echo "::error::Secret leak detected!"
+            cat audit_result.json
+            exit 1
+          fi
+
+
+Notes
+-----
+
+- The audit command analyzes up to 1000 commits by default
+- Use --max-commits to analyze more or fewer commits
+- Binary files are automatically skipped
+- The tool redacts actual secret values in output for security
+- Always rotate secrets BEFORE attempting to remove from git history
+- Coordinate with your team before force pushing history rewrites
