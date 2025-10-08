@@ -47,15 +47,19 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Install dependencies
+        # UV in CI: Use --system flag to install into system Python (no venv needed)
+        # This is simpler and more reliable than creating/activating virtual environments
         run: |
-          uv pip install -e ".[dev]" packaging
+          uv pip install --system -e ".[dev]" packaging
 
       - name: Run pre-commit
+        # uv run creates ephemeral environments - this is OK for running commands
         run: uv run pre-commit run --all-files
 
       - name: Extract & classify version (PEP 440)
         id: version
         shell: bash
+        # uv run creates ephemeral environments - this is OK for running commands
         run: |
           uv run python - <<'PY'
           import os, sys
@@ -121,10 +125,12 @@ jobs:
           fi
 
       - name: Run tests with coverage
+        # uv run creates ephemeral environments - this is OK for running commands
         run: |
           uv run pytest --cov=envsync --cov-report=xml --cov-report=term
 
       - name: Check coverage threshold (75%)
+        # uv run creates ephemeral environments - this is OK for running commands
         run: |
           uv run python - <<'PY'
           import sys
@@ -145,12 +151,15 @@ jobs:
           PY
 
       - name: Run type checking
+        # uv run creates ephemeral environments - this is OK for running commands
         run: uv run mypy src/envsync
 
       - name: Security scan with bandit
+        # uv run creates ephemeral environments - this is OK for running commands
         run: uv run bandit -r src/envsync -ll
 
       - name: Scan for secrets in codebase
+        # uv run creates ephemeral environments - this is OK for running commands
         run: |
           # Use envsync's own secret scanner
           uv run python - <<'PY'
@@ -171,6 +180,7 @@ jobs:
           PY
 
       - name: Dependency vulnerability scan
+        # uv run creates ephemeral environments - this is OK for running commands
         run: uv run pip-audit
 
   tests:
@@ -192,9 +202,11 @@ jobs:
       - uses: astral-sh/setup-uv@v4
 
       - name: Install dependencies
-        run: uv pip install -e ".[dev]"
+        # UV in CI: Use --system flag to install into system Python (no venv needed)
+        run: uv pip install --system -e ".[dev]"
 
       - name: Run tests
+        # uv run creates ephemeral environments - this is OK for running commands
         run: uv run pytest -v
 
   build-package:
@@ -212,12 +224,15 @@ jobs:
       - uses: astral-sh/setup-uv@v4
 
       - name: Install build tools
-        run: uv pip install build twine
+        # UV in CI: Use --system flag to install into system Python (no venv needed)
+        run: uv pip install --system build twine
 
       - name: Build package (sdist + wheel)
+        # uv run creates ephemeral environments - this is OK for running commands
         run: uv run python -m build
 
       - name: Check package metadata
+        # uv run creates ephemeral environments - this is OK for running commands
         run: uv run twine check dist/*
 
       - name: Verify package contents
@@ -260,13 +275,17 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
           TWINE_REPOSITORY_URL: ${{ env.TEST_PYPI_INDEX_URL }}
         run: |
-          uv pip install twine
+          # UV in CI: Use --system flag to install into system Python (no venv needed)
+          uv pip install --system twine
+          # uv run creates ephemeral environments - this is OK for running commands
           uv run twine upload --skip-existing dist/*
 
       - name: Wait for Test PyPI propagation
         run: sleep 10
 
       - name: Verify install from Test PyPI (with retry)
+        # Manual venv creation here is intentional - we're testing the installed package
+        # in isolation, separate from the build environment
         run: |
           rm -rf .venv_test
           python -m venv .venv_test
@@ -284,6 +303,7 @@ jobs:
           done
 
       - name: Comprehensive CLI verification
+        # Using the test venv created above to verify the installed package
         run: |
           . .venv_test/bin/activate
 
@@ -316,6 +336,7 @@ jobs:
           envsync check --help
 
       - name: Verify Python imports
+        # Using the test venv created above to verify the installed package
         run: |
           . .venv_test/bin/activate
 
@@ -362,6 +383,7 @@ jobs:
           PY
 
       - name: Test core functionality in clean environment
+        # Using the test venv created above to verify the installed package
         run: |
           . .venv_test/bin/activate
           cd /tmp
@@ -421,6 +443,8 @@ jobs:
         run: sleep 15
 
       - name: Verify install from PyPI (with retry)
+        # Manual venv creation here is intentional - we're testing the installed package
+        # in isolation, separate from the build environment
         run: |
           rm -rf .venv_pypi
           python -m venv .venv_pypi
@@ -438,6 +462,7 @@ jobs:
           done
 
       - name: Comprehensive verification (PyPI)
+        # Using the test venv created above to verify the installed package
         run: |
           . .venv_pypi/bin/activate
 
