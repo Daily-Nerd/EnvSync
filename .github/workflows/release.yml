@@ -65,7 +65,7 @@ jobs:
         id: version
         shell: bash
         run: |
-          python - <<'PY'
+          uv run python - <<'PY'
           import os, sys
           from packaging.version import Version, InvalidVersion
 
