@@ -15,7 +15,9 @@ from rich.console import Console
 
 from tripwire.branding import LOGO_BANNER, LOGO_SIMPLE, get_status_icon, print_status
 
-console = Console()
+# On Windows, force UTF-8 encoding for Rich console to support Unicode characters
+# Use legacy_windows=False to avoid the cp1252 encoding issue
+console = Console(legacy_windows=False)
 
 # Project template definitions (module-level constant)
 # Templates use {secret_section} placeholder for dynamic secret injection

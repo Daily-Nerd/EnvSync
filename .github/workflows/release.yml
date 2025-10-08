@@ -193,13 +193,17 @@ jobs:
         run: pip-audit --skip-editable || true
 
   tests:
-    name: Test Matrix (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    name: Test Matrix (Python ${{ matrix.python-version }} on ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     needs: validate-release
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    env:
+      # Force UTF-8 encoding on Windows for proper Unicode handling
+      PYTHONIOENCODING: utf-8
     steps:
       - uses: actions/checkout@v4
 

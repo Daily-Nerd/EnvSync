@@ -62,6 +62,7 @@ DEBUG=true
         cwd=repo_path,
         capture_output=True,
         text=True,
+        encoding="utf-8",
     )
     # Git commit might fail if no changes, that's okay
     if result.returncode != 0 and "nothing to commit" not in result.stdout.lower():
@@ -85,6 +86,7 @@ class TestAuditAutoDetection:
             cwd=temp_git_repo_with_env,
             capture_output=True,
             text=True,
+            encoding="utf-8",
         )
 
         # Should succeed (exit code 0)
@@ -108,6 +110,7 @@ class TestAuditAutoDetection:
             cwd=temp_git_repo_with_env,
             capture_output=True,
             text=True,
+            encoding="utf-8",
         )
 
         # Should succeed
@@ -145,6 +148,7 @@ class TestAuditAutoDetection:
             cwd=repo_path,
             capture_output=True,
             text=True,
+            encoding="utf-8",
         )
 
         # Should fail with error
@@ -173,6 +177,7 @@ LOG_LEVEL=INFO
             cwd=repo_path,
             capture_output=True,
             text=True,
+            encoding="utf-8",
         )
 
         # Should succeed with no secrets message
@@ -187,6 +192,7 @@ LOG_LEVEL=INFO
             cwd=temp_git_repo_with_env,
             capture_output=True,
             text=True,
+            encoding="utf-8",
         )
 
         # Should fail with error
@@ -201,6 +207,7 @@ LOG_LEVEL=INFO
             cwd=temp_git_repo_with_env,
             capture_output=True,
             text=True,
+            encoding="utf-8",
         )
 
         # Should fail with error
@@ -219,6 +226,7 @@ class TestAuditVisualTimeline:
             cwd=temp_git_repo_with_env,
             capture_output=True,
             text=True,
+            encoding="utf-8",
         )
 
         # Should succeed
@@ -236,6 +244,7 @@ class TestAuditVisualTimeline:
             cwd=temp_git_repo_with_env,
             capture_output=True,
             text=True,
+            encoding="utf-8",
         )
 
         # Should succeed
