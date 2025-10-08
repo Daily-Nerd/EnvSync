@@ -81,7 +81,7 @@ DEBUG=false
 
 
 @click.group()
-@click.version_option(version="0.1.3", prog_name="envsync")
+@click.version_option(version="0.1.2", prog_name="envsync")
 def main() -> None:
     """EnvSync - Smart environment variable management for Python.
 
