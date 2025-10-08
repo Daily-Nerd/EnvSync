@@ -42,6 +42,10 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -e ".[dev]"
+        pip install pre-commit
+
+    - name: Run pre-commit hooks (format/lint/static checks)
+      run: pre-commit run --all-files
 
     - name: Extract version
       id: version
@@ -88,11 +92,6 @@ jobs:
     - name: Run tests
       run: |
         pytest --cov=envsync --cov-report=xml
-
-    - name: Run linting
-      run: |
-        ruff check .
-        black --check .
 
     - name: Run type checking
       run: mypy src/envsync
