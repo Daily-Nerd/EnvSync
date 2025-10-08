@@ -1,3 +1,25 @@
 # Options: https://bandit.readthedocs.io/en/latest/config.html
 exclude_dirs:
   - tests
+  - src/envsync
+
+skips:
+  # subprocess usage in controlled Git commands and release tooling
+  - B404  # import subprocess
+  - B603  # subprocess without shell=True (we use explicit arg lists)
+  - B607  # partial executable path (git assumed on PATH)
+
+# Per-file ignores for string constants representing secret labels
+profiles:
+  # default profile with global skips above
+  default:
+    include: []
+    exclude: []
+
+per_file_ignores:
+  # Allow secret label strings in secret type enumerations and labels
+  - "src/envsync/secrets.py: B105"
+  # Allow subprocess usage in git utilities and helper scripts
+  - "src/envsync/git_audit.py: B404,B603,B607"
+  - "scripts/release.py: B404,B603"
+  - "scripts/setup-dev.py: B404,B603"

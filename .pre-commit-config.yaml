@@ -15,6 +15,7 @@ repos:
       - id: check-merge-conflict
       # Prevention hooks
       - id: detect-private-key
+        exclude: ^tests/
       - id: forbid-submodules
       # Python hooks
       - id: check-ast
@@ -44,3 +45,4 @@ repos:
     hooks:
       - id: bandit
         args: ["-c", "bandit.yaml", "-r"]
+        additional_dependencies: ["pbr"]
