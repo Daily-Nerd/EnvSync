@@ -26,7 +26,7 @@ from tripwire.exceptions import (
 )
 from tripwire.validation import validator
 
-__version__ = "0.2.0"
+__version__ = "0.1.4"
 
 __all__ = [
     # Core
