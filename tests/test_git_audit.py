@@ -11,7 +11,7 @@ from typing import Generator
 
 import pytest
 
-from envsync.git_audit import (
+from tripwire.git_audit import (
     FileOccurrence,
     GitAuditError,
     GitCommandError,

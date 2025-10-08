@@ -1,6 +1,6 @@
-# EnvSync Performance Benchmarks
+# TripWire Performance Benchmarks
 
-This directory contains performance benchmarks for EnvSync, measuring the execution time of various operations.
+This directory contains performance benchmarks for TripWire, measuring the execution time of various operations.
 
 ## Running Benchmarks
 
@@ -35,7 +35,7 @@ This will:
 - **Validator registration** - Custom validator registration
 
 ### Configuration
-- **Config parsing** - .envsync.toml parsing
+- **Config parsing** - .tripwire.toml parsing
 
 ## Performance Metrics
 
@@ -82,8 +82,8 @@ On a modern system (Apple M1/M2, 2023):
    - Direct types are faster than coercion
 
 2. **Cache parsed configurations**
-   - Parse .envsync.toml once at startup
-   - Reuse EnvSync instances
+   - Parse .tripwire.toml once at startup
+   - Reuse TripWire instances
 
 3. **Minimize validation**
    - Use format validators only when needed

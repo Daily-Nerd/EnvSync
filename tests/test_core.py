@@ -1,20 +1,20 @@
-"""Tests for core EnvSync functionality."""
+"""Tests for core TripWire functionality."""
 
 import os
 from pathlib import Path
 
 import pytest
 
-from envsync import EnvSync, env
-from envsync.exceptions import MissingVariableError, TypeCoercionError, ValidationError
+from tripwire import TripWire, env
+from tripwire.exceptions import MissingVariableError, TypeCoercionError, ValidationError
 
 
-class TestEnvSyncInit:
-    """Tests for EnvSync initialization."""
+class TestTripWireInit:
+    """Tests for TripWire initialization."""
 
     def test_init_default(self) -> None:
         """Test default initialization."""
-        instance = EnvSync(auto_load=False)
+        instance = TripWire(auto_load=False)
         assert instance.env_file == Path(".env")
         assert instance.strict is False
         assert instance.detect_secrets is False
@@ -22,12 +22,12 @@ class TestEnvSyncInit:
     def test_init_custom_file(self, tmp_path: Path) -> None:
         """Test initialization with custom env file."""
         env_file = tmp_path / ".env.custom"
-        instance = EnvSync(env_file=env_file, auto_load=False)
+        instance = TripWire(env_file=env_file, auto_load=False)
         assert instance.env_file == env_file
 
     def test_init_auto_load(self, sample_env_file: Path) -> None:
         """Test auto-loading of env file."""
-        instance = EnvSync(env_file=sample_env_file, auto_load=True)
+        instance = TripWire(env_file=sample_env_file, auto_load=True)
         assert sample_env_file in instance._loaded_files
 
 
@@ -212,7 +212,7 @@ class TestLoadMethod:
 
     def test_load_file(self, sample_env_file: Path) -> None:
         """Test loading env file."""
-        instance = EnvSync(auto_load=False)
+        instance = TripWire(auto_load=False)
         instance.load(sample_env_file)
 
         # Verify variables were loaded
@@ -220,14 +220,14 @@ class TestLoadMethod:
 
     def test_load_nonexistent_file_strict(self, tmp_path: Path) -> None:
         """Test loading nonexistent file in strict mode raises error."""
-        from envsync.exceptions import EnvFileNotFoundError
+        from tripwire.exceptions import EnvFileNotFoundError
 
-        instance = EnvSync(auto_load=False, strict=True)
+        instance = TripWire(auto_load=False, strict=True)
         with pytest.raises(EnvFileNotFoundError):
             instance.load(tmp_path / ".env.missing")
 
     def test_load_nonexistent_file_non_strict(self, tmp_path: Path) -> None:
         """Test loading nonexistent file in non-strict mode does nothing."""
-        instance = EnvSync(auto_load=False, strict=False)
+        instance = TripWire(auto_load=False, strict=False)
         # Should not raise
         instance.load(tmp_path / ".env.missing")

@@ -102,14 +102,14 @@ jobs:
           fi
 
           # Check __init__.py version
-          INIT_VERSION=$(grep '^__version__ = ' src/envsync/__init__.py | sed 's/__version__ = "\(.*\)"/\1/')
+          INIT_VERSION=$(grep '^__version__ = ' src/tripwire/__init__.py | sed 's/__version__ = "\(.*\)"/\1/')
           if [ "$VERSION" != "$INIT_VERSION" ]; then
             echo "::error::Version mismatch: tag=$VERSION but __init__.py=$INIT_VERSION"
             exit 1
           fi
 
           # Check cli.py version using Python for more reliable parsing
-          CLI_VERSION=$(python3 -c "import re; content=open('src/envsync/cli.py').read(); match=re.search(r'@click\.version_option\(version=\"([^\"]+)\"', content); print(match.group(1) if match else '')")
+          CLI_VERSION=$(python3 -c "import re; content=open('src/tripwire/cli.py').read(); match=re.search(r'@click\.version_option\(version=\"([^\"]+)\"', content); print(match.group(1) if match else '')")
           if [ "$VERSION" != "$CLI_VERSION" ]; then
             echo "::error::Version mismatch: tag=$VERSION but cli.py=$CLI_VERSION"
             exit 1
@@ -130,7 +130,7 @@ jobs:
         # Using direct command (installed via --system) rather than uv run
         # CI environments are already isolated, no need for additional ephemeral envs
         run: |
-          pytest --cov=envsync --cov-report=xml --cov-report=term
+          pytest --cov=tripwire --cov-report=xml --cov-report=term
 
       - name: Check coverage threshold (75%)
         # Using direct command (installed via --system) rather than uv run
@@ -157,22 +157,22 @@ jobs:
       - name: Run type checking
         # Using direct command (installed via --system) rather than uv run
         # CI environments are already isolated, no need for additional ephemeral envs
-        run: mypy src/envsync
+        run: mypy src/tripwire
 
       - name: Security scan with bandit
         # Using direct command (installed via --system) rather than uv run
         # CI environments are already isolated, no need for additional ephemeral envs
-        run: bandit -r src/envsync -ll
+        run: bandit -r src/tripwire -ll
 
       - name: Scan for secrets in codebase
         # Using direct command (installed via --system) rather than uv run
         # CI environments are already isolated, no need for additional ephemeral envs
         run: |
-          # Use envsync's own secret scanner
+          # Use tripwire's own secret scanner
           python - <<'PY'
           import sys
           from pathlib import Path
-          from envsync.secrets import scan_env_file
+          from tripwire.secrets import scan_env_file
 
           # Scan example files for accidentally committed secrets
           for env_file in Path('.').rglob('.env.example'):
@@ -193,13 +193,17 @@ jobs:
         run: pip-audit --skip-editable || true
 
   tests:
-    name: Test Matrix (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    name: Test Matrix (Python ${{ matrix.python-version }} on ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     needs: validate-release
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    env:
+      # Force UTF-8 encoding on Windows for proper Unicode handling
+      PYTHONIOENCODING: utf-8
     steps:
       - uses: actions/checkout@v4
 
@@ -253,7 +257,7 @@ jobs:
           echo "---"
           # Check entry points
           python -m zipfile -e dist/*.whl /tmp/wheel_check
-          cat /tmp/wheel_check/envsync-*.dist-info/entry_points.txt
+          cat /tmp/wheel_check/tripwire-*.dist-info/entry_points.txt
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -306,7 +310,7 @@ jobs:
 
           # Retry installation with exponential backoff
           for i in {1..5}; do
-            if pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ envsync==${{ needs.validate-release.outputs.version }}; then
+            if pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ tripwire-py==${{ needs.validate-release.outputs.version }}; then
               echo "✓ Package installed successfully"
               break
             fi
@@ -320,22 +324,22 @@ jobs:
           . .venv_test/bin/activate
 
           echo "=== Testing --version ==="
-          envsync --version
-          if ! envsync --version | grep -q "${{ needs.validate-release.outputs.version }}"; then
+          tripwire --version
+          if ! tripwire --version | grep -q "${{ needs.validate-release.outputs.version }}"; then
             echo "::error::Version mismatch in CLI output"
             exit 1
           fi
 
           echo "=== Testing --help ==="
-          envsync --help
-          if ! envsync --help | grep -q "EnvSync - Smart environment variable management"; then
+          tripwire --help
+          if ! tripwire --help | grep -q "TripWire - Smart environment variable management"; then
             echo "::error::Help output doesn't match expected format"
             exit 1
           fi
 
           echo "=== Testing subcommands exist ==="
           for cmd in init generate check sync scan audit validate docs; do
-            if ! envsync --help | grep -q "$cmd"; then
+            if ! tripwire --help | grep -q "$cmd"; then
               echo "::error::Command '$cmd' not found in help output"
               exit 1
             fi
@@ -343,9 +347,9 @@ jobs:
           done
 
           echo "=== Testing subcommand help ==="
-          envsync init --help
-          envsync generate --help
-          envsync check --help
+          tripwire init --help
+          tripwire generate --help
+          tripwire check --help
 
       - name: Verify Python imports
         # Using the test venv created above to verify the installed package
@@ -357,24 +361,24 @@ jobs:
 
           # Test basic import
           try:
-              import envsync
-              print(f"✓ Successfully imported envsync version {envsync.__version__}")
+              import tripwire
+              print(f"✓ Successfully imported tripwire version {tripwire.__version__}")
           except ImportError as e:
-              print(f"::error::Failed to import envsync: {e}")
+              print(f"::error::Failed to import tripwire: {e}")
               sys.exit(1)
 
           # Test core functionality
           try:
-              from envsync import env, EnvSync
-              print("✓ Successfully imported env and EnvSync")
+              from tripwire import env, TripWire
+              print("✓ Successfully imported env and TripWire")
           except ImportError as e:
               print(f"::error::Failed to import core components: {e}")
               sys.exit(1)
 
           # Test exceptions
           try:
-              from envsync import (
-                  EnvSyncError,
+              from tripwire import (
+                  TripWireError,
                   MissingVariableError,
                   ValidationError,
               )
@@ -385,7 +389,7 @@ jobs:
 
           # Test validator
           try:
-              from envsync import validator
+              from tripwire import validator
               print("✓ Successfully imported validator")
           except ImportError as e:
               print(f"::error::Failed to import validator: {e}")
@@ -401,11 +405,11 @@ jobs:
           cd /tmp
 
           # Test init command
-          mkdir -p test_envsync_functionality
-          cd test_envsync_functionality
+          mkdir -p test_tripwire_functionality
+          cd test_tripwire_functionality
 
-          echo "=== Testing envsync init ==="
-          envsync init --project-type=cli
+          echo "=== Testing tripwire init ==="
+          tripwire init --project-type=cli
           if [ ! -f .env ]; then
             echo "::error::init command didn't create .env file"
             exit 1
@@ -416,8 +420,8 @@ jobs:
           fi
           echo "✓ init command works"
 
-          echo "=== Testing envsync check ==="
-          envsync check || echo "Check command executed (drift expected)"
+          echo "=== Testing tripwire check ==="
+          tripwire check || echo "Check command executed (drift expected)"
 
           echo "\n✓ All functionality tests passed"
 
@@ -432,7 +436,7 @@ jobs:
       id-token: write
     environment:
       name: pypi
-      url: https://pypi.org/p/envsync
+      url: https://pypi.org/p/tripwire-py
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -443,7 +447,7 @@ jobs:
         run: |
           VERSION="${{ needs.validate-release.outputs.version }}"
           # Check if version exists on PyPI
-          if pip index versions envsync 2>/dev/null | grep -q "envsync ($VERSION)"; then
+          if pip index versions tripwire-py 2>/dev/null | grep -q "tripwire-py ($VERSION)"; then
             echo "::error::Version $VERSION already exists on PyPI!"
             echo "::error::PyPI does not allow overwriting versions."
             echo "::error::Please bump the version number and try again."
@@ -477,7 +481,7 @@ jobs:
 
           # Retry installation with exponential backoff
           for i in {1..5}; do
-            if pip install envsync==${{ needs.validate-release.outputs.version }}; then
+            if pip install tripwire-py==${{ needs.validate-release.outputs.version }}; then
               echo "✓ Package installed from PyPI"
               break
             fi
@@ -491,17 +495,17 @@ jobs:
           . .venv_pypi/bin/activate
 
           echo "=== Verifying version ==="
-          envsync --version
-          if ! envsync --version | grep -q "${{ needs.validate-release.outputs.version }}"; then
+          tripwire --version
+          if ! tripwire --version | grep -q "${{ needs.validate-release.outputs.version }}"; then
             echo "::error::Version mismatch"
             exit 1
           fi
 
           echo "=== Verifying CLI works ==="
-          envsync --help
+          tripwire --help
 
           echo "=== Verifying imports ==="
-          python -c "from envsync import env, EnvSync, validator; print('✓ All imports successful')"
+          python -c "from tripwire import env, TripWire, validator; print('✓ All imports successful')"
 
           echo "✓ PyPI package verification complete"
 
@@ -539,13 +543,13 @@ jobs:
             echo "## Installation"
             echo
             echo "\`\`\`bash"
-            echo "pip install envsync==$VERSION"
+            echo "pip install tripwire-py==$VERSION"
             echo "\`\`\`"
             echo
             echo "## Quick Start"
             echo
             echo "\`\`\`python"
-            echo "from envsync import env"
+            echo "from tripwire import env"
             echo "API_KEY = env.require('API_KEY')"
             echo "DATABASE_URL = env.require('DATABASE_URL')"
             echo "DEBUG = env.optional('DEBUG', default=False, type=bool)"
@@ -561,8 +565,8 @@ jobs:
           draft: false
           prerelease: ${{ needs.validate-release.outputs.is_prerelease }}
           files: |
-            dist/envsync-${{ needs.validate-release.outputs.version }}-py3-none-any.whl
-            dist/envsync-${{ needs.validate-release.outputs.version }}.tar.gz
+            dist/tripwire-${{ needs.validate-release.outputs.version }}-py3-none-any.whl
+            dist/tripwire-${{ needs.validate-release.outputs.version }}.tar.gz
 
   notify:
     name: Notify Release
@@ -574,7 +578,7 @@ jobs:
         run: |
           if [ "${{ needs.create-release.result }}" = "success" ]; then
             echo "✅ Release v${{ needs.validate-release.outputs.version }} published."
-            echo "📦 PyPI: https://pypi.org/project/envsync/${{ needs.validate-release.outputs.version }}/"
+            echo "📦 PyPI: https://pypi.org/project/tripwire-py/${{ needs.validate-release.outputs.version }}/"
             echo "🏷️ GitHub: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.validate-release.outputs.version }}"
           else
             echo "❌ Release failed. Check logs."

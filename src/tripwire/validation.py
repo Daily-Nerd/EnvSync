@@ -22,7 +22,7 @@ import re
 import threading
 from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
 
-from envsync.exceptions import TypeCoercionError
+from tripwire.exceptions import TypeCoercionError
 
 T = TypeVar("T")
 

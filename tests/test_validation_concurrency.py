@@ -9,7 +9,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable, List
 
-from envsync.validation import (
+from tripwire.validation import (
     clear_custom_validators,
     get_validator,
     list_validators,

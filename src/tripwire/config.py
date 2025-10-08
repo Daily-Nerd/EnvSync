@@ -1,6 +1,6 @@
-"""Configuration file support for EnvSync.
+"""Configuration file support for TripWire.
 
-This module provides functionality to load and parse .envsync.toml configuration files,
+This module provides functionality to load and parse .tripwire.toml configuration files,
 allowing teams to standardize environment variable requirements across projects.
 """
 
@@ -47,8 +47,8 @@ class VariableConfig:
 
 
 @dataclass
-class EnvSyncConfig:
-    """EnvSync project configuration.
+class TripWireConfig:
+    """TripWire project configuration.
 
     Attributes:
         variables: Dictionary of variable configurations
@@ -67,14 +67,14 @@ class EnvSyncConfig:
     allow_os_environ: bool = True
 
 
-def load_config(config_path: Optional[Path] = None) -> Optional[EnvSyncConfig]:
-    """Load EnvSync configuration from .envsync.toml file.
+def load_config(config_path: Optional[Path] = None) -> Optional[TripWireConfig]:
+    """Load TripWire configuration from .tripwire.toml file.
 
     Args:
-        config_path: Path to config file (default: search for .envsync.toml)
+        config_path: Path to config file (default: search for .tripwire.toml)
 
     Returns:
-        EnvSyncConfig object or None if no config file found
+        TripWireConfig object or None if no config file found
     """
     if config_path is None:
         config_path = find_config_file()
@@ -92,7 +92,7 @@ def load_config(config_path: Optional[Path] = None) -> Optional[EnvSyncConfig]:
 
 
 def find_config_file(start_path: Optional[Path] = None) -> Optional[Path]:
-    """Search for .envsync.toml file in current directory and parents.
+    """Search for .tripwire.toml file in current directory and parents.
 
     Args:
         start_path: Directory to start search from (default: current directory)
@@ -107,7 +107,7 @@ def find_config_file(start_path: Optional[Path] = None) -> Optional[Path]:
 
     # Search up to root
     while True:
-        config_path = current / ".envsync.toml"
+        config_path = current / ".tripwire.toml"
         if config_path.exists():
             return config_path
 
@@ -120,20 +120,20 @@ def find_config_file(start_path: Optional[Path] = None) -> Optional[Path]:
     return None
 
 
-def parse_config(data: Dict[str, Any]) -> EnvSyncConfig:
-    """Parse configuration dictionary into EnvSyncConfig object.
+def parse_config(data: Dict[str, Any]) -> TripWireConfig:
+    """Parse configuration dictionary into TripWireConfig object.
 
     Args:
         data: Configuration dictionary from TOML file
 
     Returns:
-        EnvSyncConfig object
+        TripWireConfig object
     """
-    config = EnvSyncConfig()
+    config = TripWireConfig()
 
     # Parse global settings
-    if "envsync" in data:
-        settings = data["envsync"]
+    if "tripwire" in data:
+        settings = data["tripwire"]
         config.env_file = settings.get("env_file", ".env")
         config.strict = settings.get("strict", False)
         config.detect_secrets = settings.get("detect_secrets", False)
@@ -183,18 +183,18 @@ def parse_variable_config(name: str, data: Dict[str, Any]) -> VariableConfig:
     return var_config
 
 
-def apply_config_to_envsync(config: EnvSyncConfig, env_sync: Any) -> None:
-    """Apply configuration settings to an EnvSync instance.
+def apply_config_to_tripwire(config: TripWireConfig, env_sync: Any) -> None:
+    """Apply configuration settings to an TripWire instance.
 
     Args:
         config: Configuration to apply
-        env_sync: EnvSync instance to configure
+        env_sync: TripWire instance to configure
     """
     env_sync.strict = config.strict
     env_sync.detect_secrets = config.detect_secrets
 
 
-def validate_config(config: EnvSyncConfig) -> List[str]:
+def validate_config(config: TripWireConfig) -> List[str]:
     """Validate configuration for common issues.
 
     Args:
@@ -236,15 +236,15 @@ def validate_config(config: EnvSyncConfig) -> List[str]:
 
 
 def generate_example_config() -> str:
-    """Generate an example .envsync.toml configuration file.
+    """Generate an example .tripwire.toml configuration file.
 
     Returns:
         Example configuration as a string
     """
-    return """# EnvSync Configuration File
+    return """# TripWire Configuration File
 # This file defines environment variable requirements for your project
 
-[envsync]
+[tripwire]
 # Path to .env file (default: .env)
 env_file = ".env"
 

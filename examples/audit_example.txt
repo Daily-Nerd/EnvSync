@@ -1,13 +1,13 @@
 Secret Leak Timeline - Example Output
 =====================================
 
-This file demonstrates the output of the `envsync audit` command when a secret
+This file demonstrates the output of the `tripwire audit` command when a secret
 has been leaked to git history.
 
 Example 1: Critical Leak (Public Repository)
 ---------------------------------------------
 
-$ envsync audit AWS_SECRET_ACCESS_KEY
+$ tripwire audit AWS_SECRET_ACCESS_KEY
 
 Analyzing git history for: AWS_SECRET_ACCESS_KEY
 
@@ -99,7 +99,7 @@ Timeline:
    Urgency: LOW
    Prevent future leaks by scanning commits before they're pushed.
 
-   envsync install-hooks  # Coming soon!
+   tripwire install-hooks  # Coming soon!
 
 💡 Prevention Tips:
   • Always add .env files to .gitignore
@@ -112,7 +112,7 @@ Timeline:
 Example 2: No Leak Found (Clean Repository)
 --------------------------------------------
 
-$ envsync audit DATABASE_PASSWORD
+$ tripwire audit DATABASE_PASSWORD
 
 Analyzing git history for: DATABASE_PASSWORD
 
@@ -125,7 +125,7 @@ This secret does not appear in git history.
 Example 3: Leak Removed (Fixed)
 --------------------------------
 
-$ envsync audit STRIPE_SECRET_KEY
+$ tripwire audit STRIPE_SECRET_KEY
 
 Analyzing git history for: STRIPE_SECRET_KEY
 
@@ -185,7 +185,7 @@ Timeline:
 Example 4: JSON Output (for CI/CD)
 -----------------------------------
 
-$ envsync audit AWS_SECRET_ACCESS_KEY --json
+$ tripwire audit AWS_SECRET_ACCESS_KEY --json
 
 {
   "secret_name": "AWS_SECRET_ACCESS_KEY",
@@ -235,7 +235,7 @@ Example 5: Using with Actual Secret Value
 
 For more accurate detection, you can provide the actual secret value:
 
-$ envsync audit API_KEY --value "sk-proj-abc123def456..."
+$ tripwire audit API_KEY --value "sk-proj-abc123def456..."
 
 Analyzing git history for: API_KEY
 
@@ -272,12 +272,12 @@ jobs:
         with:
           fetch-depth: 0  # Full history for audit
 
-      - name: Install envsync
-        run: pip install envsync
+      - name: Install tripwire
+        run: pip install tripwire
 
       - name: Audit for API keys
         run: |
-          envsync audit API_KEY --json > audit_result.json
+          tripwire audit API_KEY --json > audit_result.json
 
           # Check if any leaks found
           status=$(jq -r '.status' audit_result.json)

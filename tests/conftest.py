@@ -1,4 +1,4 @@
-"""Pytest configuration and shared fixtures for EnvSync tests."""
+"""Pytest configuration and shared fixtures for TripWire tests."""
 
 import os
 from pathlib import Path

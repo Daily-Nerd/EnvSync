@@ -1,4 +1,4 @@
-# EnvSync
+# TripWire
 
 **Smart Environment Variable Management for Python**
 
@@ -41,11 +41,11 @@ response = requests.get(url, headers={"Authorization": f"Bearer {API_KEY}"})
 
 ---
 
-## ✨ The Solution: EnvSync
+## ✨ The Solution: TripWire
 
-EnvSync validates environment variables **at import time** and keeps your team in sync.
+TripWire validates environment variables **at import time** and keeps your team in sync.
 
-### Before EnvSync
+### Before TripWire
 ```python
 import os
 
@@ -55,9 +55,9 @@ PORT = int(os.getenv("PORT"))  # ValueError if PORT not set
 DEBUG = os.getenv("DEBUG") == "true"  # Wrong! Returns False for "True", "1", etc.
 ```
 
-### After EnvSync
+### After TripWire
 ```python
-from envsync import env
+from tripwire import env
 
 # Import fails immediately if vars missing/invalid
 DATABASE_URL: str = env.require("DATABASE_URL", format="postgresql")
@@ -82,14 +82,14 @@ DEBUG: bool = env.optional("DEBUG", default=False, type=bool)
 ### Installation
 
 ```bash
-pip install envsync
+pip install tripwire
 ```
 
 ### Basic Usage
 
 ```python
 # app.py
-from envsync import env
+from tripwire import env
 
 # Required variables (fail if missing)
 API_KEY: str = env.require("API_KEY")
@@ -125,7 +125,7 @@ MAX_RETRIES=5
 $ python app.py
 
 # If env vars missing:
-❌ EnvSync Validation Failed!
+❌ TripWire Validation Failed!
 
 Missing required environment variables:
   - API_KEY
@@ -135,7 +135,7 @@ To fix, add to .env:
   API_KEY=your-api-key-here
   DATABASE_URL=postgresql://user:pass@localhost/dbname
 
-Or run: envsync generate
+Or run: tripwire generate
 ```
 
 ---
@@ -147,7 +147,7 @@ Or run: envsync generate
 **The killer feature** - Your app won't start with bad config.
 
 ```python
-from envsync import env
+from tripwire import env
 
 # This line MUST succeed or ImportError is raised
 API_KEY = env.require("API_KEY")
@@ -165,9 +165,9 @@ def call_api():
     headers = {"Authorization": f"Bearer {API_KEY}"}  # 💥 Crash!
 ```
 
-**EnvSync approach (import-time failure):**
+**TripWire approach (import-time failure):**
 ```python
-from envsync import env
+from tripwire import env
 API_KEY = env.require("API_KEY")  # 💥 ImportError immediately if missing!
 
 # Never reaches here with bad config
@@ -180,7 +180,7 @@ def call_api():
 Automatic type conversion with validation.
 
 ```python
-from envsync import env
+from tripwire import env
 
 # Strings (default)
 API_KEY: str = env.require("API_KEY")
@@ -216,7 +216,7 @@ ENVIRONMENT: str = env.require(
 Built-in validators for common formats.
 
 ```python
-from envsync import env
+from tripwire import env
 
 # Email validation
 ADMIN_EMAIL: str = env.require("ADMIN_EMAIL", format="email")
@@ -250,7 +250,7 @@ API_KEY: str = env.require("API_KEY", pattern=r"^sk-[a-zA-Z0-9]{32}$")
 Write your own validation logic.
 
 ```python
-from envsync import env, validator
+from tripwire import env, validator
 
 @validator
 def validate_s3_bucket(value: str) -> bool:
@@ -277,11 +277,11 @@ PORT: int = env.require(
 
 ### 5. Automatic `.env.example` Generation
 
-EnvSync scans your code and generates `.env.example` automatically.
+TripWire scans your code and generates `.env.example` automatically.
 
 ```python
 # app.py
-from envsync import env
+from tripwire import env
 
 API_KEY: str = env.require("API_KEY", description="OpenAI API key")
 DATABASE_URL: str = env.require("DATABASE_URL", description="PostgreSQL connection string")
@@ -289,7 +289,7 @@ DEBUG: bool = env.optional("DEBUG", default=False, description="Enable debug mod
 ```
 
 ```bash
-$ envsync generate
+$ tripwire generate
 
 Created: .env.example
 
@@ -319,7 +319,7 @@ cp .env.example .env
 Detect when your `.env` is out of sync with the team.
 
 ```bash
-$ envsync check
+$ tripwire check
 
 Checking .env against .env.example...
 
@@ -334,11 +334,11 @@ Missing variables:
 Extra variables (safe to remove):
   DEPRECATED_VAR
 
-Run: envsync sync
+Run: tripwire sync
 ```
 
 ```bash
-$ envsync sync
+$ tripwire sync
 
 Syncing .env with .env.example...
 
@@ -356,7 +356,7 @@ Removed from .env:
 Prevent accidentally committing secrets.
 
 ```python
-from envsync import env
+from tripwire import env
 
 # Mark as secret
 AWS_SECRET_KEY: str = env.require("AWS_SECRET_KEY", secret=True)
@@ -364,7 +364,7 @@ STRIPE_SECRET: str = env.require("STRIPE_SECRET", secret=True)
 ```
 
 ```bash
-$ envsync scan
+$ tripwire scan
 
 Scanning for secrets in git history...
 
@@ -390,7 +390,7 @@ To ignore: git commit --no-verify
 Load different env files for different environments.
 
 ```python
-from envsync import env
+from tripwire import env
 
 # Load base .env
 env.load(".env")
@@ -417,12 +417,12 @@ env.load(f".env.{environment}", override=True)
 
 ### 9. Helpful Error Messages
 
-EnvSync gives you actionable error messages.
+TripWire gives you actionable error messages.
 
 ```bash
 $ python app.py
 
-❌ EnvSync Validation Failed!
+❌ TripWire Validation Failed!
 
 Missing required environment variable: API_KEY
 
@@ -439,13 +439,13 @@ To fix:
      export API_KEY=sk-your-api-key-here
 
   3. Or generate .env.example:
-     envsync generate
+     tripwire generate
 
 Did you mean?
   - API_SECRET (similar name in .env.example)
   - API_TOKEN (similar name in .env.example)
 
-For help: envsync --help
+For help: tripwire --help
 ```
 
 ### 10. CI/CD Integration
@@ -467,28 +467,28 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install EnvSync
-        run: pip install envsync
+      - name: Install TripWire
+        run: pip install tripwire
 
       - name: Validate .env.example is up to date
         run: |
-          envsync generate --check
+          tripwire generate --check
           # Fails if .env.example is out of sync with code
 
       - name: Check for secrets in git
-        run: envsync scan --strict
+        run: tripwire scan --strict
 ```
 
 ---
 
 ## 📚 CLI Reference
 
-### `envsync generate`
+### `tripwire generate`
 
 Generate `.env.example` from your code.
 
 ```bash
-$ envsync generate
+$ tripwire generate
 
 Options:
   --output FILE        Output file (default: .env.example)
@@ -497,17 +497,17 @@ Options:
   --format json|yaml   Output format (default: dotenv)
 
 Examples:
-  envsync generate                    # Create .env.example
-  envsync generate --check            # Validate in CI
-  envsync generate --output .env.dev  # Custom output
+  tripwire generate                    # Create .env.example
+  tripwire generate --check            # Validate in CI
+  tripwire generate --output .env.dev  # Custom output
 ```
 
-### `envsync check`
+### `tripwire check`
 
 Check your `.env` for missing/extra variables.
 
 ```bash
-$ envsync check
+$ tripwire check
 
 Options:
   --env-file FILE      .env file to check (default: .env)
@@ -516,17 +516,17 @@ Options:
   --json               Output as JSON
 
 Examples:
-  envsync check                       # Check .env vs .env.example
-  envsync check --strict              # Exit 1 if differences
-  envsync check --env-file .env.prod  # Check production env
+  tripwire check                       # Check .env vs .env.example
+  tripwire check --strict              # Exit 1 if differences
+  tripwire check --env-file .env.prod  # Check production env
 ```
 
-### `envsync sync`
+### `tripwire sync`
 
 Synchronize your `.env` with `.env.example`.
 
 ```bash
-$ envsync sync
+$ tripwire sync
 
 Options:
   --env-file FILE      .env file to sync (default: .env)
@@ -535,17 +535,17 @@ Options:
   --interactive        Ask before each change
 
 Examples:
-  envsync sync                        # Sync .env
-  envsync sync --dry-run              # Preview changes
-  envsync sync --interactive          # Confirm each change
+  tripwire sync                        # Sync .env
+  tripwire sync --dry-run              # Preview changes
+  tripwire sync --interactive          # Confirm each change
 ```
 
-### `envsync scan`
+### `tripwire scan`
 
 Scan for secrets in git history.
 
 ```bash
-$ envsync scan
+$ tripwire scan
 
 Options:
   --strict             Fail if secrets found
@@ -553,41 +553,41 @@ Options:
   --fix                Offer to remove secrets from git history
 
 Examples:
-  envsync scan                        # Scan for secrets
-  envsync scan --strict               # Fail on secrets (CI)
-  envsync scan --fix                  # Remove secrets from git
+  tripwire scan                        # Scan for secrets
+  tripwire scan --strict               # Fail on secrets (CI)
+  tripwire scan --fix                  # Remove secrets from git
 ```
 
-### `envsync validate`
+### `tripwire validate`
 
 Validate environment variables without running app.
 
 ```bash
-$ envsync validate
+$ tripwire validate
 
 Options:
   --env-file FILE      .env file to validate (default: .env)
   --app MODULE         Python module to validate
 
 Examples:
-  envsync validate                    # Validate current .env
-  envsync validate --app myapp.config # Validate specific module
+  tripwire validate                    # Validate current .env
+  tripwire validate --app myapp.config # Validate specific module
 ```
 
-### `envsync docs`
+### `tripwire docs`
 
 Generate documentation for environment variables.
 
 ```bash
-$ envsync docs
+$ tripwire docs
 
 Options:
   --format markdown|html|json
   --output FILE
 
 Examples:
-  envsync docs > ENV_VARS.md          # Markdown table
-  envsync docs --format html > docs/env.html
+  tripwire docs > ENV_VARS.md          # Markdown table
+  tripwire docs --format html > docs/env.html
 ```
 
 **Example output:**
@@ -605,11 +605,11 @@ Examples:
 
 ### Configuration File
 
-Create `envsync.toml` for project-wide settings.
+Create `tripwire.toml` for project-wide settings.
 
 ```toml
-# envsync.toml
-[envsync]
+# tripwire.toml
+[tripwire]
 # Env files to load (in order)
 env_files = [".env", ".env.local"]
 
@@ -630,17 +630,17 @@ auto_sync = true  # Sync on startup
 # Error handling
 on_error = "raise"  # or "warn", "ignore"
 
-[envsync.defaults]
+[tripwire.defaults]
 # Default values for all environments
 LOG_LEVEL = "INFO"
 TIMEOUT = 30
 
-[envsync.development]
+[tripwire.development]
 # Development-specific defaults
 DEBUG = true
 LOG_LEVEL = "DEBUG"
 
-[envsync.production]
+[tripwire.production]
 # Production-specific defaults
 DEBUG = false
 LOG_LEVEL = "WARNING"
@@ -649,10 +649,10 @@ LOG_LEVEL = "WARNING"
 ### Programmatic Usage
 
 ```python
-from envsync import EnvSync
+from tripwire import TripWire
 
 # Create custom instance
-env = EnvSync(
+env = TripWire(
     env_file=".env.custom",
     auto_load=True,
     strict=True,
@@ -681,7 +681,7 @@ all_vars = env.all()  # Dict of all env vars
 try:
     env.validate()
     print("✅ All environment variables valid")
-except EnvSyncError as e:
+except TripWireError as e:
     print(f"❌ Validation failed: {e}")
 
 # Generate .env.example
@@ -694,7 +694,7 @@ env.generate_example(output=".env.example")
 
 ```python
 from fastapi import FastAPI
-from envsync import env
+from tripwire import env
 
 # Load env vars at module level
 DATABASE_URL: str = env.require("DATABASE_URL")
@@ -713,7 +713,7 @@ async def startup():
 
 ```python
 # settings.py
-from envsync import env
+from tripwire import env
 
 # Replace os.getenv with env.require/optional
 SECRET_KEY = env.require("DJANGO_SECRET_KEY", secret=True)
@@ -736,7 +736,7 @@ DATABASES = {
 
 ```python
 from flask import Flask
-from envsync import env
+from tripwire import env
 
 # Validate before app creation
 DATABASE_URL: str = env.require("DATABASE_URL")
@@ -754,7 +754,7 @@ app.config['DEBUG'] = DEBUG
 ```python
 # tests/test_config.py
 import pytest
-from envsync import env, EnvSyncError
+from tripwire import env, TripWireError
 
 def test_required_env_vars_present(monkeypatch):
     """Test that all required env vars are set."""
@@ -775,7 +775,7 @@ def test_invalid_type_raises_error(monkeypatch):
     """Test that invalid types raise errors."""
     monkeypatch.setenv("PORT", "not-a-number")
 
-    with pytest.raises(EnvSyncError, match="Invalid type.*PORT"):
+    with pytest.raises(TripWireError, match="Invalid type.*PORT"):
         PORT = env.require("PORT", type=int)
 
 # Test with temporary .env file
@@ -784,7 +784,7 @@ def test_with_temp_env(tmp_path):
     env_file = tmp_path / ".env"
     env_file.write_text("API_KEY=test-key\nDEBUG=true\n")
 
-    temp_env = EnvSync(env_file=str(env_file))
+    temp_env = TripWire(env_file=str(env_file))
     assert temp_env.get("API_KEY") == "test-key"
     assert temp_env.get("DEBUG", type=bool) is True
 ```
@@ -796,7 +796,7 @@ def test_with_temp_env(tmp_path):
 ### Environment Variable Loading
 
 ```python
-from envsync import env
+from tripwire import env
 
 # Basic loading
 env.load(".env")  # Load .env file
@@ -819,24 +819,24 @@ env.load(".env", interpolate=True)
 
 ```python
 # Strict mode (warnings become errors)
-env = EnvSync(strict=True)
+env = TripWire(strict=True)
 
 # Custom error handling
-env = EnvSync(
+env = TripWire(
     on_error="warn"  # "raise", "warn", "ignore"
 )
 
 # Validate on load
-env = EnvSync(validate_on_load=True)
+env = TripWire(validate_on_load=True)
 
 # Require .env file
-env = EnvSync(require_env_file=True)
+env = TripWire(require_env_file=True)
 ```
 
 ### Secret Detection
 
 ```python
-env = EnvSync(
+env = TripWire(
     detect_secrets=True,
     secret_patterns=[
         r"sk-[a-zA-Z0-9]{32}",         # OpenAI
@@ -852,7 +852,7 @@ env = EnvSync(
 
 ## 📊 Comparison with Alternatives
 
-| Feature | EnvSync | python-decouple | environs | pydantic-settings | python-dotenv |
+| Feature | TripWire | python-decouple | environs | pydantic-settings | python-dotenv |
 |---------|---------|-----------------|----------|-------------------|---------------|
 | Import-time validation | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Type coercion | ✅ | ⚠️ Basic | ✅ | ✅ | ❌ |
@@ -865,14 +865,14 @@ env = EnvSync(
 | Multi-environment | ✅ | ⚠️ | ✅ | ✅ | ⚠️ |
 | Zero dependencies | ❌ | ✅ | ❌ | ❌ | ✅ |
 
-**Why EnvSync?**
+**Why TripWire?**
 
 - **python-dotenv**: Just loads `.env` files, no validation
 - **python-decouple**: Basic type casting, but runtime errors only
 - **environs**: Good validation, but verbose API and no team sync
 - **pydantic-settings**: Requires Pydantic models (overkill for simple configs)
 
-**EnvSync combines the best features** and adds unique capabilities (import-time validation, team sync, secret detection).
+**TripWire combines the best features** and adds unique capabilities (import-time validation, team sync, secret detection).
 
 ---
 
@@ -928,8 +928,8 @@ We welcome contributions! Here's how to get started:
 
 ```bash
 # Clone repository
-git clone https://github.com/Daily-Nerd/EnvSync.git
-cd envsync
+git clone https://github.com/Daily-Nerd/TripWire.git
+cd tripwire
 
 # Create virtual environment
 python -m venv venv
@@ -955,7 +955,7 @@ black .
 pytest
 
 # Run with coverage
-pytest --cov=envsync --cov-report=html
+pytest --cov=tripwire --cov-report=html
 
 # Run specific test file
 pytest tests/test_validation.py
@@ -967,10 +967,10 @@ pytest tests/test_validation.py::test_import_time_validation
 ### Project Structure
 
 ```
-envsync/
-├── envsync/
+tripwire/
+├── tripwire/
 │   ├── __init__.py          # Public API
-│   ├── core.py              # Core EnvSync class
+│   ├── core.py              # Core TripWire class
 │   ├── validation.py        # Validators
 │   ├── cli.py               # CLI commands
 │   ├── scanner.py           # Secret scanning
@@ -996,7 +996,7 @@ envsync/
 
 ### Areas for Contribution
 
-- 🐛 **Bug fixes**: Check [issues](https://github.com/Daily-Nerd/EnvSync/issues)
+- 🐛 **Bug fixes**: Check [issues](https://github.com/Daily-Nerd/TripWire/issues)
 - 🎨 **New validators**: Add format validators for common patterns
 - 🔌 **Framework integrations**: Django, FastAPI, Flask plugins
 - 📚 **Documentation**: Examples, tutorials, guides
@@ -1029,22 +1029,22 @@ Built with:
 
 ## 📞 Support & Community
 
-- **Documentation**: [envsync.dev](https://envsync.dev)
-- **GitHub**: [github.com/Daily-Nerd/EnvSync](https://github.com/Daily-Nerd/EnvSync)
-- **Issues**: [github.com/Daily-Nerd/EnvSync/issues](https://github.com/Daily-Nerd/EnvSync/issues)
-- **Discord**: [discord.gg/envsync](https://discord.gg/envsync)
-- **Twitter**: [@envsync](https://twitter.com/envsync)
+- **Documentation**: [tripwire.dev](https://tripwire.dev)
+- **GitHub**: [github.com/Daily-Nerd/TripWire](https://github.com/Daily-Nerd/TripWire)
+- **Issues**: [github.com/Daily-Nerd/TripWire/issues](https://github.com/Daily-Nerd/TripWire/issues)
+- **Discord**: [discord.gg/tripwire](https://discord.gg/tripwire)
+- **Twitter**: [@tripwire](https://twitter.com/tripwire)
 
 ---
 
 ## ⭐ Star History
 
-If EnvSync helps you, please give it a star on GitHub!
+If TripWire helps you, please give it a star on GitHub!
 
-[![Star History](https://api.star-history.com/svg?repos=yourusername/envsync&type=Date)](https://star-history.com/#yourusername/envsync&Date)
+[![Star History](https://api.star-history.com/svg?repos=yourusername/tripwire&type=Date)](https://star-history.com/#yourusername/tripwire&Date)
 
 ---
 
-**EnvSync** - Environment variables that just work. 🎯
+**TripWire** - Environment variables that just work. 🎯
 
 *Stop debugging production crashes. Start shipping with confidence.*

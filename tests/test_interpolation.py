@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from envsync.parser import EnvFileParser, expand_variables
+from tripwire.parser import EnvFileParser, expand_variables
 
 
 class TestExpandVariables:

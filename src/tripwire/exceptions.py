@@ -1,6 +1,6 @@
-"""Custom exceptions for EnvSync.
+"""Custom exceptions for TripWire.
 
-This module defines all custom exception types used throughout EnvSync for
+This module defines all custom exception types used throughout TripWire for
 precise error handling and reporting.
 """
 
@@ -8,13 +8,13 @@ from pathlib import Path
 from typing import Any, List, Optional, Union
 
 
-class EnvSyncError(Exception):
-    """Base exception for all EnvSync errors."""
+class TripWireError(Exception):
+    """Base exception for all TripWire errors."""
 
     pass
 
 
-class MissingVariableError(EnvSyncError):
+class MissingVariableError(TripWireError):
     """Raised when a required environment variable is missing."""
 
     def __init__(self, variable_name: str, description: Optional[str] = None) -> None:
@@ -29,7 +29,7 @@ class MissingVariableError(EnvSyncError):
 
         # Build multi-line helpful message
         lines = [
-            f"\n❌ Missing required environment variable: {variable_name}",
+            f"\n[X] Missing required environment variable: {variable_name}",
             "",
         ]
 
@@ -50,7 +50,7 @@ class MissingVariableError(EnvSyncError):
                 "  3. Copy from example (if available):",
                 "     cp .env.example .env",
                 "",
-                "💡 Tip: Run 'envsync init' to create starter files",
+                "[Tip] Run 'tripwire init' to create starter files",
                 "",
             ]
         )
@@ -59,7 +59,7 @@ class MissingVariableError(EnvSyncError):
         super().__init__(message)
 
 
-class ValidationError(EnvSyncError):
+class ValidationError(TripWireError):
     """Raised when an environment variable fails validation."""
 
     def __init__(
@@ -89,7 +89,7 @@ class ValidationError(EnvSyncError):
         super().__init__(message)
 
 
-class TypeCoercionError(EnvSyncError):
+class TypeCoercionError(TripWireError):
     """Raised when type coercion fails."""
 
     def __init__(
@@ -118,7 +118,7 @@ class TypeCoercionError(EnvSyncError):
         super().__init__(message)
 
 
-class EnvFileNotFoundError(EnvSyncError):
+class EnvFileNotFoundError(TripWireError):
     """Raised when a required .env file is not found."""
 
     def __init__(self, file_path: str) -> None:
@@ -132,7 +132,7 @@ class EnvFileNotFoundError(EnvSyncError):
         super().__init__(message)
 
 
-class SecretDetectedError(EnvSyncError):
+class SecretDetectedError(TripWireError):
     """Raised when a secret is detected in an unsafe location."""
 
     def __init__(
@@ -158,7 +158,7 @@ class SecretDetectedError(EnvSyncError):
         super().__init__(message)
 
 
-class DriftError(EnvSyncError):
+class DriftError(TripWireError):
     """Raised when environment configuration has drifted from expected state."""
 
     def __init__(
@@ -184,7 +184,7 @@ class DriftError(EnvSyncError):
         super().__init__(message)
 
 
-class GitAuditError(EnvSyncError):
+class GitAuditError(TripWireError):
     """Base exception for git audit operations."""
 
     pass

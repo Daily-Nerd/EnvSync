@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from envsync.config import (
-    EnvSyncConfig,
+from tripwire.config import (
+    TripWireConfig,
     VariableConfig,
-    apply_config_to_envsync,
+    apply_config_to_tripwire,
     find_config_file,
     generate_example_config,
     load_config,
@@ -50,12 +50,12 @@ class TestVariableConfig:
         assert config.max_val == 65535
 
 
-class TestEnvSyncConfig:
-    """Test EnvSyncConfig dataclass."""
+class TestTripWireConfig:
+    """Test TripWireConfig dataclass."""
 
-    def test_envsync_config_defaults(self):
-        """Test default values for EnvSyncConfig."""
-        config = EnvSyncConfig()
+    def test_tripwire_config_defaults(self):
+        """Test default values for TripWireConfig."""
+        config = TripWireConfig()
         assert config.env_file == ".env"
         assert config.strict is False
         assert config.detect_secrets is False
@@ -125,13 +125,13 @@ class TestParseConfig:
     def test_parse_empty_config(self):
         """Test parsing empty configuration."""
         config = parse_config({})
-        assert isinstance(config, EnvSyncConfig)
+        assert isinstance(config, TripWireConfig)
         assert len(config.variables) == 0
 
     def test_parse_global_settings(self):
-        """Test parsing global EnvSync settings."""
+        """Test parsing global TripWire settings."""
         data = {
-            "envsync": {
+            "tripwire": {
                 "env_file": ".env.production",
                 "strict": True,
                 "detect_secrets": True,
@@ -186,10 +186,10 @@ class TestLoadConfig:
 
     def test_load_config_from_file(self, tmp_path):
         """Test loading configuration from file."""
-        config_file = tmp_path / ".envsync.toml"
+        config_file = tmp_path / ".tripwire.toml"
         config_file.write_text(
             """
-[envsync]
+[tripwire]
 strict = true
 
 [variables]
@@ -209,7 +209,7 @@ DATABASE_URL = "Database connection string"
 
     def test_load_config_invalid_toml(self, tmp_path):
         """Test loading invalid TOML file."""
-        config_file = tmp_path / ".envsync.toml"
+        config_file = tmp_path / ".tripwire.toml"
         config_file.write_text("invalid toml [[[")
 
         config = load_config(config_file)
@@ -217,10 +217,10 @@ DATABASE_URL = "Database connection string"
 
     def test_load_config_complex(self, tmp_path):
         """Test loading complex configuration."""
-        config_file = tmp_path / ".envsync.toml"
+        config_file = tmp_path / ".tripwire.toml"
         config_file.write_text(
             """
-[envsync]
+[tripwire]
 env_file = ".env.production"
 strict = true
 detect_secrets = true
@@ -276,16 +276,16 @@ class TestFindConfigFile:
 
     def test_find_config_in_current_dir(self, tmp_path):
         """Test finding config file in current directory."""
-        config_file = tmp_path / ".envsync.toml"
-        config_file.write_text("[envsync]")
+        config_file = tmp_path / ".tripwire.toml"
+        config_file.write_text("[tripwire]")
 
         found = find_config_file(tmp_path)
         assert found == config_file
 
     def test_find_config_in_parent_dir(self, tmp_path):
         """Test finding config file in parent directory."""
-        config_file = tmp_path / ".envsync.toml"
-        config_file.write_text("[envsync]")
+        config_file = tmp_path / ".tripwire.toml"
+        config_file.write_text("[tripwire]")
 
         subdir = tmp_path / "subdir" / "nested"
         subdir.mkdir(parents=True)
@@ -304,14 +304,14 @@ class TestValidateConfig:
 
     def test_validate_valid_config(self):
         """Test validation of valid configuration."""
-        config = EnvSyncConfig()
+        config = TripWireConfig()
         config.variables["TEST"] = VariableConfig(name="TEST", type="str")
         errors = validate_config(config)
         assert len(errors) == 0
 
     def test_validate_invalid_type(self):
         """Test validation catches invalid type."""
-        config = EnvSyncConfig()
+        config = TripWireConfig()
         config.variables["TEST"] = VariableConfig(name="TEST", type="invalid")
         errors = validate_config(config)
         assert len(errors) == 1
@@ -319,7 +319,7 @@ class TestValidateConfig:
 
     def test_validate_invalid_format(self):
         """Test validation catches invalid format."""
-        config = EnvSyncConfig()
+        config = TripWireConfig()
         config.variables["TEST"] = VariableConfig(name="TEST", format="invalid_format")
         errors = validate_config(config)
         assert len(errors) == 1
@@ -327,7 +327,7 @@ class TestValidateConfig:
 
     def test_validate_min_max_on_non_numeric(self):
         """Test validation catches min/max on non-numeric types."""
-        config = EnvSyncConfig()
+        config = TripWireConfig()
         config.variables["TEST"] = VariableConfig(name="TEST", type="str", min_val=0, max_val=10)
         errors = validate_config(config)
         assert len(errors) == 1
@@ -335,7 +335,7 @@ class TestValidateConfig:
 
     def test_validate_choices_on_non_string(self):
         """Test validation catches choices on non-string types."""
-        config = EnvSyncConfig()
+        config = TripWireConfig()
         config.variables["TEST"] = VariableConfig(name="TEST", type="int", choices=["one", "two"])
         errors = validate_config(config)
         assert len(errors) == 1
@@ -343,7 +343,7 @@ class TestValidateConfig:
 
     def test_validate_required_with_default(self):
         """Test validation catches required variables with defaults."""
-        config = EnvSyncConfig()
+        config = TripWireConfig()
         config.variables["TEST"] = VariableConfig(name="TEST", required=True, default="value")
         errors = validate_config(config)
         assert len(errors) == 1
@@ -351,7 +351,7 @@ class TestValidateConfig:
 
     def test_validate_multiple_errors(self):
         """Test validation catches multiple errors."""
-        config = EnvSyncConfig()
+        config = TripWireConfig()
         config.variables["VAR1"] = VariableConfig(name="VAR1", type="invalid")
         config.variables["VAR2"] = VariableConfig(name="VAR2", format="bad_format")
         errors = validate_config(config)
@@ -365,7 +365,7 @@ class TestGenerateExampleConfig:
         """Test generating example configuration."""
         example = generate_example_config()
         assert isinstance(example, str)
-        assert "[envsync]" in example
+        assert "[tripwire]" in example
         assert "[variables" in example
         assert "DATABASE_URL" in example
         assert "PORT" in example
@@ -373,7 +373,7 @@ class TestGenerateExampleConfig:
     def test_example_config_is_valid_toml(self, tmp_path):
         """Test that generated example is valid TOML."""
         example = generate_example_config()
-        config_file = tmp_path / ".envsync.toml"
+        config_file = tmp_path / ".tripwire.toml"
         config_file.write_text(example)
 
         # Should load successfully

@@ -1,6 +1,6 @@
-"""EnvSync Quickstart - Your first EnvSync script.
+"""TripWire Quickstart - Your first TripWire script.
 
-This minimal example shows EnvSync's core value: fail-fast validation.
+This minimal example shows TripWire's core value: fail-fast validation.
 Perfect for learning the basics before diving into advanced features!
 
 QUICK START:
@@ -16,7 +16,7 @@ QUICK START:
 WHAT YOU'LL LEARN:
 - How to use env.require() for required variables
 - How to use env.optional() with defaults
-- How EnvSync validates at import time (fail-fast)
+- How TripWire validates at import time (fail-fast)
 
 TIP: Want to see the helpful error messages? Remove .env and run again!
 """
@@ -39,8 +39,8 @@ if DEMO_MODE:
         }
     )
 
-# Now import EnvSync - this is where validation happens!
-from envsync import env
+# Now import TripWire - this is where validation happens!
+from tripwire import env
 
 # Example 1: Required variable
 # This MUST be set in .env or the script will fail immediately with a helpful error
@@ -73,7 +73,7 @@ PORT: int = env.optional(
 
 def main() -> None:
     """Main function demonstrating the loaded configuration."""
-    print("✅ EnvSync Quickstart Success!")
+    print("✅ TripWire Quickstart Success!")
     print("=" * 60)
     print(f"DATABASE_URL: {DATABASE_URL}")
     print(f"DEBUG:        {DEBUG}")

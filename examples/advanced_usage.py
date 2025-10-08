@@ -1,6 +1,6 @@
-"""Advanced EnvSync Usage Examples.
+"""Advanced TripWire Usage Examples.
 
-This module demonstrates advanced features of EnvSync including:
+This module demonstrates advanced features of TripWire including:
 - Complete CLI workflow
 - Code scanning and generation
 - Drift detection and synchronization
@@ -8,7 +8,7 @@ This module demonstrates advanced features of EnvSync including:
 - Documentation generation
 """
 
-from envsync import env
+from tripwire import env
 
 # Example 1: Required variables with validation
 API_KEY = env.require(
@@ -80,7 +80,7 @@ ENVIRONMENT = env.require(
 
 def main() -> None:
     """Demonstrate usage of environment variables."""
-    print("EnvSync Advanced Usage Example")
+    print("TripWire Advanced Usage Example")
     print("=" * 50)
 
     print(f"\nAPI Key: {'*' * 8} (secret, not shown)")

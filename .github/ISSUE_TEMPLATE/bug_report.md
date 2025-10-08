@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Create a report to help us improve EnvSync
+about: Create a report to help us improve TripWire
 title: '[BUG] '
 labels: bug
 assignees: ''
@@ -24,13 +24,13 @@ A clear and concise description of what actually happened.
 ## Environment
 - OS: [e.g. Ubuntu 20.04, macOS 12.0, Windows 10]
 - Python version: [e.g. 3.9.7]
-- EnvSync version: [e.g. 0.1.0]
+- TripWire version: [e.g. 0.1.0]
 - Installation method: [e.g. pip, conda, from source]
 
 ## Code Example
 ```python
 # Minimal code example that reproduces the issue
-from envsync import env
+from tripwire import env
 
 # Your code here
 ```

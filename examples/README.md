@@ -1,6 +1,6 @@
-# EnvSync Examples
+# TripWire Examples
 
-Welcome to EnvSync examples! This directory contains practical examples to help you get started with environment variable management.
+Welcome to TripWire examples! This directory contains practical examples to help you get started with environment variable management.
 
 ## Getting Started (Start Here! 👇)
 
@@ -69,7 +69,7 @@ python examples/basic_usage.py --demo
 ### 2. **basic_usage.py** - Complete Feature Tour
 
 **What it demonstrates:**
-- All EnvSync features in action
+- All TripWire features in action
 - Format validators (email, postgresql, etc.)
 - Pattern validation with regex
 - Custom validators
@@ -90,7 +90,7 @@ python examples/basic_usage.py --demo
 
 ## Testing Fail-Fast Behavior
 
-Want to see EnvSync's validation in action? Try these experiments:
+Want to see TripWire's validation in action? Try these experiments:
 
 ### Experiment 1: Missing Required Variable
 
@@ -135,7 +135,7 @@ python examples/basic_usage.py --demo
 
 ### ❌ Error: Missing required environment variable
 
-**What it means:** EnvSync is working correctly! It's enforcing that required variables must be set.
+**What it means:** TripWire is working correctly! It's enforcing that required variables must be set.
 
 **How to fix:**
 1. Copy `.env.example` to `.env`
@@ -144,7 +144,7 @@ python examples/basic_usage.py --demo
 
 ### ❌ Import errors or ModuleNotFoundError
 
-**What it means:** EnvSync isn't installed in your environment.
+**What it means:** TripWire isn't installed in your environment.
 
 **How to fix:**
 ```bash
@@ -200,13 +200,13 @@ python examples/basic_usage.py --demo
 cp examples/.env.example examples/.env
 
 # Initialize new project (from root)
-uv run envsync init
+uv run tripwire init
 
 # Check for missing variables
-uv run envsync check
+uv run tripwire check
 
 # Generate documentation
-uv run envsync docs
+uv run tripwire docs
 ```
 
 ---
@@ -217,7 +217,7 @@ uv run envsync docs
 2. ✅ Understand required vs optional variables
 3. ✅ Explore `basic_usage.py` for advanced features
 4. ✅ Read the main [README.md](../README.md) for full documentation
-5. ✅ Integrate EnvSync into your own project
+5. ✅ Integrate TripWire into your own project
 
 ---
 

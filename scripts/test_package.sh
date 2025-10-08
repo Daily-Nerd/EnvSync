@@ -1,10 +1,10 @@
 #!/bin/bash
-# Test script to verify the EnvSync package is correctly built
+# Test script to verify the TripWire package is correctly built
 
 set -e
 
 echo "========================================="
-echo "EnvSync Package Verification Test"
+echo "TripWire Package Verification Test"
 echo "========================================="
 echo ""
 
@@ -33,13 +33,13 @@ echo ""
 
 # List wheel contents
 echo "4. Listing wheel contents..."
-python -m zipfile -l dist/*.whl | grep -E "envsync/(cli|core|validation)\.py"
+python -m zipfile -l dist/*.whl | grep -E "tripwire/(cli|core|validation)\.py"
 echo "   ✓ Core modules present"
 echo ""
 
 # Install in test environment
 echo "5. Installing in clean test environment..."
-TEST_VENV="/tmp/test_envsync_$$"
+TEST_VENV="/tmp/test_tripwire_$$"
 python -m venv "$TEST_VENV"
 "$TEST_VENV/bin/pip" install -q dist/*.whl
 echo "   ✓ Installed successfully"
@@ -47,7 +47,7 @@ echo ""
 
 # Test --version
 echo "6. Testing --version..."
-VERSION_OUTPUT=$("$TEST_VENV/bin/envsync" --version)
+VERSION_OUTPUT=$("$TEST_VENV/bin/tripwire" --version)
 echo "   Output: $VERSION_OUTPUT"
 if [[ ! "$VERSION_OUTPUT" =~ "0.1.1" ]]; then
     echo "   ✗ ERROR: Version check failed!"
@@ -59,13 +59,13 @@ echo ""
 
 # Test --help
 echo "7. Testing --help..."
-"$TEST_VENV/bin/envsync" --help | head -5
+"$TEST_VENV/bin/tripwire" --help | head -5
 echo "   ✓ Help command works"
 echo ""
 
 # Test subcommands exist
 echo "8. Testing subcommands..."
-HELP_OUTPUT=$("$TEST_VENV/bin/envsync" --help)
+HELP_OUTPUT=$("$TEST_VENV/bin/tripwire" --help)
 for cmd in init generate check sync scan audit validate docs; do
     if echo "$HELP_OUTPUT" | grep -q "$cmd"; then
         echo "   ✓ Command '$cmd' found"

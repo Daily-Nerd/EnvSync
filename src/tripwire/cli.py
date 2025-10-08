@@ -1,4 +1,4 @@
-"""Command-line interface for EnvSync.
+"""Command-line interface for TripWire.
 
 This module provides CLI commands for environment variable management,
 including generation, validation, and team synchronization features.
@@ -13,7 +13,11 @@ from typing import Any, Dict, List, Optional, Tuple
 import click
 from rich.console import Console
 
-console = Console()
+from tripwire.branding import LOGO_BANNER, LOGO_SIMPLE, get_status_icon, print_status
+
+# On Windows, force UTF-8 encoding for Rich console to support Unicode characters
+# Use legacy_windows=False to avoid the cp1252 encoding issue
+console = Console(legacy_windows=False)
 
 # Project template definitions (module-level constant)
 # Templates use {secret_section} placeholder for dynamic secret injection
@@ -80,13 +84,30 @@ DEBUG=false
 }
 
 
+def print_help_with_banner(ctx, param, value):
+    """Show banner before help text."""
+    if value and not ctx.resilient_parsing:
+        console.print(f"[cyan]{LOGO_BANNER}[/cyan]")
+        console.print(ctx.get_help())
+        ctx.exit()
+
+
 @click.group()
-@click.version_option(version="0.1.4", prog_name="envsync")
+@click.option(
+    "--help",
+    "-h",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    callback=print_help_with_banner,
+    help="Show this message and exit.",
+)
+@click.version_option(version="0.1.4", prog_name="tripwire", message=f"{LOGO_SIMPLE}\nVersion: %(version)s")
 def main() -> None:
-    """EnvSync - Smart environment variable management for Python.
+    """TripWire - Catch config errors before they explode.
 
     Validate environment variables at import time with type safety,
-    format validation, and team synchronization.
+    format validation, secret detection, and git audit capabilities.
     """
     pass
 
@@ -99,12 +120,13 @@ def main() -> None:
     help="Type of project (affects starter variables)",
 )
 def init(project_type: str) -> None:
-    """Initialize EnvSync in your project.
+    """Initialize TripWire in your project.
 
     Creates .env, .env.example, and updates .gitignore with project-specific
     starter variables based on your project type.
     """
-    console.print("\n[bold cyan]Welcome to EnvSync! 🎯[/bold cyan]\n")
+    console.print(f"[cyan]{LOGO_BANNER}[/cyan]")
+    console.print("[bold cyan]Initializing TripWire in your project...[/bold cyan]\n")
 
     # Generate a secure random key for SECRET_KEY in .env only
     random_secret_key = secrets.token_urlsafe(32)
@@ -140,22 +162,22 @@ def init(project_type: str) -> None:
     # Create .env file (with real random secrets)
     env_path = Path(".env")
     if env_path.exists():
-        console.print("[yellow]⚠️  .env already exists, skipping...[/yellow]")
+        console.print("[yellow][!] .env already exists, skipping...[/yellow]")
     else:
         env_path.write_text(get_template(project_type, inject_secret=True))
-        console.print("[green]✅ Created .env[/green]")
+        console.print("[green][OK] Created .env[/green]")
 
     # Create .env.example (with placeholder secrets only)
     example_path = Path(".env.example")
     if example_path.exists():
-        console.print("[yellow]⚠️  .env.example already exists, skipping...[/yellow]")
+        console.print("[yellow][!] .env.example already exists, skipping...[/yellow]")
     else:
         # Use placeholder template for .env.example to avoid committing real secrets
         # Real random secrets only go in .env (which is gitignored)
         example_content = get_template(project_type, inject_secret=False)
 
         # Add header comment to .env.example
-        example_with_header = f"""# EnvSync Environment Variables Template
+        example_with_header = f"""# TripWire Environment Variables Template
 # Copy this file to .env and fill in your actual values:
 #   cp .env.example .env
 #
@@ -163,7 +185,7 @@ def init(project_type: str) -> None:
 
 {example_content}"""
         example_path.write_text(example_with_header)
-        console.print("[green]✅ Created .env.example[/green]")
+        console.print("[green][OK] Created .env.example[/green]")
 
     # Update .gitignore
     gitignore_path = Path(".gitignore")
@@ -185,24 +207,24 @@ def init(project_type: str) -> None:
             if gitignore_content:
                 if not gitignore_content.endswith("\n"):
                     f.write("\n")
-                f.write("\n# Environment variables (EnvSync)\n")
+                f.write("\n# Environment variables (TripWire)\n")
             else:
                 # New file - no leading newline
-                f.write("# Environment variables (EnvSync)\n")
+                f.write("# Environment variables (TripWire)\n")
 
             f.write(".env\n")
             f.write(".env.local\n")
-        console.print("[green]✅ Updated .gitignore[/green]")
+        console.print("[green][OK] Updated .gitignore[/green]")
     else:
-        console.print("[yellow]⚠️  .gitignore already contains .env entries[/yellow]")
+        console.print("[yellow][!] .gitignore already contains .env entries[/yellow]")
 
     # Success message
-    console.print("\n[bold green]Setup complete! ✅[/bold green]\n")
+    console.print("\n[bold green]Setup complete![/bold green]\n")
     console.print("Next steps:")
     console.print("  1. Edit .env with your configuration values")
-    console.print("  2. Import in your code: [cyan]from envsync import env[/cyan]")
+    console.print("  2. Import in your code: [cyan]from tripwire import env[/cyan]")
     console.print("  3. Use variables: [cyan]API_KEY = env.require('API_KEY')[/cyan]")
-    console.print("\nFor help: [cyan]envsync --help[/cyan]\n")
+    console.print("\nFor help: [cyan]tripwire --help[/cyan]\n")
 
 
 @main.command()
@@ -229,7 +251,7 @@ def generate(output: str, check: bool, force: bool) -> None:
     Scans your Python code for env.require() and env.optional() calls
     and generates a .env.example file documenting all environment variables.
     """
-    from envsync.scanner import (
+    from tripwire.scanner import (
         deduplicate_variables,
         format_var_for_env_example,
         scan_directory,
@@ -255,7 +277,7 @@ def generate(output: str, check: bool, force: bool) -> None:
 
     # Generate content
     header = """# Environment Variables
-# Generated by EnvSync
+# Generated by TripWire
 #
 # This file documents all environment variables used in this project.
 # Copy this file to .env and fill in your actual values:
@@ -291,15 +313,15 @@ def generate(output: str, check: bool, force: bool) -> None:
     if check:
         console.print("[yellow]Checking if .env.example is up to date...[/yellow]")
         if not output_path.exists():
-            console.print(f"[red]✗[/red] {output} does not exist")
+            console.print(f"[red][X][/red] {output} does not exist")
             sys.exit(1)
 
         existing_content = output_path.read_text()
         if existing_content.strip() == generated_content.strip():
-            console.print("[green]✓[/green] .env.example is up to date")
+            console.print("[green][OK][/green] .env.example is up to date")
         else:
-            console.print("[red]✗[/red] .env.example is out of date")
-            console.print("Run 'envsync generate --force' to update it")
+            console.print("[red][X][/red] .env.example is out of date")
+            console.print("Run 'tripwire generate --force' to update it")
             sys.exit(1)
         return
 
@@ -310,7 +332,7 @@ def generate(output: str, check: bool, force: bool) -> None:
 
     # Write file
     output_path.write_text(generated_content)
-    console.print(f"[green]✓[/green] Generated {output} with {len(unique_vars)} variable(s)")
+    console.print(f"[green][OK][/green] Generated {output} with {len(unique_vars)} variable(s)")
 
     # Show breakdown
     if required_vars:
@@ -351,7 +373,7 @@ def check(env_file: str, example: str, strict: bool, output_json: bool) -> None:
     """
     from rich.table import Table
 
-    from envsync.parser import compare_env_files
+    from tripwire.parser import compare_env_files
 
     env_path = Path(env_file)
     example_path = Path(example)
@@ -417,12 +439,13 @@ def check(env_file: str, example: str, strict: bool, output_json: bool) -> None:
 
         if missing:
             console.print("\nTo add missing variables:")
-            console.print("  [cyan]envsync sync[/cyan]")
+            console.print("  [cyan]tripwire sync[/cyan]")
 
         if strict:
             sys.exit(1)
     else:
-        console.print("[green]✓[/green] No drift detected - .env is in sync with .env.example")
+        status = get_status_icon("valid")
+        console.print(f"{status} No drift detected - .env is in sync with .env.example")
         console.print(f"  {len(common)} variable(s) present in both files")
 
 
@@ -456,7 +479,7 @@ def sync(env_file: str, example: str, dry_run: bool, interactive: bool) -> None:
     Updates your .env file to match the structure of .env.example,
     adding missing variables and optionally removing extra ones.
     """
-    from envsync.parser import compare_env_files, merge_env_files, parse_env_file
+    from tripwire.parser import compare_env_files, merge_env_files, parse_env_file
 
     env_path = Path(env_file)
     example_path = Path(example)
@@ -470,7 +493,8 @@ def sync(env_file: str, example: str, dry_run: bool, interactive: bool) -> None:
     missing, extra, common = compare_env_files(env_path, example_path)
 
     if not missing and not extra:
-        console.print("[green]✓[/green] Already in sync - no changes needed")
+        status = get_status_icon("valid")
+        console.print(f"{status} Already in sync - no changes needed")
         return
 
     console.print(f"\nSynchronizing [cyan]{env_file}[/cyan] with [cyan]{example}[/cyan]\n")
@@ -517,7 +541,7 @@ def sync(env_file: str, example: str, dry_run: bool, interactive: bool) -> None:
     # Write updated file
     env_path.write_text(merged_content)
 
-    console.print(f"[green]✓[/green] Synchronized {env_file}")
+    console.print(f"[green][OK][/green] Synchronized {env_file}")
     console.print(f"  Added {len(missing)} variable(s)")
     console.print("\n[yellow]Note:[/yellow] Fill in values for new variables in .env")
 
@@ -542,7 +566,7 @@ def scan(strict: bool, depth: int) -> None:
     """
     from rich.table import Table
 
-    from envsync.secrets import get_severity_color, scan_env_file, scan_git_history
+    from tripwire.secrets import get_severity_color, scan_env_file, scan_git_history
 
     console.print("[yellow]Scanning for secrets...[/yellow]\n")
 
@@ -556,9 +580,11 @@ def scan(strict: bool, depth: int) -> None:
         findings.extend(env_findings)
 
         if env_findings:
-            console.print(f"[red]Found {len(env_findings)} potential secret(s) in .env[/red]\n")
+            status = get_status_icon("invalid")
+            console.print(f"{status} Found {len(env_findings)} potential secret(s) in .env\n")
         else:
-            console.print("[green]✓[/green] No secrets found in .env\n")
+            status = get_status_icon("valid")
+            console.print(f"{status} No secrets found in .env\n")
 
     # Scan git history
     if Path(".git").exists():
@@ -588,7 +614,8 @@ def scan(strict: bool, depth: int) -> None:
                         )()
                     )
         else:
-            console.print("[green]✓[/green] No secrets found in git history\n")
+            status = get_status_icon("valid")
+            console.print(f"{status} No secrets found in git history\n")
 
     # Display findings
     if findings:
@@ -621,7 +648,8 @@ def scan(strict: bool, depth: int) -> None:
         if strict:
             sys.exit(1)
     else:
-        console.print("[green]✓[/green] No secrets detected")
+        status = get_status_icon("valid")
+        console.print(f"{status} No secrets detected")
         console.print("Your environment files appear secure")
 
 
@@ -638,20 +666,20 @@ def _display_combined_timeline(
     from rich.panel import Panel
     from rich.tree import Tree
 
-    console.print("\n[bold cyan]📊 Secret Leak Blast Radius[/bold cyan]")
-    console.print("═" * 70)
+    console.print("\n[bold cyan][Report] Secret Leak Blast Radius[/bold cyan]")
+    console.print("=" * 70)
     console.print()
 
     # Create visual tree
-    tree = Tree("🔍 [bold yellow]Repository Secret Exposure[/bold yellow]")
+    tree = Tree("[*] [bold yellow]Repository Secret Exposure[/bold yellow]")
 
     for secret_match, timeline in results:
         if timeline.total_occurrences == 0:
             continue
 
         # Determine status symbol
-        status_symbol = "🔴" if timeline.is_currently_in_git else "🟡"
-        severity_symbol = "🚨" if timeline.severity == "CRITICAL" else "⚠️"
+        status_symbol = "[!]" if timeline.is_currently_in_git else "[~]"
+        severity_symbol = "[!!]" if timeline.severity == "CRITICAL" else "[!]"
 
         secret_node = tree.add(
             f"{status_symbol} {severity_symbol} [yellow]{secret_match.variable_name}[/yellow] "
@@ -663,13 +691,13 @@ def _display_combined_timeline(
             branches_node = secret_node.add("[cyan]Branches affected:[/cyan]")
             for branch in timeline.branches_affected[:5]:
                 # Note: Showing total commits across all branches since we don't track per-branch
-                branches_node.add(f"├─ {branch} ([yellow]{len(timeline.commits_affected)} total commits[/yellow])")
+                branches_node.add(f"+- {branch} ([yellow]{len(timeline.commits_affected)} total commits[/yellow])")
 
         # Add files
         if timeline.files_affected:
             files_node = secret_node.add("[cyan]Files affected:[/cyan]")
             for file_path in timeline.files_affected[:5]:
-                files_node.add(f"├─ [red]{file_path}[/red]")
+                files_node.add(f"+- [red]{file_path}[/red]")
 
     console.print(tree)
     console.print()
@@ -683,7 +711,7 @@ def _display_combined_timeline(
         f"[bold red]Leaked:[/bold red] {total_leaked}\n"
         f"[bold green]Clean:[/bold green] {total_clean}\n"
         f"[bold yellow]Total commits affected:[/bold yellow] {total_commits}\n",
-        title="📈 Summary",
+        title="[Chart] Summary",
         border_style="yellow",
     )
 
@@ -708,17 +736,18 @@ def _display_single_audit_result(
     from rich.panel import Panel
     from rich.syntax import Syntax
 
-    from envsync.git_audit import generate_remediation_steps
+    from tripwire.git_audit import generate_remediation_steps
 
     # No leaks found
     if timeline.total_occurrences == 0:
-        console.print(f"[green]✓[/green] No leaks found for {secret_name}")
+        status = get_status_icon("valid")
+        console.print(f"{status} No leaks found for {secret_name}")
         console.print("This secret does not appear in git history.")
         return
 
     # Display timeline header
     console.print(f"[bold cyan]Secret Leak Timeline for: {secret_name}[/bold cyan]")
-    console.print("═" * 70)
+    console.print("=" * 70)
     console.print()
 
     # Display timeline events
@@ -736,7 +765,7 @@ def _display_single_audit_result(
             first_occ = occs[0]
 
             # Date header
-            console.print(f"[bold]📅 {date_str}[/bold]")
+            console.print(f"[bold][Date] {date_str}[/bold]")
 
             # Show commit info
             console.print(f"   Commit: [cyan]{first_occ.commit_hash[:8]}[/cyan] - {first_occ.commit_message[:60]}")
@@ -744,15 +773,17 @@ def _display_single_audit_result(
 
             # Show files
             for occ in occs:
-                console.print(f"   📁 [red]{occ.file_path}[/red]:{occ.line_number}")
+                console.print(f"   [File] [red]{occ.file_path}[/red]:{occ.line_number}")
 
             console.print()
 
         # Show current status
         if timeline.is_currently_in_git:
-            console.print("[bold red]⚠️  Still in git history (as of HEAD)[/bold red]")
+            status = get_status_icon("invalid")
+            console.print(f"{status} [bold red]Still in git history (as of HEAD)[/bold red]")
         else:
-            console.print("[green]✓[/green] Removed from current HEAD")
+            status = get_status_icon("valid")
+            console.print(f"{status} Removed from current HEAD")
 
         console.print(f"   Affects [yellow]{len(timeline.commits_affected)}[/yellow] commit(s)")
         console.print(f"   Found in [yellow]{len(timeline.files_affected)}[/yellow] file(s)")
@@ -783,12 +814,12 @@ def _display_single_audit_result(
 
     if timeline.is_in_public_repo:
         impact_lines.append("")
-        impact_lines.append("[bold red]⚠️  CRITICAL: Found in PUBLIC repository![/bold red]")
+        impact_lines.append("[bold red][!] CRITICAL: Found in PUBLIC repository![/bold red]")
 
     console.print(
         Panel(
             "\n".join(impact_lines),
-            title="🚨 Security Impact",
+            title="[!!] Security Impact",
             border_style="red" if timeline.severity == "CRITICAL" else "yellow",
         )
     )
@@ -797,7 +828,7 @@ def _display_single_audit_result(
     # Generate and display remediation steps
     steps = generate_remediation_steps(timeline, secret_name)
 
-    console.print("[bold yellow]🔧 Remediation Steps:[/bold yellow]\n")
+    console.print("[bold yellow][Fix] Remediation Steps:[/bold yellow]\n")
 
     for step in steps:
         urgency_color = {
@@ -818,17 +849,17 @@ def _display_single_audit_result(
             console.print("   ", syntax)
 
         if step.warning:
-            console.print(f"   [red]⚠️  {step.warning}[/red]")
+            console.print(f"   [red][!] {step.warning}[/red]")
 
         console.print()
 
     # Final recommendations
-    console.print("[bold cyan]💡 Prevention Tips:[/bold cyan]")
-    console.print("  • Always add .env files to .gitignore")
-    console.print("  • Use environment variable scanning tools")
-    console.print("  • Never commit secrets to version control")
-    console.print("  • Use a secret manager for production")
-    console.print("  • Enable pre-commit hooks to scan for secrets")
+    console.print("[bold cyan][Tip] Prevention Tips:[/bold cyan]")
+    console.print("  - Always add .env files to .gitignore")
+    console.print("  - Use environment variable scanning tools")
+    console.print("  - Never commit secrets to version control")
+    console.print("  - Use a secret manager for production")
+    console.print("  - Enable pre-commit hooks to scan for secrets")
     console.print()
 
 
@@ -870,58 +901,59 @@ def audit(
 
     Examples:
 
-        envsync audit --all
+        tripwire audit --all
 
-        envsync audit AWS_SECRET_ACCESS_KEY
+        tripwire audit AWS_SECRET_ACCESS_KEY
 
-        envsync audit API_KEY --value "sk-abc123..."
+        tripwire audit API_KEY --value "sk-abc123..."
 
-        envsync audit DATABASE_URL --json
+        tripwire audit DATABASE_URL --json
     """
     import json
 
     from rich.table import Table
 
-    from envsync.git_audit import (
+    from tripwire.git_audit import (
         GitAuditError,
         analyze_secret_history,
         generate_remediation_steps,
     )
-    from envsync.secrets import scan_env_file
+    from tripwire.secrets import scan_env_file
 
     # Validate arguments
     if not scan_all and not secret_name:
         console.print("[red]Error:[/red] Must provide SECRET_NAME or use --all flag")
-        console.print("Try: envsync audit --help")
+        console.print("Try: tripwire audit --help")
         sys.exit(1)
 
     if scan_all and secret_name:
         console.print("[red]Error:[/red] Cannot use both SECRET_NAME and --all flag")
-        console.print("Use either 'envsync audit SECRET_NAME' or 'envsync audit --all'")
+        console.print("Use either 'tripwire audit SECRET_NAME' or 'tripwire audit --all'")
         sys.exit(1)
 
     # Auto-detection mode
     if scan_all:
         if not output_json:
-            console.print("\n[bold cyan]🔍 Auto-detecting secrets in .env file...[/bold cyan]\n")
+            console.print("\n[bold cyan][*] Auto-detecting secrets in .env file...[/bold cyan]\n")
 
         env_file = Path.cwd() / ".env"
         if not env_file.exists():
             console.print("[red]Error:[/red] .env file not found in current directory")
-            console.print("Run 'envsync init' to create one, or specify a secret name to audit.")
+            console.print("Run 'tripwire init' to create one, or specify a secret name to audit.")
             sys.exit(1)
 
         # Scan .env file for secrets
         detected_secrets = scan_env_file(env_file)
 
         if not detected_secrets:
-            console.print("[green]✓[/green] No secrets detected in .env file")
+            status = get_status_icon("valid")
+            console.print(f"{status} No secrets detected in .env file")
             console.print("Your environment file appears secure")
             return
 
         # Display detected secrets summary (only in non-JSON mode)
         if not output_json:
-            console.print(f"[yellow]⚠️  Found {len(detected_secrets)} potential secret(s) in .env file[/yellow]\n")
+            console.print(f"[yellow][!] Found {len(detected_secrets)} potential secret(s) in .env file[/yellow]\n")
 
             summary_table = Table(title="Detected Secrets", show_header=True, header_style="bold cyan")
             summary_table.add_column("Variable", style="yellow")
@@ -1059,7 +1091,7 @@ def validate(env_file: str) -> None:
     Loads and validates all environment variables to ensure they
     meet requirements before starting the application.
     """
-    from envsync.scanner import deduplicate_variables, scan_directory
+    from tripwire.scanner import deduplicate_variables, scan_directory
 
     env_path = Path(env_file)
 
@@ -1119,11 +1151,13 @@ def validate(env_file: str) -> None:
 
         console.print(table)
         console.print()
-        console.print(f"[red]Validation failed:[/red] {len(missing)} required variable(s) missing")
+        status = get_status_icon("invalid")
+        console.print(f"{status} [red]Validation failed:[/red] {len(missing)} required variable(s) missing")
         console.print("\nAdd these variables to your .env file")
         sys.exit(1)
     else:
-        console.print("[green]✓[/green] All required variables are set")
+        status = get_status_icon("valid")
+        console.print(f"{status} All required variables are set")
         console.print(f"  {len(required_vars)} required variable(s) validated")
         if optional_vars:
             console.print(f"  {len(optional_vars)} optional variable(s) available")
@@ -1148,7 +1182,7 @@ def docs(format: str, output: Optional[str]) -> None:
     Creates documentation in markdown, HTML, or JSON format
     describing all environment variables used in the project.
     """
-    from envsync.scanner import deduplicate_variables, scan_directory
+    from tripwire.scanner import deduplicate_variables, scan_directory
 
     console.print("[yellow]Scanning code for environment variables...[/yellow]")
 
@@ -1178,7 +1212,7 @@ def docs(format: str, output: Optional[str]) -> None:
     if output:
         output_path = Path(output)
         output_path.write_text(doc_content)
-        console.print(f"[green]✓[/green] Documentation written to {output}")
+        console.print(f"[green][OK][/green] Documentation written to {output}")
     else:
         if format == "markdown":
             # Use rich for nice terminal rendering
@@ -1198,7 +1232,7 @@ def generate_markdown_docs(variables: Dict[str, Any]) -> str:
     Returns:
         Markdown formatted documentation
     """
-    from envsync.scanner import EnvVarInfo, format_default_value
+    from tripwire.scanner import EnvVarInfo, format_default_value
 
     lines = [
         "# Environment Variables",
@@ -1268,7 +1302,7 @@ def generate_markdown_docs(variables: Dict[str, Any]) -> str:
             "To use these variables in your Python code:",
             "",
             "```python",
-            "from envsync import env",
+            "from tripwire import env",
             "",
             "# Required variable",
             "api_key = env.require('API_KEY', description='API key for service')",
@@ -1279,7 +1313,7 @@ def generate_markdown_docs(variables: Dict[str, Any]) -> str:
             "",
             "---",
             "",
-            "*Generated by [EnvSync](https://github.com/Daily-Nerd/EnvSync)*",
+            "*Generated by [TripWire](https://github.com/Daily-Nerd/TripWire)*",
         ]
     )
 
@@ -1295,7 +1329,7 @@ def generate_html_docs(variables: Dict[str, Any]) -> str:
     Returns:
         HTML formatted documentation
     """
-    from envsync.scanner import format_default_value
+    from tripwire.scanner import format_default_value
 
     required_vars = sorted([v for v in variables.values() if v.required], key=lambda v: v.name)
     optional_vars = sorted([v for v in variables.values() if not v.required], key=lambda v: v.name)
@@ -1358,7 +1392,7 @@ def generate_html_docs(variables: Dict[str, Any]) -> str:
     html += "    </table>\n"
     html += """
     <hr>
-    <p><em>Generated by <a href="https://github.com/Daily-Nerd/EnvSync">EnvSync</a></em></p>
+    <p><em>Generated by <a href="https://github.com/Daily-Nerd/TripWire">TripWire</a></em></p>
 </body>
 </html>
 """

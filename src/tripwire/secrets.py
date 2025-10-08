@@ -850,7 +850,7 @@ def scan_env_file(file_path: Path) -> List[SecretMatch]:
     Returns:
         List of detected secrets
     """
-    from envsync.parser import EnvFileParser
+    from tripwire.parser import EnvFileParser
 
     if not file_path.exists():
         return []
@@ -914,7 +914,7 @@ def scan_git_history(
                     if file_result.returncode == 0:
                         content = file_result.stdout
                         # Parse and scan content
-                        from envsync.parser import EnvFileParser
+                        from tripwire.parser import EnvFileParser
 
                         parser = EnvFileParser()
                         entries = parser.parse_string(content)

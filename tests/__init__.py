@@ -1,1 +1,1 @@
-"""Test suite for EnvSync."""
+"""Test suite for TripWire."""

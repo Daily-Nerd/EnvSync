@@ -22,6 +22,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ["3.11", "3.12", "3.13"]
+    env:
+      # Force UTF-8 encoding on Windows for proper Unicode handling
+      PYTHONIOENCODING: utf-8
 
     steps:
     - name: Checkout code
@@ -51,11 +54,11 @@ jobs:
         pre-commit run --all-files
 
     - name: Run type checking
-      run: mypy src/envsync
+      run: mypy src/tripwire
 
     - name: Run tests with coverage
       run: |
-        pytest --cov=envsync --cov-report=xml --cov-report=term-missing
+        pytest --cov=tripwire --cov-report=xml --cov-report=term-missing
 
     - name: Upload coverage to Codecov
       if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
@@ -137,15 +140,15 @@ jobs:
 
     - name: Test CLI commands
       run: |
-        envsync --help
-        envsync init --help
-        envsync generate --help
-        envsync check --help
-        envsync sync --help
-        envsync scan --help
-        envsync audit --help
-        envsync validate --help
-        envsync docs --help
+        tripwire --help
+        tripwire init --help
+        tripwire generate --help
+        tripwire check --help
+        tripwire sync --help
+        tripwire scan --help
+        tripwire audit --help
+        tripwire validate --help
+        tripwire docs --help
 
     - name: Test basic functionality
       run: |
@@ -153,12 +156,12 @@ jobs:
         mkdir test_project
         cd test_project
 
-        # Initialize EnvSync
-        envsync init --project-type web
+        # Initialize TripWire
+        tripwire init --project-type web
 
         # Create a test Python file
         cat > test_app.py << 'EOF'
-        from envsync import env
+        from tripwire import env
 
         API_KEY = env.require('API_KEY', description='Test API key')
         DEBUG = env.optional('DEBUG', default=False, type=bool)
@@ -174,13 +177,13 @@ jobs:
         python test_app.py
 
         # Test generation
-        envsync generate --force
+        tripwire generate --force
 
         # Test validation
-        envsync validate
+        tripwire validate
 
         # Test check command
-        envsync check
+        tripwire check
 
   performance:
     name: Performance Tests
@@ -223,9 +226,9 @@ jobs:
     - name: Generate documentation
       run: |
         # Test documentation generation
-        envsync docs --format markdown > docs/generated.md
-        envsync docs --format html > docs/generated.html
-        envsync docs --format json > docs/generated.json
+        tripwire docs --format markdown > docs/generated.md
+        tripwire docs --format html > docs/generated.html
+        tripwire docs --format json > docs/generated.json
 
     - name: Upload documentation
       uses: actions/upload-artifact@v4
