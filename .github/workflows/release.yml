@@ -45,18 +45,10 @@ jobs:
 
       - name: Set up uv (fast installer/lock support)
         uses: astral-sh/setup-uv@v4
-        with:
-          python-version: "3.12"
 
-      - name: UV Sync
+      - name: Install dependencies
         run: |
-          uv sync
-          source .venv/bin/activate
-
-      - name: Install dev deps
-        run: |
-          uv pip install -U pip
-          uv pip install -e . pre-commit packaging pytest pytest-cov mypy
+          uv pip install -e ".[dev]" packaging
 
       - name: Run pre-commit
         run: uv run pre-commit run --all-files
@@ -93,6 +85,32 @@ jobs:
               f.write(f"is_prerelease={is_pre}\n")
           PY
 
+      - name: Verify version consistency
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # Check pyproject.toml version
+          PYPROJECT_VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          if [ "$VERSION" != "$PYPROJECT_VERSION" ]; then
+            echo "::error::Version mismatch: tag=$VERSION but pyproject.toml=$PYPROJECT_VERSION"
+            exit 1
+          fi
+
+          # Check __init__.py version
+          INIT_VERSION=$(grep '^__version__ = ' src/envsync/__init__.py | sed 's/__version__ = "\(.*\)"/\1/')
+          if [ "$VERSION" != "$INIT_VERSION" ]; then
+            echo "::error::Version mismatch: tag=$VERSION but __init__.py=$INIT_VERSION"
+            exit 1
+          fi
+
+          # Check cli.py version using Python for more reliable parsing
+          CLI_VERSION=$(python3 -c "import re; content=open('src/envsync/cli.py').read(); match=re.search(r'@click\.version_option\(version=\"([^\"]+)\"', content); print(match.group(1) if match else '')")
+          if [ "$VERSION" != "$CLI_VERSION" ]; then
+            echo "::error::Version mismatch: tag=$VERSION but cli.py=$CLI_VERSION"
+            exit 1
+          fi
+
+          echo "✓ Version $VERSION is consistent across all files"
+
       # Only block duplicate version when manually dispatching (tag push already contains the tag)
       - name: Guard duplicate tag (dispatch only)
         if: github.event_name == 'workflow_dispatch'
@@ -102,35 +120,82 @@ jobs:
             echo "Tag v$VERSION already exists"; exit 1
           fi
 
-      - name: Run tests (unit + type)
+      - name: Run tests with coverage
         run: |
-          uv run pytest --cov=envsync --cov-report=xml
-          uv run mypy src/envsync
+          uv run pytest --cov=envsync --cov-report=xml --cov-report=term
+
+      - name: Check coverage threshold (75%)
+        run: |
+          uv run python - <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          tree = ET.parse('coverage.xml')
+          root = tree.getroot()
+          coverage = float(root.attrib['line-rate']) * 100
+
+          threshold = 75.0
+          print(f"Coverage: {coverage:.2f}%")
+
+          if coverage < threshold:
+              print(f"::error::Coverage {coverage:.2f}% is below threshold {threshold}%")
+              sys.exit(1)
+          else:
+              print(f"✓ Coverage {coverage:.2f}% meets threshold {threshold}%")
+          PY
+
+      - name: Run type checking
+        run: uv run mypy src/envsync
+
+      - name: Security scan with bandit
+        run: uv run bandit -r src/envsync -ll
+
+      - name: Scan for secrets in codebase
+        run: |
+          # Use envsync's own secret scanner
+          uv run python - <<'PY'
+          import sys
+          from pathlib import Path
+          from envsync.secrets import scan_env_file
+
+          # Scan example files for accidentally committed secrets
+          for env_file in Path('.').rglob('.env.example'):
+              findings = scan_env_file(env_file)
+              if findings:
+                  print(f"::error::Found {len(findings)} potential secrets in {env_file}")
+                  for finding in findings:
+                      print(f"  - {finding.variable_name}: {finding.secret_type.value}")
+                  sys.exit(1)
+
+          print("✓ No secrets found in example files")
+          PY
+
+      - name: Dependency vulnerability scan
+        run: uv run pip-audit
 
   tests:
-    name: Test Matrix
+    name: Test Matrix (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     needs: validate-release
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: 'pip'
 
       - uses: astral-sh/setup-uv@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: UV Sync
-        run: |
-          uv sync
-          source .venv/bin/activate
-      - run: |
-          uv pip install -U pip
-          uv pip install -e ".[dev]" pytest
-          uv run pytest -q
+
+      - name: Install dependencies
+        run: uv pip install -e ".[dev]"
+
+      - name: Run tests
+        run: uv run pytest -v
 
   build-package:
     name: Build Package
@@ -145,30 +210,31 @@ jobs:
           cache: 'pip'
 
       - uses: astral-sh/setup-uv@v4
-        with:
-          python-version: "3.12"
 
-      - name: UV Sync
-        run: |
-          uv sync
-          source .venv/bin/activate
+      - name: Install build tools
+        run: uv pip install build twine
 
-      - name: Install build deps
-        run: |
-          uv pip install -U pip
-          uv pip install build twine
-
-      - name: Build (sdist + wheel)
+      - name: Build package (sdist + wheel)
         run: uv run python -m build
 
-      - name: Twine check
+      - name: Check package metadata
         run: uv run twine check dist/*
+
+      - name: Verify package contents
+        run: |
+          # List wheel contents to verify structure
+          python -m zipfile -l dist/*.whl | head -20
+          echo "---"
+          # Check entry points
+          python -m zipfile -e dist/*.whl /tmp/wheel_check
+          cat /tmp/wheel_check/envsync-*.dist-info/entry_points.txt
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
+          retention-days: 7
 
   test-pypi:
     name: Test PyPI Upload
@@ -182,23 +248,11 @@ jobs:
           name: dist
           path: dist
 
-      - name: Create requirements.txt
-        run: |
-          echo "twine" > requirements.txt
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - uses: astral-sh/setup-uv@v4
-        with:
-          python-version: "3.12"
-
-      - name: UV Sync
-        run: |
-          uv init --bare
-          uv sync
-          source .venv/bin/activate
 
       - name: Upload to Test PyPI (API token)
         env:
@@ -209,17 +263,129 @@ jobs:
           uv pip install twine
           uv run twine upload --skip-existing dist/*
 
-      - name: Verify install from Test PyPI (clean venv + retry)
+      - name: Wait for Test PyPI propagation
+        run: sleep 10
+
+      - name: Verify install from Test PyPI (with retry)
         run: |
-          python -m venv .venv && . .venv/bin/activate
-          python -m pip install -U pip
+          rm -rf .venv_test
+          python -m venv .venv_test
+          . .venv_test/bin/activate
+          pip install -U pip
+
+          # Retry installation with exponential backoff
           for i in {1..5}; do
             if pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ envsync==${{ needs.validate-release.outputs.version }}; then
+              echo "✓ Package installed successfully"
               break
             fi
-            echo "Retry $i after TestPyPI sync..."; sleep 5
+            echo "Retry $i/5 after TestPyPI sync..."
+            sleep $((5 * i))
           done
+
+      - name: Comprehensive CLI verification
+        run: |
+          . .venv_test/bin/activate
+
+          echo "=== Testing --version ==="
           envsync --version
+          if ! envsync --version | grep -q "${{ needs.validate-release.outputs.version }}"; then
+            echo "::error::Version mismatch in CLI output"
+            exit 1
+          fi
+
+          echo "=== Testing --help ==="
+          envsync --help
+          if ! envsync --help | grep -q "EnvSync - Smart environment variable management"; then
+            echo "::error::Help output doesn't match expected format"
+            exit 1
+          fi
+
+          echo "=== Testing subcommands exist ==="
+          for cmd in init generate check sync scan audit validate docs; do
+            if ! envsync --help | grep -q "$cmd"; then
+              echo "::error::Command '$cmd' not found in help output"
+              exit 1
+            fi
+            echo "✓ Command '$cmd' exists"
+          done
+
+          echo "=== Testing subcommand help ==="
+          envsync init --help
+          envsync generate --help
+          envsync check --help
+
+      - name: Verify Python imports
+        run: |
+          . .venv_test/bin/activate
+
+          python - <<'PY'
+          import sys
+
+          # Test basic import
+          try:
+              import envsync
+              print(f"✓ Successfully imported envsync version {envsync.__version__}")
+          except ImportError as e:
+              print(f"::error::Failed to import envsync: {e}")
+              sys.exit(1)
+
+          # Test core functionality
+          try:
+              from envsync import env, EnvSync
+              print("✓ Successfully imported env and EnvSync")
+          except ImportError as e:
+              print(f"::error::Failed to import core components: {e}")
+              sys.exit(1)
+
+          # Test exceptions
+          try:
+              from envsync import (
+                  EnvSyncError,
+                  MissingVariableError,
+                  ValidationError,
+              )
+              print("✓ Successfully imported exceptions")
+          except ImportError as e:
+              print(f"::error::Failed to import exceptions: {e}")
+              sys.exit(1)
+
+          # Test validator
+          try:
+              from envsync import validator
+              print("✓ Successfully imported validator")
+          except ImportError as e:
+              print(f"::error::Failed to import validator: {e}")
+              sys.exit(1)
+
+          print("\n✓ All imports successful")
+          PY
+
+      - name: Test core functionality in clean environment
+        run: |
+          . .venv_test/bin/activate
+          cd /tmp
+
+          # Test init command
+          mkdir -p test_envsync_functionality
+          cd test_envsync_functionality
+
+          echo "=== Testing envsync init ==="
+          envsync init --project-type=cli
+          if [ ! -f .env ]; then
+            echo "::error::init command didn't create .env file"
+            exit 1
+          fi
+          if [ ! -f .env.example ]; then
+            echo "::error::init command didn't create .env.example file"
+            exit 1
+          fi
+          echo "✓ init command works"
+
+          echo "=== Testing envsync check ==="
+          envsync check || echo "Check command executed (drift expected)"
+
+          echo "\n✓ All functionality tests passed"
 
   pypi:
     name: PyPI Upload (Trusted Publishing)
@@ -244,19 +410,51 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages_dir: dist
-          # provenance: true   # uncomment after enabling project-wide provenance
+          # Enable SLSA provenance for supply chain security
+          attestations: true
 
-      - name: Verify install from PyPI (clean venv + retry)
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Wait for PyPI propagation
+        run: sleep 15
+
+      - name: Verify install from PyPI (with retry)
         run: |
-          python -m venv .venv && . .venv/bin/activate
-          python -m pip install -U pip
+          rm -rf .venv_pypi
+          python -m venv .venv_pypi
+          . .venv_pypi/bin/activate
+          pip install -U pip
+
+          # Retry installation with exponential backoff
           for i in {1..5}; do
             if pip install envsync==${{ needs.validate-release.outputs.version }}; then
+              echo "✓ Package installed from PyPI"
               break
             fi
-            echo "Retry $i after PyPI sync..."; sleep 5
+            echo "Retry $i/5 after PyPI sync..."
+            sleep $((10 * i))
           done
+
+      - name: Comprehensive verification (PyPI)
+        run: |
+          . .venv_pypi/bin/activate
+
+          echo "=== Verifying version ==="
           envsync --version
+          if ! envsync --version | grep -q "${{ needs.validate-release.outputs.version }}"; then
+            echo "::error::Version mismatch"
+            exit 1
+          fi
+
+          echo "=== Verifying CLI works ==="
+          envsync --help
+
+          echo "=== Verifying imports ==="
+          python -c "from envsync import env, EnvSync, validator; print('✓ All imports successful')"
+
+          echo "✓ PyPI package verification complete"
 
   create-release:
     name: Create GitHub Release

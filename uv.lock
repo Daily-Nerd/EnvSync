@@ -475,7 +475,6 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
-    { name = "pre-commit" },
     { name = "python-dotenv" },
     { name = "rich" },
     { name = "tomli" },
@@ -503,7 +502,6 @@ requires-dist = [
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.18.2" },
     { name = "pip-audit", marker = "extra == 'dev'", specifier = ">=2.6.1" },
     { name = "pip-licenses", marker = "extra == 'dev'", specifier = ">=4.3.0" },
-    { name = "pre-commit", specifier = ">=4.3.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.3.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4.2" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.0.0" },

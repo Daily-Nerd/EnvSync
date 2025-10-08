@@ -1,11 +1,14 @@
 archive/*
 .claude/*
+CLAUDE.md
 .coverage
+coverage.*
 .env
 .env.*
 .venv/*
-__pycache__/*
+__pycache__/
 .pytest_cache/*
 .ruff_cache/*
 htmlcov/*
 .DS_Store
+dist/*

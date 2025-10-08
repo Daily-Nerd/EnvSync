@@ -25,7 +25,6 @@ classifiers = [
 
 dependencies = [
     "click>=8.1.8",
-    "pre-commit>=4.3.0",
     "python-dotenv>=1.1.1",
     "rich>=14.1.0",
     "tomli>=2.2.1",
