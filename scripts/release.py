@@ -22,23 +22,44 @@ from pathlib import Path
 from typing import Optional
 
 
-def run_command(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
-    """Run a command and return the result."""
+def run_command(cmd: list[str], check: bool = True, interactive: bool = False) -> subprocess.CompletedProcess:
+    """Run a command and return the result.
+
+    Args:
+        cmd: Command to run as list of strings
+        check: If True, exit on non-zero return code
+        interactive: If True, don't capture output (allows user interaction like GPG signing)
+    """
     print(f"Running: {' '.join(cmd)}")
-    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    if interactive:
+        # Don't capture output - allows GPG passphrase prompts to show
+        result = subprocess.run(cmd, text=True)
+    else:
+        result = subprocess.run(cmd, capture_output=True, text=True)
 
     if check and result.returncode != 0:
         print(f"Error running command: {' '.join(cmd)}")
-        print(f"STDOUT: {result.stdout}")
-        print(f"STDERR: {result.stderr}")
+        if not interactive:
+            print(f"STDOUT: {result.stdout}")
+            print(f"STDERR: {result.stderr}")
         sys.exit(1)
 
     return result
 
 
 def validate_version(version: str) -> bool:
-    """Validate version format."""
-    pattern = r"^\d+\.\d+\.\d+(-(a|b|rc|alpha|beta|dev)\d*)?$"
+    """Validate version format (PEP 440 compatible).
+
+    Examples:
+        - 1.0.0
+        - 1.0.0-rc.1
+        - 1.0.0-beta.2
+        - 1.0.0-alpha
+        - 1.0.0a1, 1.0.0b2, 1.0.0rc3 (PEP 440 style)
+    """
+    # More permissive pattern that accepts common version formats
+    pattern = r"^\d+\.\d+\.\d+(-(rc|alpha|beta|a|b|dev)\.?\d*)?$"
     return bool(re.match(pattern, version))
 
 
@@ -81,6 +102,20 @@ def update_version_in_files(version: str) -> None:
     init_path.write_text(content)
     print(f"Updated version in {init_path} to {version}")
 
+    # Update cli.py
+    cli_path = Path("src/envsync/cli.py")
+    content = cli_path.read_text()
+
+    # Replace version in @click.version_option decorator
+    content = re.sub(
+        r'@click\.version_option\(version="[^"]*"',
+        f'@click.version_option(version="{version}"',
+        content
+    )
+
+    cli_path.write_text(content)
+    print(f"Updated version in {cli_path} to {version}")
+
 
 def run_tests() -> None:
     """Run tests to ensure everything works."""
@@ -104,8 +139,9 @@ def commit_changes(version: str, is_prerelease: bool) -> None:
     if is_prerelease:
         commit_msg += " (prerelease)"
 
-    run_command(["git", "add", "pyproject.toml", "src/envsync/__init__.py"])
-    run_command(["git", "commit", "-m", commit_msg])
+    run_command(["git", "add", "pyproject.toml", "src/envsync/__init__.py", "src/envsync/cli.py"])
+    # Use interactive=True to allow GPG signing prompts to show
+    run_command(["git", "commit", "-m", commit_msg], interactive=True)
     print(f"✅ Committed changes: {commit_msg}")
 
 
@@ -119,7 +155,8 @@ def create_tag(version: str) -> None:
         print(f"Error: Tag {tag} already exists")
         sys.exit(1)
 
-    run_command(["git", "tag", "-a", tag, "-m", f"Release {tag}"])
+    # Use interactive=True to allow GPG signing prompts for annotated tags
+    run_command(["git", "tag", "-a", tag, "-m", f"Release {tag}"], interactive=True)
     print(f"✅ Created tag: {tag}")
 
 

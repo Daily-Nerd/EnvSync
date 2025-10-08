@@ -3,7 +3,8 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'   # Release on version tags like v1.2.3
+      - 'v*.*.*'        # Stable releases: v1.2.3
+      - 'v*.*.*-*'      # Pre-releases: v1.2.3-rc.1, v1.2.3-beta.2, etc.
   workflow_dispatch:
     inputs:
       version:
