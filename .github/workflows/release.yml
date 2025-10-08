@@ -3,21 +3,24 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'  # Trigger on version tags like v1.0.0
+      - 'v*.*.*'   # Release on version tags like v1.2.3
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., 1.0.0)'
+        description: 'Version to release (e.g., 1.2.3 or v1.2.3)'
         required: true
         type: string
       prerelease:
-        description: 'Is this a prerelease?'
+        description: 'Mark GitHub release as prerelease'
         required: false
         default: false
         type: boolean
 
+# Principle of least privilege by default. Elevate per job when needed.
+permissions:
+  contents: read
+
 env:
-  PYPI_INDEX_URL: https://upload.pypi.org/legacy/
   TEST_PYPI_INDEX_URL: https://test.pypi.org/legacy/
 
 jobs:
@@ -28,246 +31,257 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       is_prerelease: ${{ steps.version.outputs.is_prerelease }}
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref }}
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.12"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: 'pip'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e ".[dev]"
-        pip install pre-commit
+      - name: Set up uv (fast installer/lock support)
+        uses: astral-sh/setup-uv@v4
 
-    - name: Run pre-commit hooks (format/lint/static checks)
-      run: pre-commit run --all-files
+      - name: Install dev deps
+        run: |
+          uv pip install -U pip
+          uv pip install -e ".[dev]" pre-commit packaging pytest pytest-cov mypy
 
-    - name: Extract version
-      id: version
-      run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          VERSION="${{ github.event.inputs.version }}"
-          # Normalize: strip optional leading 'v'
-          VERSION="${VERSION#v}"
-          IS_PRERELEASE="${{ github.event.inputs.prerelease }}"
-        else
-          VERSION=${GITHUB_REF#refs/tags/v}
-          # Check if version contains pre-release identifiers
-          if [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(a|b|rc|alpha|beta|dev)[0-9]*$ ]]; then
-            IS_PRERELEASE="true"
-          else
-            IS_PRERELEASE="false"
+      - name: Run pre-commit
+        run: pre-commit run --all-files
+
+      - name: Extract & classify version (PEP 440)
+        id: version
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os, sys
+          from packaging.version import Version, InvalidVersion
+
+          ev = os.environ.get("GITHUB_EVENT_NAME")
+          if ev == "workflow_dispatch":
+              raw = os.environ["INPUT_VERSION"]
+          else:
+              # refs/tags/v1.2.3
+              raw = os.environ["GITHUB_REF"].split("/")[-1]
+          ver = raw[1:] if raw.startswith("v") else raw
+
+          try:
+              v = Version(ver)
+          except InvalidVersion:
+              print(f"::error::Invalid version: {raw} (normalized: {ver})")
+              sys.exit(1)
+
+          is_pre = "true" if (v.is_prerelease or v.is_devrelease) else "false"
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"version={ver}\n")
+              f.write(f"is_prerelease={is_pre}\n")
+          PY
+
+      # Only block duplicate version when manually dispatching (tag push already contains the tag)
+      - name: Guard duplicate tag (dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists"; exit 1
           fi
-        fi
 
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
-        echo "Version: $VERSION"
-        echo "Is prerelease: $IS_PRERELEASE"
+      - name: Run tests (unit + type)
+        run: |
+          pytest --cov=envsync --cov-report=xml
+          mypy src/envsync
 
-    - name: Validate version format
-      run: |
-        RAW_VERSION="${{ steps.version.outputs.version }}"
-        VERSION="${RAW_VERSION#v}"
-        if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(a|b|rc|alpha|beta|dev)?[0-9]*$ ]]; then
-          echo "Invalid version format: ${RAW_VERSION}"
-          echo "Expected format: X.Y.Z or vX.Y.Z (optionally with pre-release)"
-          exit 1
-        fi
-
-    - name: Check if version exists
-      run: |
-        VERSION="${{ steps.version.outputs.version }}"
-        # Check if tag already exists
-        if git rev-parse "v$VERSION" >/dev/null 2>&1; then
-          echo "Tag v$VERSION already exists"
-          exit 1
-        fi
-
-    - name: Run tests
-      run: |
-        pytest --cov=envsync --cov-report=xml
-
-    - name: Run type checking
-      run: mypy src/envsync
+  tests:
+    name: Test Matrix
+    runs-on: ubuntu-latest
+    needs: validate-release
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      - uses: astral-sh/setup-uv@v4
+      - run: |
+          uv pip install -U pip
+          uv pip install -e ".[dev]" pytest
+          pytest -q
 
   build-package:
     name: Build Package
     runs-on: ubuntu-latest
-    needs: validate-release
+    needs: [validate-release, tests]
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.12"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: 'pip'
 
-    - name: Install build dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install build twine
+      - uses: astral-sh/setup-uv@v4
 
-    - name: Build package
-      run: python -m build
+      - name: Install build deps
+        run: |
+          uv pip install -U pip
+          uv pip install build twine
 
-    - name: Check package
-      run: twine check dist/*
+      - name: Build (sdist + wheel)
+        run: python -m build
 
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: dist
-        path: dist/
+      - name: Twine check
+        run: twine check dist/*
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
 
   test-pypi:
     name: Test PyPI Upload
     runs-on: ubuntu-latest
     needs: [validate-release, build-package]
+    # Keep your original logic: tag push OR explicit prerelease flag uploads to TestPyPI
     if: github.event_name == 'push' || github.event.inputs.prerelease == 'true'
     steps:
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: dist
-        path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.12"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: 'pip'
 
-    - name: Install twine
-      run: pip install twine
+      - uses: astral-sh/setup-uv@v4
 
-    - name: Upload to Test PyPI
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
-        TWINE_REPOSITORY_URL: ${{ env.TEST_PYPI_INDEX_URL }}
-      run: |
-        twine upload --skip-existing dist/*
+      - name: Upload to Test PyPI (API token)
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          TWINE_REPOSITORY_URL: ${{ env.TEST_PYPI_INDEX_URL }}
+        run: |
+          uv pip install twine
+          twine upload --skip-existing dist/*
 
-    - name: Show downloaded artifacts (test-pypi)
-      run: |
-        echo "Listing dist/ contents:"
-        ls -la dist || true
-
-    - name: Test installation from Test PyPI
-      run: |
-        pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ envsync==${{ needs.validate-release.outputs.version }}
-        envsync --version
+      - name: Verify install from Test PyPI (clean venv + retry)
+        run: |
+          python -m venv .venv && . .venv/bin/activate
+          python -m pip install -U pip
+          for i in {1..5}; do
+            if pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ envsync==${{ needs.validate-release.outputs.version }}; then
+              break
+            fi
+            echo "Retry $i after TestPyPI sync..."; sleep 5
+          done
+          envsync --version
 
   pypi:
-    name: PyPI Upload
+    name: PyPI Upload (Trusted Publishing)
     runs-on: ubuntu-latest
     needs: [validate-release, build-package, test-pypi]
     if: github.event_name == 'push' && needs.validate-release.outputs.is_prerelease == 'false'
+    # OIDC for Trusted Publishing
+    permissions:
+      contents: read
+      id-token: write
+    environment:
+      name: pypi
+      url: https://pypi.org/p/envsync
     steps:
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.11"
+      # Publish via OIDC (configure Trusted Publisher in PyPI first)
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages_dir: dist
+          # provenance: true   # uncomment after enabling project-wide provenance
 
-    - name: Install twine
-      run: pip install twine
-
-    - name: Upload to PyPI
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-      run: |
-        twine upload dist/*
-
-    - name: Show downloaded artifacts (pypi)
-      run: |
-        echo "Listing dist/ contents:"
-        ls -la dist || true
-
-    - name: Verify upload
-      run: |
-        pip install envsync==${{ needs.validate-release.outputs.version }}
-        envsync --version
+      - name: Verify install from PyPI (clean venv + retry)
+        run: |
+          python -m venv .venv && . .venv/bin/activate
+          python -m pip install -U pip
+          for i in {1..5}; do
+            if pip install envsync==${{ needs.validate-release.outputs.version }}; then
+              break
+            fi
+            echo "Retry $i after PyPI sync..."; sleep 5
+          done
+          envsync --version
 
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [validate-release, build-package, pypi]
+    needs: [validate-release, build-package, pypi, test-pypi]
     if: always() && (needs.pypi.result == 'success' || needs.test-pypi.result == 'success')
+    permissions:
+      contents: write
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
 
-    - name: Generate changelog
-      id: changelog
-      run: |
-        VERSION="${{ needs.validate-release.outputs.version }}"
-        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+      - name: Generate basic changelog
+        id: changelog
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          PREV=$(git describe --tags --abbrev=0 v$VERSION^ 2>/dev/null || echo "")
+          {
+            echo "## What's Changed"
+            echo
+            if [ -n "$PREV" ]; then
+              echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV...v$VERSION"
+            else
+              echo "Initial release."
+            fi
+            echo
+            echo "## Installation"
+            echo
+            echo "\`\`\`bash"
+            echo "pip install envsync==$VERSION"
+            echo "\`\`\`"
+            echo
+            echo "## Quick Start"
+            echo
+            echo "\`\`\`python"
+            echo "from envsync import env"
+            echo "API_KEY = env.require('API_KEY')"
+            echo "DATABASE_URL = env.require('DATABASE_URL')"
+            echo "DEBUG = env.optional('DEBUG', default=False, type=bool)"
+            echo "\`\`\`"
+          } > CHANGELOG.md
 
-        echo "## What's Changed" > CHANGELOG.md
-        echo "" >> CHANGELOG.md
-
-        if [ -n "$PREVIOUS_TAG" ]; then
-          echo "### Full Changelog" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREVIOUS_TAG...v$VERSION" >> CHANGELOG.md
-        else
-          echo "### Initial Release" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "This is the initial release of EnvSync!" >> CHANGELOG.md
-        fi
-
-        echo "" >> CHANGELOG.md
-        echo "## Installation" >> CHANGELOG.md
-        echo "" >> CHANGELOG.md
-        echo "\`\`\`bash" >> CHANGELOG.md
-        echo "pip install envsync==$VERSION" >> CHANGELOG.md
-        echo "\`\`\`" >> CHANGELOG.md
-
-        echo "" >> CHANGELOG.md
-        echo "## Quick Start" >> CHANGELOG.md
-        echo "" >> CHANGELOG.md
-        echo "\`\`\`python" >> CHANGELOG.md
-        echo "from envsync import env" >> CHANGELOG.md
-        echo "" >> CHANGELOG.md
-        echo "# Required variables (fail if missing)" >> CHANGELOG.md
-        echo "API_KEY = env.require('API_KEY')" >> CHANGELOG.md
-        echo "DATABASE_URL = env.require('DATABASE_URL')" >> CHANGELOG.md
-        echo "" >> CHANGELOG.md
-        echo "# Optional with defaults" >> CHANGELOG.md
-        echo "DEBUG = env.optional('DEBUG', default=False, type=bool)" >> CHANGELOG.md
-        echo "\`\`\`" >> CHANGELOG.md
-
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: v${{ needs.validate-release.outputs.version }}
-        name: EnvSync v${{ needs.validate-release.outputs.version }}
-        body_path: CHANGELOG.md
-        draft: false
-        prerelease: ${{ needs.validate-release.outputs.is_prerelease }}
-        files: |
-          dist/envsync-${{ needs.validate-release.outputs.version }}-py3-none-any.whl
-          dist/envsync-${{ needs.validate-release.outputs.version }}.tar.gz
-        generate_release_notes: true
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.validate-release.outputs.version }}
+          name: EnvSync v${{ needs.validate-release.outputs.version }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: ${{ needs.validate-release.outputs.is_prerelease }}
+          files: |
+            dist/envsync-${{ needs.validate-release.outputs.version }}-py3-none-any.whl
+            dist/envsync-${{ needs.validate-release.outputs.version }}.tar.gz
 
   notify:
     name: Notify Release
@@ -275,15 +289,12 @@ jobs:
     needs: [create-release]
     if: always()
     steps:
-    - name: Notify on Success
-      if: needs.create-release.result == 'success'
-      run: |
-        echo "✅ Release v${{ needs.validate-release.outputs.version }} published successfully!"
-        echo "📦 PyPI: https://pypi.org/project/envsync/${{ needs.validate-release.outputs.version }}/"
-        echo "🏷️  GitHub: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.validate-release.outputs.version }}"
-
-    - name: Notify on Failure
-      if: needs.create-release.result == 'failure'
-      run: |
-        echo "❌ Release failed!"
-        echo "Check the logs for details."
+      - name: Outcome
+        run: |
+          if [ "${{ needs.create-release.result }}" = "success" ]; then
+            echo "✅ Release v${{ needs.validate-release.outputs.version }} published."
+            echo "📦 PyPI: https://pypi.org/project/envsync/${{ needs.validate-release.outputs.version }}/"
+            echo "🏷️ GitHub: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.validate-release.outputs.version }}"
+          else
+            echo "❌ Release failed. Check logs."
+          fi
