@@ -59,7 +59,7 @@ jobs:
           uv pip install -e ".[dev]" pre-commit packaging pytest pytest-cov mypy
 
       - name: Run pre-commit
-        run: uv run python -m pre-commit run --all-files
+        run: pre-commit run --all-files
 
       - name: Extract & classify version (PEP 440)
         id: version

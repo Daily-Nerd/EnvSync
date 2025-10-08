@@ -25,6 +25,7 @@ classifiers = [
 
 dependencies = [
     "click>=8.1.8",
+    "pre-commit>=4.3.0",
     "python-dotenv>=1.1.1",
     "rich>=14.1.0",
     "tomli>=2.2.1",
@@ -33,6 +34,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "black>=25.9.0",
+    "pre-commit>=4.3.0",
     "mypy>=1.18.2",
     "pytest>=8.4.2",
     "pytest-cov>=7.0.0",
@@ -45,7 +47,7 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/Daily-Nerd/EnvSync"
-Documentation = "https://github.com/Daily-Nerd/EnvSync/docs"
+Documentation = "https://github.com/Daily-Nerd/EnvSync/tree/main/docs"
 Repository = "https://github.com/Daily-Nerd/EnvSync"
 Issues = "https://github.com/Daily-Nerd/EnvSync/issues"
 
