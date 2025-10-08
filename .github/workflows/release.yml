@@ -438,6 +438,18 @@ jobs:
           name: dist
           path: dist
 
+      - name: Check if version already exists on PyPI
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          # Check if version exists on PyPI
+          if pip index versions envsync 2>/dev/null | grep -q "envsync ($VERSION)"; then
+            echo "::error::Version $VERSION already exists on PyPI!"
+            echo "::error::PyPI does not allow overwriting versions."
+            echo "::error::Please bump the version number and try again."
+            exit 1
+          fi
+          echo "✓ Version $VERSION does not exist on PyPI yet"
+
       # Publish via OIDC (configure Trusted Publisher in PyPI first)
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
@@ -543,7 +555,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.validate-release.outputs.version }}
-          name: EnvSync v${{ needs.validate-release.outputs.version }}
+          name: Release v${{ needs.validate-release.outputs.version }}
           body_path: CHANGELOG.md
           draft: false
           prerelease: ${{ needs.validate-release.outputs.is_prerelease }}
