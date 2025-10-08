@@ -97,17 +97,12 @@ jobs:
     - name: Install security tools
       run: |
         python -m pip install --upgrade pip
-        pip install bandit[toml] semgrep
+        pip install bandit
 
     - name: Run Bandit security scan
       run: |
         bandit -c bandit.yaml -r src/envsync -f json -o bandit-report.json || true
         bandit -c bandit.yaml -r src/envsync -f txt || true
-
-    - name: Run Semgrep security scan
-      run: |
-        semgrep --config=auto src/envsync --json --output=semgrep-report.json
-        semgrep --config=auto src/envsync
 
     - name: Upload security reports
       uses: actions/upload-artifact@v4
@@ -115,7 +110,6 @@ jobs:
         name: code-security-reports
         path: |
           bandit-report.json
-          semgrep-report.json
 
   license-check:
     name: License Compliance

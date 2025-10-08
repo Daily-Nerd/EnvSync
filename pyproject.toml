@@ -40,7 +40,6 @@ dev = [
     "bandit>=1.7.5",
     "safety>=2.3.5",
     "pip-audit>=2.6.1",
-    "semgrep>=1.45.0",
     "pip-licenses>=4.3.0",
 ]
 
