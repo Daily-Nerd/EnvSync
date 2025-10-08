@@ -71,7 +71,7 @@ jobs:
 
           ev = os.environ.get("GITHUB_EVENT_NAME")
           if ev == "workflow_dispatch":
-              raw = ${{ inputs.version }}
+              raw = "${{ inputs.version }}"
               if not raw:
                   print("::error::INPUT_VERSION not provided for workflow_dispatch")
                   sys.exit(1)
