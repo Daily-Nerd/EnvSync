@@ -123,9 +123,10 @@ def run_tests() -> None:
 def run_linting() -> None:
     """Run linting checks."""
     print("Running linting...")
-    run_command(["ruff", "check", "."])
-    run_command(["black", "--check", "."])
-    run_command(["mypy", "src/envsync"])
+    # Use UV to run tools from the project environment
+    run_command(["uv", "run", "ruff", "check", "."])
+    run_command(["uv", "run", "black", "--check", "."])
+    run_command(["uv", "run", "mypy", "src/envsync"])
     print("✅ Linting passed")
 
 
