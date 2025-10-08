@@ -1575,7 +1575,7 @@ wheels = [
 ]
 
 [[package]]
-name = "tripwire"
+name = "tripwire-py"
 version = "0.1.4"
 source = { editable = "." }
 dependencies = [

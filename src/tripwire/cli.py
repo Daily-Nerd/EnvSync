@@ -665,7 +665,7 @@ def _display_combined_timeline(
     from rich.tree import Tree
 
     console.print("\n[bold cyan][Report] Secret Leak Blast Radius[/bold cyan]")
-    console.print("═" * 70)
+    console.print("=" * 70)
     console.print()
 
     # Create visual tree
@@ -689,13 +689,13 @@ def _display_combined_timeline(
             branches_node = secret_node.add("[cyan]Branches affected:[/cyan]")
             for branch in timeline.branches_affected[:5]:
                 # Note: Showing total commits across all branches since we don't track per-branch
-                branches_node.add(f"├─ {branch} ([yellow]{len(timeline.commits_affected)} total commits[/yellow])")
+                branches_node.add(f"+- {branch} ([yellow]{len(timeline.commits_affected)} total commits[/yellow])")
 
         # Add files
         if timeline.files_affected:
             files_node = secret_node.add("[cyan]Files affected:[/cyan]")
             for file_path in timeline.files_affected[:5]:
-                files_node.add(f"├─ [red]{file_path}[/red]")
+                files_node.add(f"+- [red]{file_path}[/red]")
 
     console.print(tree)
     console.print()
@@ -745,7 +745,7 @@ def _display_single_audit_result(
 
     # Display timeline header
     console.print(f"[bold cyan]Secret Leak Timeline for: {secret_name}[/bold cyan]")
-    console.print("═" * 70)
+    console.print("=" * 70)
     console.print()
 
     # Display timeline events
