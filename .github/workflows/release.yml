@@ -257,7 +257,7 @@ jobs:
           echo "---"
           # Check entry points
           python -m zipfile -e dist/*.whl /tmp/wheel_check
-          cat /tmp/wheel_check/tripwire-*.dist-info/entry_points.txt
+          cat /tmp/wheel_check/tripwire_py-*.dist-info/entry_points.txt
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
