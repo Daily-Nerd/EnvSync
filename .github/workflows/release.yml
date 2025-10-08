@@ -207,7 +207,7 @@ jobs:
           TWINE_REPOSITORY_URL: ${{ env.TEST_PYPI_INDEX_URL }}
         run: |
           uv pip install twine
-          twine upload --skip-existing dist/*
+          uv run twine upload --skip-existing dist/*
 
       - name: Verify install from Test PyPI (clean venv + retry)
         run: |
