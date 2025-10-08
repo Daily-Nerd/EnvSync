@@ -205,7 +205,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'
 
       - uses: astral-sh/setup-uv@v4
 
