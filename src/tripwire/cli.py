@@ -160,15 +160,15 @@ def init(project_type: str) -> None:
     # Create .env file (with real random secrets)
     env_path = Path(".env")
     if env_path.exists():
-        console.print("[yellow]⚠️  .env already exists, skipping...[/yellow]")
+        console.print("[yellow][!] .env already exists, skipping...[/yellow]")
     else:
         env_path.write_text(get_template(project_type, inject_secret=True))
-        console.print("[green]✅ Created .env[/green]")
+        console.print("[green][OK] Created .env[/green]")
 
     # Create .env.example (with placeholder secrets only)
     example_path = Path(".env.example")
     if example_path.exists():
-        console.print("[yellow]⚠️  .env.example already exists, skipping...[/yellow]")
+        console.print("[yellow][!] .env.example already exists, skipping...[/yellow]")
     else:
         # Use placeholder template for .env.example to avoid committing real secrets
         # Real random secrets only go in .env (which is gitignored)
@@ -183,7 +183,7 @@ def init(project_type: str) -> None:
 
 {example_content}"""
         example_path.write_text(example_with_header)
-        console.print("[green]✅ Created .env.example[/green]")
+        console.print("[green][OK] Created .env.example[/green]")
 
     # Update .gitignore
     gitignore_path = Path(".gitignore")
@@ -212,12 +212,12 @@ def init(project_type: str) -> None:
 
             f.write(".env\n")
             f.write(".env.local\n")
-        console.print("[green]✅ Updated .gitignore[/green]")
+        console.print("[green][OK] Updated .gitignore[/green]")
     else:
-        console.print("[yellow]⚠️  .gitignore already contains .env entries[/yellow]")
+        console.print("[yellow][!] .gitignore already contains .env entries[/yellow]")
 
     # Success message
-    console.print("\n[bold green]Setup complete! ✅[/bold green]\n")
+    console.print("\n[bold green]Setup complete![/bold green]\n")
     console.print("Next steps:")
     console.print("  1. Edit .env with your configuration values")
     console.print("  2. Import in your code: [cyan]from tripwire import env[/cyan]")
@@ -664,20 +664,20 @@ def _display_combined_timeline(
     from rich.panel import Panel
     from rich.tree import Tree
 
-    console.print("\n[bold cyan]📊 Secret Leak Blast Radius[/bold cyan]")
+    console.print("\n[bold cyan][Report] Secret Leak Blast Radius[/bold cyan]")
     console.print("═" * 70)
     console.print()
 
     # Create visual tree
-    tree = Tree("🔍 [bold yellow]Repository Secret Exposure[/bold yellow]")
+    tree = Tree("[*] [bold yellow]Repository Secret Exposure[/bold yellow]")
 
     for secret_match, timeline in results:
         if timeline.total_occurrences == 0:
             continue
 
         # Determine status symbol
-        status_symbol = "🔴" if timeline.is_currently_in_git else "🟡"
-        severity_symbol = "🚨" if timeline.severity == "CRITICAL" else "⚠️"
+        status_symbol = "[!]" if timeline.is_currently_in_git else "[~]"
+        severity_symbol = "[!!]" if timeline.severity == "CRITICAL" else "[!]"
 
         secret_node = tree.add(
             f"{status_symbol} {severity_symbol} [yellow]{secret_match.variable_name}[/yellow] "
@@ -763,7 +763,7 @@ def _display_single_audit_result(
             first_occ = occs[0]
 
             # Date header
-            console.print(f"[bold]📅 {date_str}[/bold]")
+            console.print(f"[bold][Date] {date_str}[/bold]")
 
             # Show commit info
             console.print(f"   Commit: [cyan]{first_occ.commit_hash[:8]}[/cyan] - {first_occ.commit_message[:60]}")
@@ -771,7 +771,7 @@ def _display_single_audit_result(
 
             # Show files
             for occ in occs:
-                console.print(f"   📁 [red]{occ.file_path}[/red]:{occ.line_number}")
+                console.print(f"   [File] [red]{occ.file_path}[/red]:{occ.line_number}")
 
             console.print()
 
@@ -812,12 +812,12 @@ def _display_single_audit_result(
 
     if timeline.is_in_public_repo:
         impact_lines.append("")
-        impact_lines.append("[bold red]⚠️  CRITICAL: Found in PUBLIC repository![/bold red]")
+        impact_lines.append("[bold red][!] CRITICAL: Found in PUBLIC repository![/bold red]")
 
     console.print(
         Panel(
             "\n".join(impact_lines),
-            title="🚨 Security Impact",
+            title="[!!] Security Impact",
             border_style="red" if timeline.severity == "CRITICAL" else "yellow",
         )
     )
@@ -826,7 +826,7 @@ def _display_single_audit_result(
     # Generate and display remediation steps
     steps = generate_remediation_steps(timeline, secret_name)
 
-    console.print("[bold yellow]🔧 Remediation Steps:[/bold yellow]\n")
+    console.print("[bold yellow][Fix] Remediation Steps:[/bold yellow]\n")
 
     for step in steps:
         urgency_color = {
@@ -847,12 +847,12 @@ def _display_single_audit_result(
             console.print("   ", syntax)
 
         if step.warning:
-            console.print(f"   [red]⚠️  {step.warning}[/red]")
+            console.print(f"   [red][!] {step.warning}[/red]")
 
         console.print()
 
     # Final recommendations
-    console.print("[bold cyan]💡 Prevention Tips:[/bold cyan]")
+    console.print("[bold cyan][Tip] Prevention Tips:[/bold cyan]")
     console.print("  • Always add .env files to .gitignore")
     console.print("  • Use environment variable scanning tools")
     console.print("  • Never commit secrets to version control")
@@ -932,7 +932,7 @@ def audit(
     # Auto-detection mode
     if scan_all:
         if not output_json:
-            console.print("\n[bold cyan]🔍 Auto-detecting secrets in .env file...[/bold cyan]\n")
+            console.print("\n[bold cyan][*] Auto-detecting secrets in .env file...[/bold cyan]\n")
 
         env_file = Path.cwd() / ".env"
         if not env_file.exists():
@@ -951,7 +951,7 @@ def audit(
 
         # Display detected secrets summary (only in non-JSON mode)
         if not output_json:
-            console.print(f"[yellow]⚠️  Found {len(detected_secrets)} potential secret(s) in .env file[/yellow]\n")
+            console.print(f"[yellow][!] Found {len(detected_secrets)} potential secret(s) in .env file[/yellow]\n")
 
             summary_table = Table(title="Detected Secrets", show_header=True, header_style="bold cyan")
             summary_table.add_column("Variable", style="yellow")
