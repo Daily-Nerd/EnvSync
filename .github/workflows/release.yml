@@ -56,10 +56,10 @@ jobs:
       - name: Install dev deps
         run: |
           uv pip install -U pip
-          uv pip install -e ".[dev]" pre-commit packaging pytest pytest-cov mypy
+          uv pip install -e . pre-commit packaging pytest pytest-cov mypy
 
       - name: Run pre-commit
-        run: pre-commit run --all-files
+        run: uv run pre-commit run --all-files
 
       - name: Extract & classify version (PEP 440)
         id: version
