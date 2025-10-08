@@ -967,7 +967,7 @@ We welcome contributions! Here's how to get started:
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/envsync.git
+git clone https://github.com/Daily-Nerd/EnvSync.git
 cd envsync
 
 # Create virtual environment
@@ -1025,8 +1025,8 @@ Built with:
 
 ## Support
 
-- **GitHub**: [github.com/yourusername/envsync](https://github.com/yourusername/envsync)
-- **Issues**: [github.com/yourusername/envsync/issues](https://github.com/yourusername/envsync/issues)
+- **GitHub**: [github.com/Daily-Nerd/EnvSync](https://github.com/Daily-Nerd/EnvSync)
+- **Issues**: [github.com/Daily-Nerd/EnvSync/issues](https://github.com/Daily-Nerd/EnvSync/issues)
 
 ---
 

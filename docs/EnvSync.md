@@ -928,7 +928,7 @@ We welcome contributions! Here's how to get started:
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/envsync.git
+git clone https://github.com/Daily-Nerd/EnvSync.git
 cd envsync
 
 # Create virtual environment
@@ -996,7 +996,7 @@ envsync/
 
 ### Areas for Contribution
 
-- 🐛 **Bug fixes**: Check [issues](https://github.com/yourusername/envsync/issues)
+- 🐛 **Bug fixes**: Check [issues](https://github.com/Daily-Nerd/EnvSync/issues)
 - 🎨 **New validators**: Add format validators for common patterns
 - 🔌 **Framework integrations**: Django, FastAPI, Flask plugins
 - 📚 **Documentation**: Examples, tutorials, guides
@@ -1030,8 +1030,8 @@ Built with:
 ## 📞 Support & Community
 
 - **Documentation**: [envsync.dev](https://envsync.dev)
-- **GitHub**: [github.com/yourusername/envsync](https://github.com/yourusername/envsync)
-- **Issues**: [github.com/yourusername/envsync/issues](https://github.com/yourusername/envsync/issues)
+- **GitHub**: [github.com/Daily-Nerd/EnvSync](https://github.com/Daily-Nerd/EnvSync)
+- **Issues**: [github.com/Daily-Nerd/EnvSync/issues](https://github.com/Daily-Nerd/EnvSync/issues)
 - **Discord**: [discord.gg/envsync](https://discord.gg/envsync)
 - **Twitter**: [@envsync](https://twitter.com/envsync)
 

@@ -276,6 +276,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
 
 ## 📞 Support
 
-- GitHub Issues: [Create an issue](https://github.com/yourusername/envsync/issues)
-- Discussions: [GitHub Discussions](https://github.com/yourusername/envsync/discussions)
+- GitHub Issues: [Create an issue](https://github.com/Daily-Nerd/EnvSync/issues)
+- Discussions: [GitHub Discussions](https://github.com/Daily-Nerd/EnvSync/discussions)
 - Documentation: [Read the docs](https://envsync.dev)

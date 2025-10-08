@@ -200,13 +200,13 @@ def main():
 
     print(f"\n🎉 Successfully released EnvSync {args.version}!")
     print(f"📦 PyPI: https://pypi.org/project/envsync/{args.version}/")
-    print(f"🏷️  GitHub: https://github.com/yourusername/envsync/releases/tag/v{args.version}")
+    print(f"🏷️  GitHub: https://github.com/Daily-Nerd/EnvSync/releases/tag/v{args.version}")
     print("\nThe GitHub Actions workflow will now:")
     print("  1. Build the package")
     print("  2. Upload to PyPI")
     print("  3. Create a GitHub release")
     print("\nYou can monitor progress at:")
-    print("  https://github.com/yourusername/envsync/actions")
+    print("  https://github.com/Daily-Nerd/EnvSync/actions")
 
 
 if __name__ == "__main__":

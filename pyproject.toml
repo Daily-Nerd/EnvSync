@@ -44,10 +44,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/envsync"
+Homepage = "https://github.com/Daily-Nerd/EnvSync"
 Documentation = "https://envsync.dev"
-Repository = "https://github.com/yourusername/envsync"
-Issues = "https://github.com/yourusername/envsync/issues"
+Repository = "https://github.com/Daily-Nerd/EnvSync"
+Issues = "https://github.com/Daily-Nerd/EnvSync/issues"
 
 [project.scripts]
 envsync = "envsync.cli:main"
