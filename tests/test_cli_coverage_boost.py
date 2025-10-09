@@ -112,10 +112,7 @@ class TestScanCommandDeepCoverage:
         """Test scan detects multiple secret types."""
         runner = CliRunner()
         with runner.isolated_filesystem(temp_dir=tmp_path):
-            Path(".env").write_text(
-                "GITHUB_TOKEN=test-github-token-not-real\n"
-                "STRIPE_KEY=test-stripe-key-not-real\n"
-            )
+            Path(".env").write_text("GITHUB_TOKEN=test-github-token-not-real\n" "STRIPE_KEY=test-stripe-key-not-real\n")
 
             result = runner.invoke(main, ["scan"])
 
