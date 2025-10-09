@@ -8,7 +8,18 @@ import inspect
 import linecache
 import os
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, TypeVar, Union, get_type_hints
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    TypeVar,
+    Union,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 from dotenv import load_dotenv
 
@@ -64,7 +75,8 @@ class TripWire:
         """Infer type from caller's variable annotation.
 
         Uses stack introspection to find the calling frame and extract
-        the type annotation from the assignment target by parsing the source code.
+        the type annotation from the assignment target. This method uses
+        safe type inference techniques to avoid security risks.
 
         Returns:
             Inferred type or None if cannot determine
@@ -76,7 +88,53 @@ class TripWire:
             if not caller_frame:
                 return None
 
-            # Parse the source line to extract type annotation
+            # Get module for type hints (safest approach)
+            module = inspect.getmodule(caller_frame)
+            if module:
+                # Try get_type_hints first (safe and recommended)
+                try:
+                    hints = get_type_hints(module)
+                except Exception:
+                    # Fallback if type hints can't be resolved
+                    hints = {}
+
+                # Parse source line to find variable name
+                filename = caller_frame.f_code.co_filename
+                lineno = caller_frame.f_lineno
+                line = linecache.getline(filename, lineno).strip()
+
+                # Extract variable name from pattern: VAR_NAME: type = ...
+                if ":" in line and "=" in line:
+                    var_part = line.split("=")[0].strip()
+                    if ":" in var_part:
+                        var_name = var_part.split(":")[0].strip()
+
+                        # Check if we have type hint for this variable
+                        if var_name in hints:
+                            hint = hints[var_name]
+
+                            # Handle Optional[T] -> extract T
+                            origin = get_origin(hint)
+                            if origin is Union:
+                                args = get_args(hint)
+                                # Filter out NoneType (using proper comparison)
+                                non_none_args = [arg for arg in args if arg is not type(None)]
+                                if non_none_args:
+                                    return non_none_args[0]
+
+                            # Return the hint if it's a basic type
+                            if hint in (int, float, bool, str, list, dict):
+                                return hint
+
+                            # Handle generic types (List[T], Dict[K,V]) -> return base type
+                            if origin in (list, dict):
+                                return origin
+
+                            # If it's already a type, return it
+                            if isinstance(hint, type):
+                                return hint
+
+            # Fallback: Parse annotation string with safe type mapping (NO EVAL)
             filename = caller_frame.f_code.co_filename
             lineno = caller_frame.f_lineno
             line = linecache.getline(filename, lineno).strip()
@@ -92,52 +150,23 @@ class TripWire:
             # Extract the type annotation string
             type_str = var_part.split(":", 1)[1].strip()
 
-            # Try to evaluate the type annotation in the caller's context
-            try:
-                # Get the caller's globals and locals for evaluation
-                caller_globals = caller_frame.f_globals
-                caller_locals = caller_frame.f_locals
+            # Safe mapping for basic types only (NO EVAL!)
+            type_map = {
+                "int": int,
+                "float": float,
+                "bool": bool,
+                "str": str,
+                "list": list,
+                "dict": dict,
+            }
 
-                # Evaluate the type string in the caller's context
-                type_obj = eval(type_str, caller_globals, caller_locals)
+            # Check for Optional[T] pattern (extract T)
+            if type_str.startswith("Optional[") and type_str.endswith("]"):
+                inner_type = type_str[9:-1].strip()
+                return type_map.get(inner_type, None)
 
-                # Handle Optional[T] -> extract T
-                origin = getattr(type_obj, "__origin__", None)
-                if origin is Union:
-                    args = getattr(type_obj, "__args__", ())
-                    # Filter out NoneType
-                    non_none_args = [arg for arg in args if arg is not type(None)]
-                    if len(non_none_args) == 1:
-                        return non_none_args[0]
-
-                # Return the type if it's a valid type
-                if isinstance(type_obj, type):
-                    return type_obj
-
-                # Handle special typing constructs (list, dict, etc.)
-                if type_obj is list or (hasattr(type_obj, "__origin__") and type_obj.__origin__ is list):
-                    return list
-                if type_obj is dict or (hasattr(type_obj, "__origin__") and type_obj.__origin__ is dict):
-                    return dict
-
-                return type_obj
-
-            except Exception:
-                # If evaluation fails, try simple name mapping
-                type_str_lower = type_str.lower()
-                if type_str_lower == "int":
-                    return int
-                elif type_str_lower == "float":
-                    return float
-                elif type_str_lower == "bool":
-                    return bool
-                elif type_str_lower == "str":
-                    return str
-                elif type_str_lower == "list":
-                    return list
-                elif type_str_lower == "dict":
-                    return dict
-                return None
+            # Check for direct type match
+            return type_map.get(type_str, None)
 
         finally:
             # Clean up frame references to avoid memory leaks

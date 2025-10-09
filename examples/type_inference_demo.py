@@ -1,4 +1,4 @@
-"""Demo of TripWire v0.4.0 Type Inference Feature.
+"""Demo of TripWire Type Inference Feature.
 
 This script demonstrates the new type inference capability and typed convenience methods.
 """
@@ -6,7 +6,7 @@ This script demonstrates the new type inference capability and typed convenience
 import tempfile
 from pathlib import Path
 
-from tripwire import TripWire
+from tripwire import TripWire, __version__
 
 # Create a temporary .env file for demo
 demo_env = """
@@ -38,7 +38,7 @@ with tempfile.TemporaryDirectory() as tmp_dir:
     env = TripWire(env_file=str(env_file))
 
     print("=" * 70)
-    print("TripWire v0.4.0 - Type Inference Demo")
+    print(f"TripWire v{__version__} - Type Inference Demo")
     print("=" * 70)
     print()
 

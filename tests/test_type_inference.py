@@ -235,6 +235,8 @@ class TestTypedConvenienceMethods:
         env_file.write_text("")
 
         monkeypatch.chdir(tmp_path)
+        # CRITICAL: Clear environment to prevent pollution
+        monkeypatch.delenv("DEBUG", raising=False)
         env = TripWire(env_file=str(env_file))
 
         debug = env.optional_bool("DEBUG", default=False)
