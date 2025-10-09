@@ -311,6 +311,124 @@ class TripWireSchema:
 
         return "\n".join(lines)
 
+    def generate_env_for_environment(
+        self,
+        environment: str = "development",
+        interactive: bool = False,
+    ) -> str:
+        """
+        Generate .env file for specific environment from schema.
+
+        Args:
+            environment: Environment name (development, production, etc.)
+            interactive: If True, prompt for secret values
+
+        Returns:
+            Generated .env file content
+        """
+        from datetime import datetime
+
+        lines = [
+            f"# Environment: {environment}",
+            f"# Generated from .tripwire.toml on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            "# DO NOT COMMIT TO VERSION CONTROL",
+            "",
+        ]
+
+        # Get environment-specific defaults
+        env_defaults = self.get_defaults(environment)
+
+        # Track variables needing manual input
+        needs_input = []
+
+        # Group by required/optional
+        required_vars = sorted([v for v in self.variables.values() if v.required], key=lambda v: v.name)
+        optional_vars = sorted([v for v in self.variables.values() if not v.required], key=lambda v: v.name)
+
+        if required_vars:
+            lines.append("# Required Variables")
+            lines.append("")
+
+            for var in required_vars:
+                # Add description comment
+                if var.description:
+                    lines.append(f"# {var.description}")
+
+                # Add metadata comment
+                info_parts = [f"Type: {var.type}", "Required"]
+                if var.format:
+                    info_parts.append(f"Format: {var.format}")
+                if var.secret:
+                    info_parts.append("Secret: true")
+                lines.append(f"# {' | '.join(info_parts)}")
+
+                # Determine value
+                value = None
+
+                # Check environment-specific default first
+                if var.name in env_defaults:
+                    value = env_defaults[var.name]
+                elif var.default is not None:
+                    value = var.default
+
+                # For secrets without defaults, use placeholder or prompt
+                if value is None and var.secret:
+                    if interactive:
+                        # Will be prompted later
+                        value = "PROMPT_ME"
+                        needs_input.append((var.name, var.description or ""))
+                    else:
+                        value = "CHANGE_ME_SECRET_VALUE"
+                        needs_input.append((var.name, var.description or ""))
+                elif value is None:
+                    # Required but not secret, use placeholder
+                    value = ""
+                    needs_input.append((var.name, var.description or ""))
+
+                # Format value
+                if isinstance(value, bool):
+                    value = "true" if value else "false"
+
+                lines.append(f"{var.name}={value}")
+                lines.append("")
+
+        if optional_vars:
+            lines.append("# Optional Variables")
+            lines.append("")
+
+            for var in optional_vars:
+                # Add description comment
+                if var.description:
+                    lines.append(f"# {var.description}")
+
+                # Add metadata comment
+                info_parts = [f"Type: {var.type}", "Optional"]
+                if var.default is not None:
+                    info_parts.append(f"Default: {var.default}")
+                if var.format:
+                    info_parts.append(f"Format: {var.format}")
+                lines.append(f"# {' | '.join(info_parts)}")
+
+                # Determine value
+                value = None
+
+                # Check environment-specific default first
+                if var.name in env_defaults:
+                    value = env_defaults[var.name]
+                elif var.default is not None:
+                    value = var.default
+                else:
+                    value = ""
+
+                # Format value
+                if isinstance(value, bool):
+                    value = "true" if value else "false"
+
+                lines.append(f"{var.name}={value}")
+                lines.append("")
+
+        return "\n".join(lines), needs_input
+
     def _format_variable(self, var: VariableSchema) -> List[str]:
         """Format a variable for .env.example."""
         lines = []

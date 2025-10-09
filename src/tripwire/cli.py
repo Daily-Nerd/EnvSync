@@ -1976,6 +1976,203 @@ def schema_check(schema_file: str) -> None:
             console.print(f"  {len(warnings)} warning(s) (non-blocking)")
 
 
+@schema.command("generate-env")
+@click.option(
+    "--environment",
+    "-e",
+    default="development",
+    help="Environment name (development, staging, production)",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    help="Output .env file [default: .env.{environment}]",
+)
+@click.option(
+    "--schema-file",
+    type=click.Path(exists=True),
+    default=".tripwire.toml",
+    help="Schema file to generate from",
+)
+@click.option(
+    "--interactive",
+    "-i",
+    is_flag=True,
+    help="Prompt for secret values",
+)
+@click.option(
+    "--overwrite",
+    is_flag=True,
+    help="Overwrite existing file",
+)
+@click.option(
+    "--validate",
+    is_flag=True,
+    default=True,
+    help="Validate after generation [default: true]",
+)
+@click.option(
+    "--format-output",
+    type=click.Choice(["env", "json", "yaml"]),
+    default="env",
+    help="Output format",
+)
+def schema_generate_env(
+    environment: str,
+    output: Optional[str],
+    schema_file: str,
+    interactive: bool,
+    overwrite: bool,
+    validate: bool,
+    format_output: str,
+) -> None:
+    """Generate environment-specific .env file from schema.
+
+    Creates a .env file for a specific environment using defaults
+    from .tripwire.toml. Optionally prompts for secret values.
+
+    Examples:
+
+        tripwire schema generate-env --environment production
+
+        tripwire schema generate-env -e staging -i
+
+        tripwire schema generate-env -e prod --output /tmp/.env.prod
+    """
+    import json
+
+    from tripwire.schema import load_schema, validate_with_schema
+
+    schema_path = Path(schema_file)
+    if not schema_path.exists():
+        console.print(f"[red]Error:[/red] Schema file not found: {schema_file}")
+        console.print("Run [cyan]tripwire schema init[/cyan] to create one")
+        sys.exit(1)
+
+    # Determine output path
+    if not output:
+        output = f".env.{environment}"
+    output_path = Path(output)
+
+    if output_path.exists() and not overwrite:
+        console.print(f"[red]Error:[/red] {output} already exists")
+        console.print("Use --overwrite to replace it")
+        sys.exit(1)
+
+    console.print(f"[yellow]Generating {output} from {schema_file}...[/yellow]\n")
+    console.print(f"Environment: [cyan]{environment}[/cyan]\n")
+
+    # Load schema
+    schema = load_schema(schema_path)
+    if not schema:
+        console.print("[red]Error:[/red] Failed to load schema")
+        sys.exit(1)
+
+    # Generate content
+    if format_output == "env":
+        env_content, needs_input = schema.generate_env_for_environment(
+            environment=environment,
+            interactive=interactive,
+        )
+
+        # Interactive mode: prompt for values
+        if interactive and needs_input:
+            console.print("[bold cyan]Please provide values for the following variables:[/bold cyan]\n")
+
+            # Build replacements for PROMPT_ME placeholders
+            replacements = {}
+            for var_name, description in needs_input:
+                var_schema = schema.variables.get(var_name)
+                is_secret = var_schema.secret if var_schema else False
+
+                if is_secret:
+                    value = click.prompt(
+                        f"{var_name} ({description})",
+                        hide_input=True,
+                        default="",
+                        show_default=False,
+                    )
+                else:
+                    value = click.prompt(
+                        f"{var_name} ({description})",
+                        default="",
+                        show_default=False,
+                    )
+
+                replacements[var_name] = value
+
+            # Replace PROMPT_ME values
+            for var_name, value in replacements.items():
+                env_content = env_content.replace(f"{var_name}=PROMPT_ME", f"{var_name}={value}")
+
+            console.print()
+
+        # Write file
+        output_path.write_text(env_content)
+
+        status = get_status_icon("valid")
+        console.print(f"{status} [green]Generated {output}[/green]")
+
+        # Count variables
+        required_count = len([v for v in schema.variables.values() if v.required])
+        optional_count = len([v for v in schema.variables.values() if not v.required])
+
+        console.print(f"  - {required_count} required variable(s)")
+        console.print(f"  - {optional_count} optional variable(s)")
+
+        # Show variables requiring manual input
+        if needs_input and not interactive:
+            console.print(f"\n[yellow]Variables requiring manual input:[/yellow]")
+            for var_name, description in needs_input:
+                console.print(f"  - {var_name}: {description or 'No description'}")
+
+    elif format_output == "json":
+        # Generate JSON format
+        env_defaults = schema.get_defaults(environment)
+        json_content = json.dumps(env_defaults, indent=2)
+        output_path.write_text(json_content)
+
+        console.print(f"[green][OK][/green] Generated {output} (JSON format)")
+
+    elif format_output == "yaml":
+        try:
+            import yaml
+        except ImportError:
+            console.print("[red]Error:[/red] PyYAML not installed")
+            console.print("Install it with: [cyan]pip install pyyaml[/cyan]")
+            sys.exit(1)
+
+        # Generate YAML format
+        env_defaults = schema.get_defaults(environment)
+        yaml_content = yaml.dump(env_defaults, default_flow_style=False)
+        output_path.write_text(yaml_content)
+
+        console.print(f"[green][OK][/green] Generated {output} (YAML format)")
+
+    # Validate after generation
+    if validate and format_output == "env":
+        console.print(f"\n[yellow]Validating generated file...[/yellow]")
+
+        is_valid, errors = validate_with_schema(output_path, schema_path, environment)
+
+        if is_valid:
+            status = get_status_icon("valid")
+            console.print(f"{status} [green]Validation passed![/green]")
+        else:
+            status = get_status_icon("invalid")
+            console.print(f"{status} [yellow]Validation warnings:[/yellow]")
+            for error in errors:
+                console.print(f"  - {error}")
+
+    console.print("\n[bold cyan]Next steps:[/bold cyan]")
+    console.print(f"  1. Review {output} and fill in any missing values")
+    if format_output == "env":
+        console.print(
+            f"  2. Validate: [cyan]tripwire schema validate --env-file {output} --environment {environment}[/cyan]"
+        )
+
+
 @schema.command("docs")
 @click.option(
     "--schema-file",
@@ -2108,6 +2305,633 @@ def schema_docs(schema_file: str, format: str, output: Optional[str]) -> None:
             console.print(Markdown(doc_content))
         else:
             print(doc_content)
+
+
+@schema.command("diff")
+@click.argument("schema1", type=click.Path(exists=True))
+@click.argument("schema2", type=click.Path(exists=True))
+@click.option(
+    "--output-format",
+    type=click.Choice(["table", "json", "markdown"]),
+    default="table",
+    help="Output format",
+)
+@click.option(
+    "--show-non-breaking",
+    is_flag=True,
+    help="Include non-breaking changes",
+)
+def schema_diff(schema1: str, schema2: str, output_format: str, show_non_breaking: bool) -> None:
+    """Compare two schema files and show differences.
+
+    Shows added, removed, and modified variables between schema versions.
+    Highlights breaking changes that require migration.
+
+    Examples:
+
+        tripwire schema diff .tripwire.toml .tripwire.toml.old
+
+        tripwire schema diff schema-v1.toml schema-v2.toml --output-format json
+    """
+    import json
+
+    from rich.table import Table
+
+    from tripwire.schema import TripWireSchema
+    from tripwire.schema_diff import compare_schemas
+
+    console.print(f"\n[bold cyan]Schema Diff: {schema1} vs {schema2}[/bold cyan]\n")
+
+    # Load schemas
+    try:
+        old_schema = TripWireSchema.from_toml(schema1)
+        new_schema = TripWireSchema.from_toml(schema2)
+    except Exception as e:
+        console.print(f"[red]Error loading schemas:[/red] {e}")
+        sys.exit(1)
+
+    # Compare
+    diff = compare_schemas(old_schema, new_schema)
+
+    if output_format == "json":
+        # JSON output
+        result = {
+            "added": [
+                {
+                    "variable": c.variable_name,
+                    "required": c.new_schema.required,
+                    "type": c.new_schema.type,
+                    "breaking": c.breaking,
+                }
+                for c in diff.added_variables
+            ],
+            "removed": [
+                {
+                    "variable": c.variable_name,
+                    "was_required": c.old_schema.required,
+                    "type": c.old_schema.type,
+                    "breaking": c.breaking,
+                }
+                for c in diff.removed_variables
+            ],
+            "modified": [
+                {
+                    "variable": c.variable_name,
+                    "changes": c.changes,
+                    "breaking": c.breaking,
+                }
+                for c in diff.modified_variables
+            ],
+            "summary": diff.summary(),
+        }
+        print(json.dumps(result, indent=2))
+        return
+
+    if output_format == "markdown":
+        # Markdown output
+        lines = [
+            f"# Schema Diff: {schema1} vs {schema2}",
+            "",
+        ]
+
+        if diff.added_variables:
+            lines.append("## Added Variables")
+            lines.append("")
+            lines.append("| Variable | Type | Required | Breaking |")
+            lines.append("|----------|------|----------|----------|")
+            for change in diff.added_variables:
+                lines.append(
+                    f"| `{change.variable_name}` | {change.new_schema.type} | "
+                    f"{'Yes' if change.new_schema.required else 'No'} | "
+                    f"{'Yes' if change.breaking else 'No'} |"
+                )
+            lines.append("")
+
+        if diff.removed_variables:
+            lines.append("## Removed Variables")
+            lines.append("")
+            lines.append("| Variable | Type | Was Required | Breaking |")
+            lines.append("|----------|------|--------------|----------|")
+            for change in diff.removed_variables:
+                lines.append(
+                    f"| `{change.variable_name}` | {change.old_schema.type} | "
+                    f"{'Yes' if change.old_schema.required else 'No'} | "
+                    f"{'Yes' if change.breaking else 'No'} |"
+                )
+            lines.append("")
+
+        if diff.modified_variables:
+            lines.append("## Modified Variables")
+            lines.append("")
+            for change in diff.modified_variables:
+                lines.append(f"### `{change.variable_name}`")
+                lines.append("")
+                for desc in change.changes:
+                    lines.append(f"- {desc}")
+                if change.breaking:
+                    lines.append(f"- **Breaking**: {', '.join(r.value for r in change.breaking_reasons)}")
+                lines.append("")
+
+        print("\n".join(lines))
+        return
+
+    # Table output (default)
+    summary = diff.summary()
+
+    # Added variables
+    if diff.added_variables:
+        table = Table(title="Added Variables", show_header=True, header_style="bold green")
+        table.add_column("Variable", style="green")
+        table.add_column("Type")
+        table.add_column("Required")
+        table.add_column("Description")
+
+        for change in diff.added_variables:
+            table.add_row(
+                change.variable_name,
+                change.new_schema.type,
+                "Yes" if change.new_schema.required else "No",
+                change.new_schema.description or "-",
+            )
+
+        console.print(table)
+        console.print()
+
+    # Removed variables
+    if diff.removed_variables:
+        table = Table(title="Removed Variables", show_header=True, header_style="bold red")
+        table.add_column("Variable", style="red")
+        table.add_column("Type")
+        table.add_column("Was Required")
+        table.add_column("Description")
+
+        for change in diff.removed_variables:
+            table.add_row(
+                change.variable_name,
+                change.old_schema.type,
+                "Yes" if change.old_schema.required else "No",
+                change.old_schema.description or "-",
+            )
+
+        console.print(table)
+        console.print()
+
+    # Modified variables
+    if diff.modified_variables:
+        table = Table(title="Modified Variables", show_header=True, header_style="bold yellow")
+        table.add_column("Variable", style="yellow")
+        table.add_column("Changes")
+
+        for change in diff.modified_variables:
+            if not show_non_breaking and not change.breaking:
+                continue
+
+            changes_text = "\n".join(change.changes)
+            table.add_row(change.variable_name, changes_text)
+
+        console.print(table)
+        console.print()
+
+    # Breaking changes warning
+    if diff.has_breaking_changes:
+        console.print("[bold red]Breaking Changes Detected:[/bold red]")
+        for change in diff.breaking_changes:
+            console.print(f"  - {change.variable_name}: {', '.join(change.changes)}")
+        console.print()
+
+    # Summary
+    console.print(f"[bold]Summary:[/bold]")
+    console.print(f"  Added: {summary['added']}")
+    console.print(f"  Removed: {summary['removed']}")
+    console.print(f"  Modified: {summary['modified']}")
+    console.print(f"  Unchanged: {summary['unchanged']}")
+    console.print(f"  Breaking: {summary['breaking']}")
+
+    if diff.has_breaking_changes:
+        console.print("\n[yellow]Migration recommended:[/yellow]")
+        console.print(f"  Run: [cyan]tripwire schema migrate --from {schema1} --to {schema2}[/cyan]")
+
+
+@schema.command("migrate")
+@click.option(
+    "--from",
+    "from_schema",
+    type=click.Path(exists=True),
+    required=True,
+    help="Old schema file",
+)
+@click.option(
+    "--to",
+    "to_schema",
+    type=click.Path(exists=True),
+    required=True,
+    help="New schema file",
+)
+@click.option(
+    "--env-file",
+    type=click.Path(exists=True),
+    default=".env",
+    help=".env file to migrate",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show migration plan without applying",
+)
+@click.option(
+    "--interactive",
+    "-i",
+    is_flag=True,
+    help="Confirm each change",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Apply even with breaking changes",
+)
+@click.option(
+    "--backup/--no-backup",
+    default=True,
+    help="Create backup before migration",
+)
+def schema_migrate(
+    from_schema: str,
+    to_schema: str,
+    env_file: str,
+    dry_run: bool,
+    interactive: bool,
+    force: bool,
+    backup: bool,
+) -> None:
+    """Migrate .env file between schema versions.
+
+    Updates .env file to match new schema, adding missing variables,
+    removing deprecated ones, and converting types where possible.
+
+    Examples:
+
+        tripwire schema migrate --from old.toml --to new.toml
+
+        tripwire schema migrate --from old.toml --to new.toml --dry-run
+
+        tripwire schema migrate --from old.toml --to new.toml --force
+    """
+    from tripwire.schema_diff import create_migration_plan
+
+    console.print(f"[bold cyan]Migrating {env_file} from schema {from_schema} to {to_schema}...[/bold cyan]\n")
+
+    # Create migration plan
+    try:
+        plan = create_migration_plan(
+            old_schema_path=Path(from_schema),
+            new_schema_path=Path(to_schema),
+            env_file_path=Path(env_file),
+        )
+    except Exception as e:
+        console.print(f"[red]Error creating migration plan:[/red] {e}")
+        sys.exit(1)
+
+    # Check for breaking changes
+    if plan.diff.has_breaking_changes and not force:
+        console.print("[red]Breaking changes detected:[/red]")
+        for change in plan.diff.breaking_changes:
+            console.print(f"  - {change.variable_name}: {', '.join(change.changes)}")
+        console.print()
+        console.print("[yellow]Use --force to proceed with migration[/yellow]")
+        sys.exit(1)
+
+    # Show changes
+    console.print("[bold]Changes to apply:[/bold]\n")
+
+    if plan.diff.added_variables:
+        console.print("[green]Added variables:[/green]")
+        for change in plan.diff.added_variables:
+            if change.new_schema.default is not None:
+                console.print(f"  + {change.variable_name} (default: {change.new_schema.default})")
+            else:
+                console.print(f"  + {change.variable_name} (needs value)")
+
+    if plan.diff.removed_variables:
+        console.print("\n[red]Removed variables:[/red]")
+        for change in plan.diff.removed_variables:
+            console.print(f"  - {change.variable_name}")
+
+    if plan.diff.modified_variables:
+        console.print("\n[yellow]Modified variables:[/yellow]")
+        for change in plan.diff.modified_variables:
+            console.print(f"  ~ {change.variable_name}: {', '.join(change.changes)}")
+
+    console.print()
+
+    # Dry run mode
+    if dry_run:
+        console.print("[yellow]Dry run - no changes applied[/yellow]")
+        console.print("Run without --dry-run to apply changes")
+        return
+
+    # Interactive confirmation
+    if interactive:
+        if not click.confirm("Apply these changes?"):
+            console.print("Migration cancelled")
+            return
+
+    # Execute migration
+    success, messages = plan.execute(dry_run=False, interactive=interactive)
+
+    if success:
+        for msg in messages:
+            console.print(msg)
+
+        console.print(f"\n[green]Migration completed successfully![/green]")
+
+        if plan.backup_file:
+            console.print(f"Backup saved to: {plan.backup_file}")
+
+        console.print("\n[bold cyan]Next steps:[/bold cyan]")
+        console.print(f"  1. Review {env_file} and fill in any CHANGE_ME placeholders")
+        console.print(f"  2. Validate: [cyan]tripwire schema validate --schema-file {to_schema}[/cyan]")
+    else:
+        console.print(f"[red]Migration failed:[/red]")
+        for msg in messages:
+            console.print(f"  {msg}")
+        sys.exit(1)
+
+
+@main.command("install-hooks")
+@click.option(
+    "--framework",
+    type=click.Choice(["git", "pre-commit"]),
+    default="git",
+    help="Hook framework to use",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Overwrite existing hooks",
+)
+@click.option(
+    "--uninstall",
+    is_flag=True,
+    help="Remove TripWire hooks",
+)
+def install_hooks(framework: str, force: bool, uninstall: bool) -> None:
+    """Install pre-commit hooks for TripWire.
+
+    Prevents commits with validation errors or secrets by automatically
+    running checks before each commit.
+
+    Examples:
+
+        tripwire install-hooks
+
+        tripwire install-hooks --framework pre-commit
+
+        tripwire install-hooks --uninstall
+    """
+    import os
+    import shutil
+    import stat
+    from datetime import datetime
+
+    git_dir = Path(".git")
+
+    if not git_dir.exists():
+        console.print("[red]Error:[/red] Not a git repository")
+        console.print("Initialize git first: [cyan]git init[/cyan]")
+        sys.exit(1)
+
+    hooks_dir = git_dir / "hooks"
+    pre_commit_hook = hooks_dir / "pre-commit"
+    config_file = Path(".tripwire-hooks.toml")
+
+    # Uninstall mode
+    if uninstall:
+        console.print("[yellow]Uninstalling TripWire hooks...[/yellow]\n")
+
+        removed_files = []
+
+        if pre_commit_hook.exists():
+            # Check if it's our hook
+            content = pre_commit_hook.read_text()
+            if "Generated by TripWire" in content:
+                pre_commit_hook.unlink()
+                removed_files.append(str(pre_commit_hook))
+                console.print(f"[green][OK][/green] Removed {pre_commit_hook}")
+            else:
+                console.print(f"[yellow][!][/yellow] {pre_commit_hook} not managed by TripWire, skipping")
+
+        if config_file.exists():
+            config_file.unlink()
+            removed_files.append(str(config_file))
+            console.print(f"[green][OK][/green] Removed {config_file}")
+
+        if removed_files:
+            console.print(f"\n[green]Successfully removed {len(removed_files)} file(s)[/green]")
+        else:
+            console.print("[yellow]No TripWire hooks found to remove[/yellow]")
+
+        return
+
+    # Install mode
+    if framework == "pre-commit":
+        # Generate .pre-commit-config.yaml
+        pre_commit_config = Path(".pre-commit-config.yaml")
+
+        if pre_commit_config.exists() and not force:
+            console.print(f"[red]Error:[/red] {pre_commit_config} already exists")
+            console.print("Use --force to overwrite or manually add TripWire hooks to the file")
+            sys.exit(1)
+
+        # Check if pre-commit is installed
+        if not shutil.which("pre-commit"):
+            console.print("[red]Error:[/red] pre-commit framework not installed")
+            console.print("Install it with: [cyan]pip install pre-commit[/cyan]")
+            sys.exit(1)
+
+        config_content = """# TripWire Pre-Commit Hooks
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+
+repos:
+  - repo: local
+    hooks:
+      - id: tripwire-schema-validate
+        name: TripWire Schema Validation
+        entry: tripwire schema validate --strict
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: tripwire-secret-scan
+        name: TripWire Secret Scan
+        entry: tripwire scan --strict
+        language: system
+        pass_filenames: false
+        always_run: true
+"""
+
+        pre_commit_config.write_text(config_content)
+        console.print(f"[green][OK][/green] Created {pre_commit_config}")
+
+        console.print("\n[bold cyan]Next steps:[/bold cyan]")
+        console.print("  1. Run: [cyan]pre-commit install[/cyan]")
+        console.print("  2. Test hooks: [cyan]pre-commit run --all-files[/cyan]")
+        console.print("  3. Commit as usual - hooks run automatically")
+
+        return
+
+    # Git hooks mode
+    console.print("[bold cyan]Installing TripWire git hooks...[/bold cyan]\n")
+
+    # Create hooks directory if it doesn't exist
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+
+    # Check for existing hook
+    if pre_commit_hook.exists() and not force:
+        content = pre_commit_hook.read_text()
+        if "Generated by TripWire" not in content:
+            console.print(f"[red]Error:[/red] {pre_commit_hook} already exists (not managed by TripWire)")
+            console.print("Use --force to overwrite, or manually integrate TripWire commands")
+            console.print("\nManual integration:")
+            console.print("  Add to your existing hook:")
+            console.print("  [cyan]tripwire schema validate --strict[/cyan]")
+            console.print("  [cyan]tripwire scan --strict[/cyan]")
+            sys.exit(1)
+        else:
+            console.print(f"[yellow][!][/yellow] TripWire hook already installed, updating...")
+
+    # Create config file if it doesn't exist
+    if not config_file.exists():
+        config_content = """# TripWire Pre-Commit Hook Configuration
+# Generated by: tripwire install-hooks
+
+[pre-commit]
+enabled = true
+strict = true
+
+[checks]
+schema_validate = true
+secret_scan = true
+drift_check = false
+
+[schema_validate]
+environment = "development"
+strict = true
+
+[secret_scan]
+fail_on_critical = true
+fail_on_high = false
+
+[drift_check]
+# Variables allowed to differ from .env.example
+allowed_drift = ["DEBUG", "LOG_LEVEL"]
+"""
+
+        config_file.write_text(config_content)
+        console.print(f"[green][OK][/green] Created {config_file}")
+
+    # Create pre-commit hook script
+    hook_content = f"""#!/bin/bash
+# Generated by TripWire - DO NOT EDIT MANUALLY
+# Created: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+# To disable: git commit --no-verify
+
+CONFIG_FILE=".tripwire-hooks.toml"
+
+# Check if TripWire hooks are enabled
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "Warning: TripWire hook configuration not found"
+    exit 0
+fi
+
+# Colors for output
+RED='\\033[0;31m'
+GREEN='\\033[0;32m'
+YELLOW='\\033[1;33m'
+NC='\\033[0m' # No Color
+
+echo "Running TripWire pre-commit checks..."
+echo ""
+
+FAILED=0
+
+# Check if schema validation is enabled
+if grep -q "schema_validate = true" "$CONFIG_FILE"; then
+    if [ -f ".tripwire.toml" ]; then
+        echo "Validating .env against schema..."
+        if ! tripwire schema validate --strict --environment development; then
+            echo "${{RED}}Schema validation failed${{NC}}"
+            echo "Fix errors or skip with: git commit --no-verify"
+            FAILED=1
+        else
+            echo "${{GREEN}}Schema validation passed${{NC}}"
+        fi
+        echo ""
+    fi
+fi
+
+# Check if secret scan is enabled
+if grep -q "secret_scan = true" "$CONFIG_FILE"; then
+    echo "Scanning for secrets..."
+    if ! tripwire scan --strict --depth 10; then
+        echo "${{RED}}Secret scan failed${{NC}}"
+        echo "Fix secrets or skip with: git commit --no-verify"
+        FAILED=1
+    else
+        echo "${{GREEN}}No secrets detected${{NC}}"
+    fi
+    echo ""
+fi
+
+# Check if drift check is enabled
+if grep -q "drift_check = true" "$CONFIG_FILE"; then
+    if [ -f ".env" ] && [ -f ".env.example" ]; then
+        echo "Checking for .env drift..."
+        if ! tripwire check --strict; then
+            echo "${{RED}}Drift check failed${{NC}}"
+            echo "Sync with: tripwire sync"
+            # Don't fail on drift, just warn
+            echo "${{YELLOW}}Warning: .env differs from .env.example${{NC}}"
+        else
+            echo "${{GREEN}}No drift detected${{NC}}"
+        fi
+        echo ""
+    fi
+fi
+
+if [ $FAILED -eq 1 ]; then
+    echo "${{RED}}TripWire pre-commit checks failed${{NC}}"
+    echo "To skip these checks: git commit --no-verify"
+    exit 1
+fi
+
+echo "${{GREEN}}All TripWire checks passed${{NC}}"
+exit 0
+"""
+
+    pre_commit_hook.write_text(hook_content)
+
+    # Make hook executable
+    current_perms = pre_commit_hook.stat().st_mode
+    pre_commit_hook.chmod(current_perms | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+    console.print(f"[green][OK][/green] Created {pre_commit_hook}")
+    console.print(f"[green][OK][/green] Made hook executable")
+
+    console.print("\n[bold green]Hooks installed successfully![/bold green]\n")
+    console.print("[bold cyan]What happens now:[/bold cyan]")
+    console.print("  - Every commit will automatically:")
+    console.print("    1. Validate .env against schema (if .tripwire.toml exists)")
+    console.print("    2. Scan for secrets in staged files")
+    console.print("    3. Optionally check for .env drift\n")
+
+    console.print("[bold cyan]Configuration:[/bold cyan]")
+    console.print(f"  - Edit {config_file} to customize checks")
+    console.print("  - Enable/disable individual checks")
+    console.print("  - Configure strictness levels\n")
+
+    console.print("[bold cyan]To bypass hooks:[/bold cyan]")
+    console.print("  git commit --no-verify")
 
 
 if __name__ == "__main__":
