@@ -5,7 +5,7 @@ must implement, ensuring a consistent interface across different formats.
 """
 
 from pathlib import Path
-from typing import Dict, Optional, Protocol
+from typing import Protocol
 
 from .models import ConfigFormat, ConfigValue
 
@@ -49,7 +49,7 @@ class ConfigSource(Protocol):
         ...
 
     @property
-    def file_path(self) -> Optional[Path]:
+    def file_path(self) -> Path | None:
         """Path to configuration file, if applicable.
 
         Returns:
@@ -58,7 +58,7 @@ class ConfigSource(Protocol):
         """
         ...
 
-    def load(self) -> Dict[str, ConfigValue]:
+    def load(self) -> dict[str, ConfigValue]:
         """Load configuration from source.
 
         Reads configuration data from the source and returns it as a dictionary
@@ -74,7 +74,7 @@ class ConfigSource(Protocol):
         """
         ...
 
-    def save(self, data: Dict[str, ConfigValue]) -> None:
+    def save(self, data: dict[str, ConfigValue]) -> None:
         """Save configuration to source.
 
         Writes configuration data to the source, preserving existing structure

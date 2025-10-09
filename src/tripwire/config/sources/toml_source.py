@@ -4,14 +4,9 @@ This module provides an adapter for reading and writing TOML files with
 support for nested sections, native type preservation, and secret detection.
 """
 
-import sys
+import tomllib
 from pathlib import Path
-from typing import Any, Dict, Optional
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
+from typing import Any
 
 import tomli_w
 
@@ -73,7 +68,7 @@ class TOMLSource:
         return ConfigFormat.TOML
 
     @property
-    def file_path(self) -> Optional[Path]:
+    def file_path(self) -> Path | None:
         """Path to configuration file.
 
         Returns:
@@ -81,7 +76,7 @@ class TOMLSource:
         """
         return self.path
 
-    def load(self) -> Dict[str, ConfigValue]:
+    def load(self) -> dict[str, ConfigValue]:
         """Load configuration from TOML file.
 
         Reads the TOML file, navigates to the specified section, and creates
@@ -116,7 +111,7 @@ class TOMLSource:
         last_modified = self.path.stat().st_mtime
 
         # Flatten nested dicts and create ConfigValue objects
-        config: Dict[str, ConfigValue] = {}
+        config: dict[str, ConfigValue] = {}
         flattened = self._flatten_dict(section_data)
 
         for key, value in flattened.items():
@@ -139,7 +134,7 @@ class TOMLSource:
 
         return config
 
-    def save(self, data: Dict[str, ConfigValue]) -> None:
+    def save(self, data: dict[str, ConfigValue]) -> None:
         """Save configuration to TOML file.
 
         Writes configuration to the TOML file, preserving other sections and
@@ -202,7 +197,7 @@ class TOMLSource:
         supported = {"multiline", "nested", "typed_values", "sections"}
         return feature in supported
 
-    def _navigate_to_section(self, toml_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _navigate_to_section(self, toml_data: dict[str, Any]) -> dict[str, Any]:
         """Navigate to specified section in TOML data.
 
         Args:
@@ -229,7 +224,7 @@ class TOMLSource:
 
         return current
 
-    def _update_section(self, toml_data: Dict[str, Any], section_data: Dict[str, Any]) -> None:
+    def _update_section(self, toml_data: dict[str, Any], section_data: dict[str, Any]) -> None:
         """Update specified section in TOML data.
 
         Args:
@@ -248,7 +243,7 @@ class TOMLSource:
         # Update the target section
         current[parts[-1]] = section_data
 
-    def _flatten_dict(self, data: Dict[str, Any], parent_key: str = "", sep: str = ".") -> Dict[str, Any]:
+    def _flatten_dict(self, data: dict[str, Any], parent_key: str = "", sep: str = ".") -> dict[str, Any]:
         """Flatten nested dict to dotted keys.
 
         Args:
@@ -275,7 +270,7 @@ class TOMLSource:
 
         return dict(items)
 
-    def _unflatten_dict(self, data: Dict[str, Any], sep: str = ".") -> Dict[str, Any]:
+    def _unflatten_dict(self, data: dict[str, Any], sep: str = ".") -> dict[str, Any]:
         """Unflatten dotted keys to nested dict.
 
         Args:
@@ -289,7 +284,7 @@ class TOMLSource:
             >>> self._unflatten_dict({"db.host": "localhost"})
             {"db": {"host": "localhost"}}
         """
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
 
         for key, value in data.items():
             parts = key.split(sep)

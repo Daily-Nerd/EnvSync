@@ -6,7 +6,6 @@ python-dotenv, with support for comment preservation and secret detection.
 
 import re
 from pathlib import Path
-from typing import Dict, Optional
 
 from dotenv import dotenv_values
 
@@ -66,7 +65,7 @@ class EnvFileSource:
         return ConfigFormat.ENV
 
     @property
-    def file_path(self) -> Optional[Path]:
+    def file_path(self) -> Path | None:
         """Path to configuration file.
 
         Returns:
@@ -74,7 +73,7 @@ class EnvFileSource:
         """
         return self.path
 
-    def load(self) -> Dict[str, ConfigValue]:
+    def load(self) -> dict[str, ConfigValue]:
         """Load configuration from .env file.
 
         Reads the .env file and creates ConfigValue objects for each variable,
@@ -106,7 +105,7 @@ class EnvFileSource:
         line_data = self._parse_file_structure()
 
         # Create ConfigValue objects
-        config: Dict[str, ConfigValue] = {}
+        config: dict[str, ConfigValue] = {}
         for key, value in values.items():
             if value is None:
                 value = ""
@@ -137,7 +136,7 @@ class EnvFileSource:
 
         return config
 
-    def save(self, data: Dict[str, ConfigValue]) -> None:
+    def save(self, data: dict[str, ConfigValue]) -> None:
         """Save configuration to .env file.
 
         Writes configuration to the .env file, preserving existing structure,
@@ -157,7 +156,7 @@ class EnvFileSource:
         """
         # Read existing file content if it exists
         if self.path.exists():
-            with open(self.path, "r", encoding="utf-8") as f:
+            with open(self.path, encoding="utf-8") as f:
                 lines = f.readlines()
         else:
             lines = []
@@ -254,7 +253,7 @@ class EnvFileSource:
         key_upper = key.upper()
         return any(re.search(pattern, key_upper) for pattern in self.SECRET_PATTERNS)
 
-    def _parse_file_structure(self) -> Dict[str, Dict[str, int | str | None]]:
+    def _parse_file_structure(self) -> dict[str, dict[str, int | str | None]]:
         """Parse .env file to extract line numbers and comments.
 
         Returns:
@@ -263,9 +262,9 @@ class EnvFileSource:
         if not self.path.exists():
             return {}
 
-        line_data: Dict[str, Dict[str, int | str | None]] = {}
+        line_data: dict[str, dict[str, int | str | None]] = {}
 
-        with open(self.path, "r", encoding="utf-8") as f:
+        with open(self.path, encoding="utf-8") as f:
             for line_num, line in enumerate(f, start=1):
                 stripped = line.strip()
 

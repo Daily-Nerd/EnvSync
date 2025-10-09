@@ -6,7 +6,6 @@ loading, merging, and comparing configuration from multiple sources.
 
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from .models import ConfigDiff, ConfigValue
 from .source import ConfigSource
@@ -55,7 +54,7 @@ class ConfigRepository:
 
     def __init__(
         self,
-        sources: Optional[List[ConfigSource]] = None,
+        sources: list[ConfigSource] | None = None,
         merge_strategy: MergeStrategy = MergeStrategy.LAST_WINS,
     ) -> None:
         """Initialize the configuration repository.
@@ -66,7 +65,7 @@ class ConfigRepository:
         """
         self.sources = sources or []
         self.merge_strategy = merge_strategy
-        self._config: Optional[Dict[str, ConfigValue]] = None
+        self._config: dict[str, ConfigValue] | None = None
 
     def add_source(self, source: ConfigSource) -> "ConfigRepository":
         """Add a configuration source (builder pattern).
@@ -112,7 +111,7 @@ class ConfigRepository:
             return self
 
         # Load from all sources
-        all_configs: List[Dict[str, ConfigValue]] = []
+        all_configs: list[dict[str, ConfigValue]] = []
         for source in self.sources:
             try:
                 config = source.load()
@@ -125,7 +124,7 @@ class ConfigRepository:
         self._config = self._merge_configs(all_configs)
         return self
 
-    def get(self, key: str) -> Optional[ConfigValue]:
+    def get(self, key: str) -> ConfigValue | None:
         """Get a configuration value.
 
         Args:
@@ -147,7 +146,7 @@ class ConfigRepository:
 
         return self._config.get(key)
 
-    def get_all(self) -> Dict[str, ConfigValue]:
+    def get_all(self) -> dict[str, ConfigValue]:
         """Get all configuration values.
 
         Returns:
@@ -201,8 +200,8 @@ class ConfigRepository:
         removed = {key: self._config[key] for key in self_keys - other_keys}
 
         # Modified: in both but with different values
-        modified: Dict[str, tuple[ConfigValue, ConfigValue]] = {}
-        unchanged: Dict[str, ConfigValue] = {}
+        modified: dict[str, tuple[ConfigValue, ConfigValue]] = {}
+        unchanged: dict[str, ConfigValue] = {}
 
         for key in self_keys & other_keys:
             self_val = self._config[key]
@@ -250,7 +249,7 @@ class ConfigRepository:
         repo.add_source(source)
         return repo
 
-    def _merge_configs(self, configs: List[Dict[str, ConfigValue]]) -> Dict[str, ConfigValue]:
+    def _merge_configs(self, configs: list[dict[str, ConfigValue]]) -> dict[str, ConfigValue]:
         """Merge multiple configuration dicts according to strategy.
 
         Args:
@@ -268,7 +267,7 @@ class ConfigRepository:
         if len(configs) == 1:
             return configs[0]
 
-        merged: Dict[str, ConfigValue] = {}
+        merged: dict[str, ConfigValue] = {}
 
         if self.merge_strategy == MergeStrategy.FIRST_WINS:
             # Reverse order so first source wins

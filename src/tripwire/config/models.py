@@ -8,7 +8,7 @@ values and their metadata.
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 
 class ConfigFormat(Enum):
@@ -49,11 +49,11 @@ class SourceMetadata:
     """
 
     source_type: ConfigFormat
-    file_path: Optional[Path] = None
-    line_number: Optional[int] = None
-    last_modified: Optional[float] = None
+    file_path: Path | None = None
+    line_number: int | None = None
+    last_modified: float | None = None
     is_secret: bool = False
-    comment: Optional[str] = None
+    comment: str | None = None
 
 
 @dataclass
@@ -121,10 +121,10 @@ class ConfigDiff:
         ...     print("Configurations differ!")
     """
 
-    added: Dict[str, ConfigValue]
-    removed: Dict[str, ConfigValue]
-    modified: Dict[str, Tuple[ConfigValue, ConfigValue]]
-    unchanged: Dict[str, ConfigValue]
+    added: dict[str, ConfigValue]
+    removed: dict[str, ConfigValue]
+    modified: dict[str, tuple[ConfigValue, ConfigValue]]
+    unchanged: dict[str, ConfigValue]
 
     @property
     def has_changes(self) -> bool:
