@@ -284,7 +284,11 @@ API_KEY = env.require("API_KEY")
 
 ### 2. Type Coercion & Validation
 
-Automatic type conversion with validation.
+Automatic type conversion with validation and **type inference from annotations** (New in v0.4.0).
+
+#### Type Inference (Recommended)
+
+TripWire automatically infers types from your variable annotations - **no need to specify `type=` twice!**
 
 ```python
 from tripwire import env
@@ -292,23 +296,23 @@ from tripwire import env
 # Strings (default)
 API_KEY: str = env.require("API_KEY")
 
-# Integers with range validation
-PORT: int = env.require("PORT", type=int, min_val=1, max_val=65535)
-MAX_CONNECTIONS: int = env.optional("MAX_CONNECTIONS", default=100, type=int, min_val=1)
+# Integers with range validation (type inferred from annotation!)
+PORT: int = env.require("PORT", min_val=1, max_val=65535)
+MAX_CONNECTIONS: int = env.optional("MAX_CONNECTIONS", default=100, min_val=1)
 
 # Booleans (handles "true", "True", "1", "yes", "on", etc.)
-DEBUG: bool = env.optional("DEBUG", default=False, type=bool)
+DEBUG: bool = env.optional("DEBUG", default=False)
 
 # Floats
-TIMEOUT: float = env.optional("TIMEOUT", default=30.0, type=float)
+TIMEOUT: float = env.optional("TIMEOUT", default=30.0)
 
 # Lists (comma-separated or JSON)
-ALLOWED_HOSTS: list = env.require("ALLOWED_HOSTS", type=list)
+ALLOWED_HOSTS: list = env.require("ALLOWED_HOSTS")
 # .env: ALLOWED_HOSTS=localhost,example.com,api.example.com
 # Or: ALLOWED_HOSTS=["localhost", "example.com"]
 
 # Dictionaries (JSON or key=value pairs)
-FEATURE_FLAGS: dict = env.optional("FEATURE_FLAGS", default={}, type=dict)
+FEATURE_FLAGS: dict = env.optional("FEATURE_FLAGS", default={})
 # .env: FEATURE_FLAGS={"new_ui": true, "beta": false}
 # Or: FEATURE_FLAGS=new_ui=true,beta=false
 
@@ -318,6 +322,37 @@ ENVIRONMENT: str = env.require(
     choices=["development", "staging", "production"]
 )
 ```
+
+####  Typed Convenience Methods
+
+For cases without annotations (e.g., in dictionaries, comprehensions):
+
+```python
+# Use typed methods when you can't use annotations
+config = {
+    "port": env.require_int("PORT", min_val=1, max_val=65535),
+    "debug": env.optional_bool("DEBUG", default=False),
+    "timeout": env.optional_float("TIMEOUT", default=30.0),
+    "api_key": env.require_str("API_KEY", min_length=32),
+}
+```
+
+#### Explicit Type (Backward Compatible)
+
+The old API with explicit `type=` parameter still works:
+
+```python
+# Old API still works (backward compatible)
+PORT: int = env.require("PORT", type=int, min_val=1, max_val=65535)
+DEBUG: bool = env.optional("DEBUG", default=False, type=bool)
+```
+
+**How it works:**
+- Type inference uses Python's type annotations at runtime
+- Works with module-level and function-level variables
+- Supports `int`, `float`, `bool`, `str`, `list`, `dict`
+- Handles `Optional[T]` annotations (extracts `T`)
+- Falls back to `str` if type cannot be inferred
 
 ### 3. Format Validators
 
