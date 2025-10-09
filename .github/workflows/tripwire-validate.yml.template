@@ -1,0 +1,117 @@
+name: TripWire Environment Validation
+
+# This workflow validates environment variables using TripWire schema
+# To use:
+#   1. Copy this file to .github/workflows/tripwire.yml
+#   2. Create .tripwire.toml schema (run: tripwire schema init)
+#   3. Customize for your environments
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Validate schema syntax
+  schema-check:
+    name: Check Schema Syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install TripWire
+        run: pip install tripwire-py
+
+      - name: Validate schema file
+        run: tripwire schema check
+
+  # Validate environment files
+  validate-environments:
+    name: Validate ${{ matrix.environment }}
+    needs: schema-check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [development, staging, production]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install TripWire
+        run: pip install tripwire-py
+
+      # Create test .env file (customize this for your setup)
+      - name: Create test .env for ${{ matrix.environment }}
+        run: |
+          # Option 1: Copy from template
+          if [ -f .env.${{ matrix.environment }}.example ]; then
+            cp .env.${{ matrix.environment }}.example .env
+          else
+            # Option 2: Create minimal .env for validation
+            touch .env
+          fi
+
+      - name: Validate ${{ matrix.environment }} environment
+        run: |
+          tripwire schema validate \
+            --environment ${{ matrix.environment }} \
+            --strict
+
+  # Check schema drift
+  drift-detection:
+    name: Check Schema Drift
+    needs: schema-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install TripWire
+        run: pip install tripwire-py
+
+      - name: Generate .env.example from schema
+        run: tripwire schema generate-example --output /tmp/generated.env.example
+
+      - name: Check if .env.example is up to date
+        run: |
+          if [ -f .env.example ]; then
+            if ! diff -q .env.example /tmp/generated.env.example; then
+              echo "::warning::.env.example is out of sync with schema"
+              echo "Run: tripwire schema generate-example --force"
+              diff .env.example /tmp/generated.env.example || true
+            fi
+          fi
+
+  # Security scan
+  security-scan:
+    name: Secret Detection
+    needs: validate-environments
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install TripWire
+        run: pip install tripwire-py
+
+      - name: Scan for secrets
+        run: tripwire scan --strict

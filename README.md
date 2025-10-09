@@ -1002,6 +1002,194 @@ Each of these projects has made significant contributions to Python configuratio
 
 ---
 
+## Configuration as Code (v0.3.0)
+
+Define your environment variables declaratively using TOML schemas.
+
+### Quick Start
+
+**1. Create schema:**
+```bash
+tripwire schema init
+```
+
+**2. Define variables in `.tripwire.toml`:**
+```toml
+[project]
+name = "my-app"
+version = "1.0.0"
+
+[variables.DATABASE_URL]
+type = "string"
+required = true
+format = "postgresql"
+description = "PostgreSQL connection"
+secret = true
+
+[variables.PORT]
+type = "int"
+required = false
+default = 8000
+min = 1024
+max = 65535
+
+[environments.development]
+DATABASE_URL = "postgresql://localhost:5432/dev"
+
+[environments.production]
+strict_secrets = true
+```
+
+**3. Validate your .env:**
+```bash
+tripwire schema validate --environment production
+```
+
+**4. Auto-generate .env.example:**
+```bash
+tripwire schema generate-example
+```
+
+### Benefits
+
+- **Single Source of Truth** - All env var contracts in one file
+- **Type Safety** - Enforced types, formats, ranges
+- **Environment-Specific Defaults** - Different values for dev/staging/prod
+- **CI/CD Ready** - Perfect for GitHub Actions validation
+- **Auto-Documentation** - Generate .env.example from schema
+
+### CLI Commands
+
+#### `schema init` - Create Schema Template
+
+```bash
+$ tripwire schema init
+
+✓ Created .tripwire.toml
+
+Next steps:
+  1. Edit .tripwire.toml to define your environment variables
+  2. Run tripwire schema validate to check your .env file
+  3. Run tripwire schema generate-example to create .env.example from schema
+```
+
+#### `schema validate` - Validate Against Schema
+
+```bash
+$ tripwire schema validate --environment production
+
+Validating .env against .tripwire.toml...
+
+Environment: production
+
+✓ Validation passed!
+All environment variables are valid
+
+Options:
+  --env-file FILE       .env file to validate (default: .env)
+  --schema-file FILE    Schema file (default: .tripwire.toml)
+  --environment ENV     Environment name (default: development)
+  --strict              Exit with error if validation fails
+
+Examples:
+  tripwire schema validate
+  tripwire schema validate --environment production --strict
+  tripwire schema validate --env-file .env.prod
+```
+
+#### `schema check` - Validate Schema Syntax
+
+```bash
+$ tripwire schema check
+
+Checking .tripwire.toml...
+
+✓ TOML syntax is valid
+✓ Schema structure is valid
+✓ All format validators exist
+✓ All type values are valid
+✓ Environment references are valid
+
+✓ Schema is valid
+
+Options:
+  --schema-file FILE    Schema file to validate (default: .tripwire.toml)
+
+Examples:
+  tripwire schema check
+  tripwire schema check --schema-file custom.toml
+```
+
+#### `schema import` - Generate from Code
+
+```bash
+$ tripwire schema import
+
+Scanning Python files for environment variables...
+Found 5 unique variable(s)
+
+Generating .tripwire.toml...
+
+✓ Generated .tripwire.toml with 5 variable(s)
+  - 3 required
+  - 2 optional
+
+Next steps:
+  1. Review .tripwire.toml and customize as needed
+  2. Run: tripwire schema validate
+
+Options:
+  --output FILE    Output schema file (default: .tripwire.toml)
+  --force          Overwrite existing file
+
+Examples:
+  tripwire schema import
+  tripwire schema import --output custom.toml --force
+```
+
+#### `schema generate-example` - Generate .env.example
+
+```bash
+$ tripwire schema generate-example
+
+Generating .env.example from .tripwire.toml...
+
+✓ Generated .env.example
+  11 variable(s) defined
+
+Options:
+  --schema-file FILE    Schema file (default: .tripwire.toml)
+  --output FILE         Output file (default: .env.example)
+  --force               Overwrite existing file
+
+Examples:
+  tripwire schema generate-example
+  tripwire schema generate-example --output .env.dev
+```
+
+### GitHub Actions Integration
+
+```yaml
+name: Validate Environment
+
+on: [push, pull_request]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - run: pip install tripwire-py
+      - run: tripwire schema validate --environment production --strict
+```
+
+**[See full documentation →](docs/CONFIGURATION_AS_CODE.md)**
+
+---
+
 ## Development Roadmap
 
 ### Implemented Features ✅
