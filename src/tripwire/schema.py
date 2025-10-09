@@ -127,6 +127,9 @@ class VariableSchema:
 
     def _validate_format(self, value: str) -> bool:
         """Validate string against format validator."""
+        if not self.format:
+            return False
+
         format_validators = {
             "email": validate_email,
             "url": validate_url,
