@@ -10,7 +10,7 @@ import re
 import tomllib  # Python 3.11+
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from tripwire.validation import (
     coerce_bool,
@@ -47,7 +47,7 @@ class VariableSchema:
     min_length: Optional[int] = None  # min string length
     max_length: Optional[int] = None  # max string length
 
-    def validate(self, value: Any) -> tuple[bool, Optional[str]]:
+    def validate(self, value: Any) -> Tuple[bool, Optional[str]]:
         """
         Validate a value against this schema.
 
@@ -231,7 +231,7 @@ class TripWireSchema:
 
         return schema
 
-    def validate_env(self, env_dict: Dict[str, str], environment: str = "development") -> tuple[bool, List[str]]:
+    def validate_env(self, env_dict: Dict[str, str], environment: str = "development") -> Tuple[bool, List[str]]:
         """
         Validate environment variables against schema.
 
@@ -384,7 +384,7 @@ def validate_with_schema(
     env_file: Union[str, Path] = ".env",
     schema_file: Union[str, Path] = ".tripwire.toml",
     environment: str = "development",
-) -> tuple[bool, List[str]]:
+) -> Tuple[bool, List[str]]:
     """
     Validate .env file against schema.
 
