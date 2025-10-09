@@ -210,8 +210,11 @@ class TestHasMethod:
 class TestLoadMethod:
     """Tests for load() method."""
 
-    def test_load_file(self, sample_env_file: Path) -> None:
+    def test_load_file(self, sample_env_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test loading env file."""
+        # Clear any existing API_KEY that might be set by other tests
+        monkeypatch.delenv("API_KEY", raising=False)
+
         instance = TripWire(auto_load=False)
         instance.load(sample_env_file)
 
