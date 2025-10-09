@@ -2,6 +2,7 @@
 
 import os
 import stat
+import sys
 from pathlib import Path
 
 import pytest
@@ -41,9 +42,10 @@ class TestHookInstallation:
         assert (git_repo / ".git/hooks/pre-commit").exists()
         assert (git_repo / ".tripwire-hooks.toml").exists()
 
-        # Check hook is executable
+        # Check hook is executable (Unix only - Windows doesn't use executable bits)
         hook_file = git_repo / ".git/hooks/pre-commit"
-        assert hook_file.stat().st_mode & stat.S_IXUSR
+        if sys.platform != "win32":
+            assert hook_file.stat().st_mode & stat.S_IXUSR
 
     def test_install_hooks_without_git_repo(self, tmp_path: Path, monkeypatch) -> None:
         """Test that install-hooks fails without git repo."""
