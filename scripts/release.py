@@ -2,9 +2,9 @@
 """Release script for TripWire.
 
 This script helps automate the release process by:
-1. Validating the current state
+1. Validating the current state (including CHANGELOG.md)
 2. Updating version numbers
-3. Creating git tags
+3. Creating git tags (with changelog content)
 4. Pushing to remote
 5. Triggering GitHub Actions workflows
 
@@ -12,6 +12,7 @@ Usage:
     python scripts/release.py 1.0.0
     python scripts/release.py 1.0.0 --prerelease
     python scripts/release.py 1.0.0 --dry-run
+    python scripts/release.py 1.0.0 --skip-changelog-check
 """
 
 import argparse
@@ -139,8 +140,67 @@ def commit_changes(version: str, is_prerelease: bool) -> None:
     print(f"✅ Committed changes: {commit_msg}")
 
 
-def create_tag(version: str) -> None:
-    """Create git tag."""
+def validate_changelog(version: str) -> bool:
+    """Validate that CHANGELOG.md has an entry for this version.
+
+    Returns:
+        True if changelog is valid, False otherwise
+    """
+    changelog_path = Path("CHANGELOG.md")
+
+    if not changelog_path.exists():
+        print("⚠️  Warning: CHANGELOG.md not found")
+        return False
+
+    # Use the validation script if it exists
+    validation_script = Path(".github/scripts/validate_changelog.sh")
+    if validation_script.exists():
+        result = run_command(["bash", str(validation_script), version], check=False)
+        return result.returncode == 0
+
+    # Fallback: Simple check for version header
+    content = changelog_path.read_text()
+    version_pattern = rf"## \[{re.escape(version)}\]"
+
+    if not re.search(version_pattern, content):
+        print(f"⚠️  Warning: No entry found for version {version} in CHANGELOG.md")
+        print(f"   Expected to find: ## [{version}]")
+        return False
+
+    return True
+
+
+def get_changelog_content(version: str) -> str:
+    """Extract changelog content for this version.
+
+    Returns:
+        Changelog content as string, or generic message if extraction fails
+    """
+    # Use the extraction script if it exists
+    extraction_script = Path(".github/scripts/extract_changelog.sh")
+    if extraction_script.exists():
+        result = run_command(["bash", str(extraction_script), version], check=False)
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+
+    # Fallback: Try to extract manually
+    changelog_path = Path("CHANGELOG.md")
+    if changelog_path.exists():
+        content = changelog_path.read_text()
+
+        # Find the section for this version
+        version_pattern = rf"## \[{re.escape(version)}\].*?\n(.*?)(?=\n## \[|$)"
+        match = re.search(version_pattern, content, re.DOTALL)
+
+        if match:
+            return match.group(1).strip()
+
+    # Generic fallback
+    return f"Release {version}"
+
+
+def create_tag(version: str, skip_changelog: bool = False) -> None:
+    """Create git tag with changelog content as message."""
     tag = f"v{version}"
 
     # Check if tag already exists
@@ -149,8 +209,17 @@ def create_tag(version: str) -> None:
         print(f"Error: Tag {tag} already exists")
         sys.exit(1)
 
+    # Get tag message from changelog
+    if skip_changelog:
+        tag_message = f"Release {tag}"
+    else:
+        tag_message = get_changelog_content(version)
+        if not tag_message or tag_message == f"Release {version}":
+            print("⚠️  Using generic tag message (no changelog content found)")
+
+    # Create annotated tag with changelog content
     # Use interactive=True to allow GPG signing prompts for annotated tags
-    run_command(["git", "tag", "-a", tag, "-m", f"Release {tag}"], interactive=True)
+    run_command(["git", "tag", "-a", tag, "-m", tag_message], interactive=True)
     print(f"✅ Created tag: {tag}")
 
 
@@ -175,6 +244,7 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Show what would be done without doing it")
     parser.add_argument("--skip-tests", action="store_true", help="Skip running tests")
     parser.add_argument("--skip-linting", action="store_true", help="Skip running linting")
+    parser.add_argument("--skip-changelog-check", action="store_true", help="Skip CHANGELOG.md validation")
 
     args = parser.parse_args()
 
@@ -201,6 +271,18 @@ def main():
             if response.lower() != "y":
                 sys.exit(1)
 
+    # Validate CHANGELOG.md
+    if not args.dry_run and not args.skip_changelog_check:
+        print("📝 Validating CHANGELOG.md...")
+        if not validate_changelog(args.version):
+            print("\n❌ CHANGELOG.md validation failed!")
+            print("\nPlease ensure CHANGELOG.md has an entry for this version:")
+            print(f"   ## [{args.version}] - YYYY-MM-DD")
+            print("\nSee docs/CHANGELOG_WORKFLOW.md for guidance.")
+            print("\nTo skip this check, use --skip-changelog-check")
+            sys.exit(1)
+        print("✅ CHANGELOG.md validated")
+
     # Update version in files
     if not args.dry_run:
         update_version_in_files(args.version)
@@ -214,17 +296,19 @@ def main():
 
     if args.dry_run:
         print("🔍 DRY RUN - Would have:")
+        if not args.skip_changelog_check:
+            print(f"  - Validated CHANGELOG.md for version {args.version}")
         print(f"  - Updated version to {args.version}")
         print(f"  - Committed changes")
-        print(f"  - Created tag v{args.version}")
+        print(f"  - Created tag v{args.version} with changelog content")
         print(f"  - Pushed to remote")
         return
 
     # Commit changes
     commit_changes(args.version, args.prerelease)
 
-    # Create tag
-    create_tag(args.version)
+    # Create tag (with changelog content if available)
+    create_tag(args.version, skip_changelog=args.skip_changelog_check)
 
     # Push changes
     push_changes(branch, args.version)

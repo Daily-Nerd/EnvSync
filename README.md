@@ -515,6 +515,52 @@ Examples:
   tripwire sync --interactive          # Confirm each change
 ```
 
+### `tripwire diff` - Compare Configurations
+
+**NEW in v0.4.0** - Compare configuration files to identify differences.
+
+```bash
+$ tripwire diff .env .env.prod
+
+Comparing configurations: .env vs .env.prod
+
+           Configuration Differences: .env vs .env.prod
+┏━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┓
+┃ Status     ┃ Variable     ┃ .env              ┃ .env.prod         ┃
+┡━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━┩
+│ + Added    │ PROD_FEATURE │                   │ enabled           │
+│ - Removed  │ DEV_MODE     │ true              │                   │
+│ ~ Modified │ DATABASE_URL │ localhost:5432/dev│ prod-db:5432/app  │
+│ ~ Modified │ PORT         │ 8000              │ 80                │
+└────────────┴──────────────┴───────────────────┴───────────────────┘
+
+1 added, 1 removed, 2 modified
+
+[WARNING] Secrets automatically hidden. Use --show-secrets cautiously.
+
+Options:
+  --format [table|summary|json]  Output format (default: table)
+  --show-secrets                 Show secret values (use with caution!)
+  --hide-secrets                 Hide secret values (default)
+
+Examples:
+  tripwire diff .env .env.prod              # Compare environments
+  tripwire diff .env pyproject.toml         # Compare .env vs TOML
+  tripwire diff .env.dev .env.staging       # Staging vs dev
+  tripwire diff .env .env.prod --format=json # JSON output for scripts
+```
+
+**Supported formats:**
+- `.env` files (standard environment variable format)
+- `pyproject.toml` files (TOML format with `[tool.tripwire]` section)
+- Cross-format comparison (e.g., `.env` vs `.toml`)
+
+**Use cases:**
+- Spot differences between dev/staging/production configurations
+- Verify environment migrations before deployment
+- Audit configuration drift across environments
+- Generate reports on environment variable changes
+
 ### `tripwire scan` - Scan for Secrets
 
 Detect potential secrets in .env file and git history.
@@ -1232,6 +1278,7 @@ jobs:
 - [x] Environment variable loading
 - [x] Import-time validation
 - [x] Type coercion (str, int, bool, float, list, dict)
+- [x] **Type inference from annotations** (v0.4.0 - automatic type detection)
 - [x] Format validators (email, url, uuid, ipv4, postgresql)
 - [x] Custom validators
 - [x] Required vs optional variables
@@ -1239,7 +1286,9 @@ jobs:
 - [x] `.env.example` generation from code
 - [x] Drift detection (`check` command)
 - [x] Team sync (`sync` command)
+- [x] **Configuration comparison** (`diff` command - v0.4.0)
 - [x] Multi-environment support
+- [x] **Unified config abstraction** (v0.4.0 - .env + TOML support)
 - [x] Documentation generation (`docs` command)
 - [x] Secret detection (45+ platform-specific patterns)
 - [x] Generic credential detection (PASSWORD, TOKEN, SECRET, etc.)
