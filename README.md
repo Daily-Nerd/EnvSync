@@ -15,8 +15,12 @@
 
 > Catch missing/invalid environment variables at import time (not runtime) with type validation, secret detection, and git history auditing.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/Daily-Nerd/TripWire/actions/workflows/ci.yml/badge.svg)](https://github.com/Daily-Nerd/TripWire/actions/workflows/ci.yml)
+[![Security](https://github.com/Daily-Nerd/TripWire/actions/workflows/security.yml/badge.svg)](https://github.com/Daily-Nerd/TripWire/actions/workflows/security.yml)
+[![codecov](https://codecov.io/gh/Daily-Nerd/TripWire/graph/badge.svg?token=QEWI3WS989)](https://codecov.io/gh/Daily-Nerd/TripWire)
+[![PyPI version](https://badge.fury.io/py/tripwire-py.svg)](https://badge.fury.io/py/tripwire-py)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 </div>
 
@@ -914,27 +918,87 @@ jobs:
 
 ## Comparison with Alternatives
 
+> **Note:** This comparison reflects features as of January 2025. All libraries shown are actively maintained
+> and serve different use cases. TripWire builds upon python-dotenv for .env parsing. Choose based on your
+> project's specific requirements.
+
 | Feature | TripWire | python-decouple | environs | pydantic-settings | python-dotenv |
 |---------|---------|-----------------|----------|-------------------|---------------|
-| Import-time validation | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Import-time validation¹ | ✅ | ❌ | ⚠️² | ⚠️³ | ❌ |
 | Type coercion | ✅ | ⚠️ Basic | ✅ | ✅ | ❌ |
-| Format validators | ✅ | ❌ | ⚠️ Limited | ✅ | ❌ |
+| Format validators | ✅ | ❌ | ✅ | ✅ | ❌ |
 | .env.example generation | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Team sync (drift detection) | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Secret detection (45+ patterns) | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Git history auditing | ✅ | ❌ | ❌ | ❌ | ❌ |
-| CLI tools | ✅ | ❌ | ❌ | ❌ | ❌ |
+| CLI tools | ✅ | ❌ | ❌ | ❌ | ⚠️⁴ |
 | Helpful error messages | ✅ | ⚠️ | ✅ | ✅ | ❌ |
-| Multi-environment | ✅ | ⚠️ | ✅ | ✅ | ⚠️ |
+| Multi-environment | ✅ | ✅ | ✅ | ✅ | ✅ |
 
-**Why TripWire?**
+**Footnotes:**
+1. TripWire validates when `env.require()` is called at module-level
+2. environs validates eagerly by default when parsing (can be at import time)
+3. pydantic-settings validates at instantiation, which can be import-time if done at module level
+4. python-dotenv CLI is for command execution with .env files, not .env management
 
-- **python-dotenv**: Just loads `.env` files, no validation
-- **python-decouple**: Basic type casting, but runtime errors only
-- **environs**: Good validation, but verbose API and no team sync
-- **pydantic-settings**: Requires Pydantic models (overkill for simple configs)
+### What Makes TripWire Different?
 
-**TripWire combines the best features** and adds unique capabilities like git history auditing and 45+ secret detection patterns.
+While all these libraries handle environment variables, **TripWire focuses on the complete developer workflow**:
+
+- **Prevent production failures** with import-time validation
+- **Keep teams in sync** with automated .env.example generation
+- **Protect secrets** with detection and git history auditing
+- **Streamline onboarding** with CLI tools for env management
+
+TripWire is designed for teams that want comprehensive config management, not just loading .env files.
+
+### When to Choose Each Library
+
+**Choose TripWire When:**
+- You need guaranteed import-time validation to prevent production starts with invalid config
+- Your team struggles with .env file drift and keeping documentation current
+- Security is paramount and you need secret detection/git history auditing
+- You want automated .env.example generation from your code
+- You prefer comprehensive CLI tools for environment management
+- You're on Python 3.11+ and don't mind additional dependencies for rich features
+
+**Choose python-dotenv When:**
+- You need a minimal, zero-config .env loader
+- You want the de facto standard with maximum compatibility
+- You're building a simple script or small project
+- You prefer to handle validation separately or don't need it
+- You need variable interpolation (references between env vars)
+- Minimal dependencies are a priority
+
+**Choose environs When:**
+- You need comprehensive type validation powered by marshmallow
+- You want extensive built-in validators (email, URL, UUID, etc.)
+- You prefer explicit parsing with the option for deferred validation
+- You're already using marshmallow in your project
+- You want validation errors collected together rather than failing fast
+
+**Choose pydantic-settings When:**
+- Your project already uses Pydantic for data validation
+- You want type safety with dataclasses/BaseModel
+- You need settings to integrate seamlessly with FastAPI
+- You want strict vs lax parsing modes
+- You need advanced features like model validators and serializers
+
+**Choose python-decouple When:**
+- You want strict separation of config from code with minimal overhead
+- You need something simple with basic type casting
+- You're working on a Django project
+- You want zero dependencies
+- You need INI file support alongside .env
+
+### Acknowledgments
+
+TripWire builds on the excellent work of the Python community, particularly:
+- **python-dotenv** for reliable .env file parsing
+- The validation patterns pioneered by **environs** and **pydantic**
+- The config separation philosophy of **python-decouple**
+
+Each of these projects has made significant contributions to Python configuration management, and TripWire aims to complement them by focusing on team workflow and security concerns.
 
 ---
 
