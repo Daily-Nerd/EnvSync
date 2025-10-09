@@ -918,7 +918,7 @@ jobs:
 
 ## Comparison with Alternatives
 
-> **Note:** This comparison reflects features as of January 2025. All libraries shown are actively maintained
+> **Note:** This comparison reflects features as of October 2025. All libraries shown are actively maintained
 > and serve different use cases. TripWire builds upon python-dotenv for .env parsing. Choose based on your
 > project's specific requirements.
 
