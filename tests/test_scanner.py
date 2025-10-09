@@ -187,7 +187,7 @@ SECRET_KEY = env.require('SECRET_KEY', secret=True)
 
 
 def test_scan_directory_exclude_tests():
-    """Test that test files are excluded by default."""
+    """Test that test files in tests/ directory are excluded by default."""
     with tempfile.TemporaryDirectory() as tmpdir:
         tmppath = Path(tmpdir)
 
@@ -199,20 +199,33 @@ API_KEY = env.require('API_KEY')
 """
         )
 
-        # Create test file (should be excluded)
-        (tmppath / "test_app.py").write_text(
+        # Create test directory with test file (should be excluded)
+        tests_dir = tmppath / "tests"
+        tests_dir.mkdir()
+        (tests_dir / "test_app.py").write_text(
             """
 from tripwire import env
 TEST_VAR = env.require('TEST_VAR')
 """
         )
 
+        # Create file starting with "test_" in root (should NOT be excluded)
+        # Users might have legitimate files like test_app.py, test_server.py
+        (tmppath / "test_config.py").write_text(
+            """
+from tripwire import env
+CONFIG_VAR = env.require('CONFIG_VAR')
+"""
+        )
+
         # Scan directory
         variables = scan_directory(tmppath)
 
-        # Only API_KEY should be found
-        assert len(variables) == 1
-        assert variables[0].name == "API_KEY"
+        # Should find API_KEY and CONFIG_VAR, but NOT TEST_VAR (from tests/ dir)
+        assert len(variables) == 2
+        var_names = {v.name for v in variables}
+        assert var_names == {"API_KEY", "CONFIG_VAR"}
+        assert "TEST_VAR" not in var_names
 
 
 def test_deduplicate_variables():

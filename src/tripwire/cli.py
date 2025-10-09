@@ -946,6 +946,16 @@ def audit(
         detected_secrets = scan_env_file(env_file)
 
         if not detected_secrets:
+            # JSON output mode - return empty results as JSON
+            if output_json:
+                json_output = {
+                    "total_secrets_found": 0,
+                    "secrets": [],
+                }
+                print(json.dumps(json_output, indent=2))
+                return
+
+            # Human-readable output
             status = get_status_icon("valid")
             console.print(f"{status} No secrets detected in .env file")
             console.print("Your environment file appears secure")

@@ -220,7 +220,7 @@ def scan_directory(
 
     Args:
         directory: Root directory to scan
-        exclude_patterns: Patterns to exclude (e.g., ['test_*', '*_test.py'])
+        exclude_patterns: Patterns to exclude (e.g., ['tests/*', '.venv/*'])
         max_depth: Maximum directory depth (None for unlimited)
 
     Returns:
@@ -228,9 +228,8 @@ def scan_directory(
     """
     if exclude_patterns is None:
         exclude_patterns = [
-            "test_*",
-            "*_test.py",
             "tests/*",
+            "tests/**/*",
             ".venv/*",
             "venv/*",
             ".git/*",
