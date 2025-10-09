@@ -83,8 +83,18 @@ class TripWire:
         """
         frame = inspect.currentframe()
         try:
-            # Get caller's frame (2 levels up: _infer -> require/optional -> caller)
-            caller_frame = frame.f_back.f_back if frame and frame.f_back else None
+            # Find the first frame outside the TripWire module
+            # This handles both direct require() calls and indirect optional() calls
+            caller_frame = frame.f_back
+            tripwire_module_file = __file__.replace(".pyc", ".py")
+
+            while caller_frame:
+                frame_file = caller_frame.f_code.co_filename
+                # Skip frames within the TripWire module
+                if frame_file != tripwire_module_file:
+                    break
+                caller_frame = caller_frame.f_back
+
             if not caller_frame:
                 return None
 

@@ -156,6 +156,25 @@ class TestTypeInference:
         assert isinstance(OPT_DEBUG, bool)
         assert OPT_DEBUG is False
 
+    def test_type_inference_with_optional_existing_var(self, tmp_path, monkeypatch):
+        """Test type inference with optional() when variable exists (regression test for frame depth bug)."""
+        env_file = tmp_path / ".env"
+        env_file.write_text("DEBUG_EXISTS=true\nPORT_EXISTS=8080\n")
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.delenv("DEBUG_EXISTS", raising=False)
+        monkeypatch.delenv("PORT_EXISTS", raising=False)
+        env = TripWire(env_file=str(env_file))
+
+        # This was broken before the frame depth fix - optional() would return string instead of bool
+        DEBUG_EXISTS: bool = env.optional("DEBUG_EXISTS", default=False)
+        PORT_EXISTS: int = env.optional("PORT_EXISTS", default=3000)
+
+        assert isinstance(DEBUG_EXISTS, bool)
+        assert DEBUG_EXISTS is True
+        assert isinstance(PORT_EXISTS, int)
+        assert PORT_EXISTS == 8080
+
     def test_type_inference_with_default(self, tmp_path, monkeypatch):
         """Test type inference with default value."""
         env_file = tmp_path / ".env"
