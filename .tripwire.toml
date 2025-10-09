@@ -1,0 +1,50 @@
+# TripWire Configuration Schema
+# Define your environment variables with validation rules
+
+[project]
+name = "my-project"
+version = "0.1.0"
+description = "Project description"
+
+[validation]
+strict = true  # Fail on unknown variables
+allow_missing_optional = true
+warn_unused = true
+
+[security]
+entropy_threshold = 4.5
+scan_git_history = true
+exclude_patterns = ["TEST_*", "EXAMPLE_*"]
+
+# Example variable definitions
+# Uncomment and customize for your project
+
+[variables.DATABASE_URL]
+type = "string"
+required = true
+format = "postgresql"
+description = "PostgreSQL database connection"
+secret = true
+
+# [variables.DEBUG]
+# type = "bool"
+# required = false
+# default = false
+# description = "Enable debug mode"
+
+# [variables.PORT]
+# type = "int"
+# required = false
+# default = 8000
+# min = 1024
+# max = 65535
+# description = "Server port"
+
+# Environment-specific defaults
+[environments.development]
+# DATABASE_URL = "postgresql://localhost:5432/dev"
+# DEBUG = true
+
+[environments.production]
+# DEBUG = false
+# strict_secrets = true
