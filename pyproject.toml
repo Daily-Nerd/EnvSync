@@ -3,7 +3,7 @@ name = "tripwire-py"
 version = "0.3.0"
 description = "Catch config errors before they explode - Python environment variable management with import-time validation, type safety, and secret detection"
 authors = [
-    { name = "kibukx" }
+    { name = "Kibukx" }
 ]
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -14,7 +14,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",

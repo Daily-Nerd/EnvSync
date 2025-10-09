@@ -319,6 +319,9 @@ class MigrationPlan:
             var_name = change.variable_name
             var_schema = change.new_schema
 
+            if var_schema is None:
+                continue
+
             if var_schema.default is not None:
                 env_vars[var_name] = str(var_schema.default)
                 changes_applied += 1
@@ -345,7 +348,7 @@ class MigrationPlan:
             old_value = env_vars[var_name]
 
             # Type conversion
-            if "Type:" in " ".join(change.changes):
+            if "Type:" in " ".join(change.changes) and change.new_schema is not None:
                 try:
                     # Attempt to convert value to new type
                     new_type = change.new_schema.type

@@ -315,7 +315,7 @@ class TripWireSchema:
         self,
         environment: str = "development",
         interactive: bool = False,
-    ) -> str:
+    ) -> Tuple[str, List[Tuple[str, str]]]:
         """
         Generate .env file for specific environment from schema.
 
@@ -324,7 +324,7 @@ class TripWireSchema:
             interactive: If True, prompt for secret values
 
         Returns:
-            Generated .env file content
+            Tuple of (generated .env file content, list of variables needing input)
         """
         from datetime import datetime
 
