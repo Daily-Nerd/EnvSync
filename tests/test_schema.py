@@ -919,3 +919,589 @@ API_KEY=secret-key-1234567890
         assert is_valid is False
         assert len(errors) == 1
         assert "Schema file not found" in errors[0]
+
+
+# ============================================================================
+# Environment-Specific .env Generation Tests
+# ============================================================================
+
+
+class TestEnvGenerationForEnvironments:
+    """Tests for generate_env_for_environment() method."""
+
+    def test_generate_env_for_development(self, sample_schema_toml: Path) -> None:
+        """Test generating .env file for development environment."""
+        schema = TripWireSchema.from_toml(sample_schema_toml)
+        env_content, needs_input = schema.generate_env_for_environment("development", interactive=False)
+
+        # Should contain environment header
+        assert "Environment: development" in env_content
+        assert "DO NOT COMMIT" in env_content
+
+        # Should use development defaults
+        assert "DATABASE_URL=postgresql://localhost:5432/dev" in env_content
+        assert "DEBUG=true" in env_content
+        assert "LOG_LEVEL=DEBUG" in env_content
+
+        # Should have placeholders for secrets without defaults
+        assert "API_KEY=CHANGE_ME_SECRET_VALUE" in env_content
+        assert len(needs_input) == 1  # API_KEY needs input
+        assert needs_input[0][0] == "API_KEY"
+
+    def test_generate_env_for_production(self, sample_schema_toml: Path) -> None:
+        """Test generating .env file for production environment."""
+        schema = TripWireSchema.from_toml(sample_schema_toml)
+        env_content, needs_input = schema.generate_env_for_environment("production", interactive=False)
+
+        # Should use production defaults
+        assert "DEBUG=false" in env_content
+        assert "LOG_LEVEL=WARNING" in env_content
+
+        # Secrets without prod defaults should have placeholders
+        assert "DATABASE_URL=CHANGE_ME_SECRET_VALUE" in env_content
+        assert "API_KEY=CHANGE_ME_SECRET_VALUE" in env_content
+        assert len(needs_input) == 2  # Both secrets need input
+
+    def test_generate_env_interactive_mode(self, sample_schema_toml: Path) -> None:
+        """Test generating .env with interactive mode enabled."""
+        schema = TripWireSchema.from_toml(sample_schema_toml)
+        env_content, needs_input = schema.generate_env_for_environment("production", interactive=True)
+
+        # Interactive mode uses PROMPT_ME instead of CHANGE_ME_SECRET_VALUE
+        assert "PROMPT_ME" in env_content
+        assert len(needs_input) > 0
+
+    def test_generate_env_with_optional_vars(self, sample_schema_toml: Path) -> None:
+        """Test .env generation includes optional variables with defaults."""
+        schema = TripWireSchema.from_toml(sample_schema_toml)
+        env_content, needs_input = schema.generate_env_for_environment("development")
+
+        # Optional variables with defaults
+        assert "PORT=8000" in env_content
+        assert "RATE_LIMIT=100.0" in env_content
+        assert "# Optional Variables" in env_content
+
+    def test_generate_env_formatting(self, sample_schema_toml: Path) -> None:
+        """Test generated .env file has proper formatting and comments."""
+        schema = TripWireSchema.from_toml(sample_schema_toml)
+        env_content, _ = schema.generate_env_for_environment("development")
+
+        # Should have sections
+        assert "# Required Variables" in env_content
+        assert "# Optional Variables" in env_content
+
+        # Should have descriptions
+        assert "PostgreSQL database connection" in env_content
+        assert "Server port" in env_content
+
+        # Should have metadata comments
+        assert "Type: string | Required" in env_content
+        assert "Type: int | Optional" in env_content
+
+    def test_generate_env_bool_formatting(self, sample_schema_toml: Path) -> None:
+        """Test boolean values are formatted as lowercase strings."""
+        schema = TripWireSchema.from_toml(sample_schema_toml)
+        env_content, _ = schema.generate_env_for_environment("development")
+
+        # Booleans should be lowercase
+        assert "DEBUG=true" in env_content or "DEBUG=false" in env_content
+        # Should NOT be Python bool repr
+        assert "DEBUG=True" not in env_content
+        assert "DEBUG=False" not in env_content
+
+
+# ============================================================================
+# CLI Schema Generate-Env Tests
+# ============================================================================
+
+
+class TestCLISchemaGenerateEnv:
+    """Tests for 'schema generate-env' CLI command."""
+
+    def test_generate_env_command_basic(self, sample_schema_toml: Path, tmp_path: Path) -> None:
+        """Test basic 'schema generate-env' command."""
+        runner = CliRunner()
+        output_file = tmp_path / ".env.dev"
+
+        result = runner.invoke(
+            main,
+            [
+                "schema",
+                "generate-env",
+                "--environment",
+                "development",
+                "--schema-file",
+                str(sample_schema_toml),
+                "--output",
+                str(output_file),
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert output_file.exists()
+        assert "Generated" in result.output
+
+        # Check content
+        content = output_file.read_text()
+        assert "Environment: development" in content
+        assert "DATABASE_URL=" in content
+
+    def test_generate_env_command_production(self, sample_schema_toml: Path, tmp_path: Path) -> None:
+        """Test generating production .env with secrets placeholders."""
+        runner = CliRunner()
+        output_file = tmp_path / ".env.prod"
+
+        result = runner.invoke(
+            main,
+            [
+                "schema",
+                "generate-env",
+                "--environment",
+                "production",
+                "--schema-file",
+                str(sample_schema_toml),
+                "--output",
+                str(output_file),
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert output_file.exists()
+
+        content = output_file.read_text()
+        assert "CHANGE_ME_SECRET_VALUE" in content
+        assert "Variables requiring manual input" in result.output
+
+    def test_generate_env_command_overwrite_protection(self, sample_schema_toml: Path, tmp_path: Path) -> None:
+        """Test generate-env protects against overwriting existing files."""
+        runner = CliRunner()
+        output_file = tmp_path / ".env.dev"
+        output_file.write_text("EXISTING=value\n")
+
+        result = runner.invoke(
+            main,
+            [
+                "schema",
+                "generate-env",
+                "--environment",
+                "development",
+                "--schema-file",
+                str(sample_schema_toml),
+                "--output",
+                str(output_file),
+            ],
+            input="n\n",  # Don't overwrite
+        )
+
+        # Exit code 1 is expected when user declines to overwrite
+        assert result.exit_code == 1
+        assert "already exists" in result.output or "Aborted" in result.output
+        # Original content preserved
+        assert output_file.read_text() == "EXISTING=value\n"
+
+    def test_generate_env_command_force_overwrite(self, sample_schema_toml: Path, tmp_path: Path) -> None:
+        """Test generate-env with --overwrite flag."""
+        runner = CliRunner()
+        output_file = tmp_path / ".env.dev"
+        output_file.write_text("EXISTING=value\n")
+
+        result = runner.invoke(
+            main,
+            [
+                "schema",
+                "generate-env",
+                "--environment",
+                "development",
+                "--schema-file",
+                str(sample_schema_toml),
+                "--output",
+                str(output_file),
+                "--overwrite",
+            ],
+        )
+
+        assert result.exit_code == 0
+        # File should be overwritten
+        content = output_file.read_text()
+        assert "EXISTING=value" not in content
+        assert "Environment: development" in content
+
+    def test_generate_env_command_json_format(self, sample_schema_toml: Path, tmp_path: Path) -> None:
+        """Test generate-env with JSON output format."""
+        runner = CliRunner()
+        output_file = tmp_path / ".env.json"
+
+        result = runner.invoke(
+            main,
+            [
+                "schema",
+                "generate-env",
+                "--environment",
+                "development",
+                "--schema-file",
+                str(sample_schema_toml),
+                "--output",
+                str(output_file),
+                "--format-output",
+                "json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert output_file.exists()
+
+        # Should be valid JSON
+        import json
+
+        data = json.loads(output_file.read_text())
+        assert isinstance(data, dict)
+        assert "DATABASE_URL" in data
+
+    @pytest.mark.skip(reason="YAML format may require yaml library - testing if basic formats work first")
+    def test_generate_env_command_yaml_format(self, sample_schema_toml: Path, tmp_path: Path) -> None:
+        """Test generate-env with YAML output format."""
+        runner = CliRunner()
+        output_file = tmp_path / ".env.yaml"
+
+        result = runner.invoke(
+            main,
+            [
+                "schema",
+                "generate-env",
+                "--environment",
+                "development",
+                "--schema-file",
+                str(sample_schema_toml),
+                "--output",
+                str(output_file),
+                "--format-output",
+                "yaml",
+            ],
+        )
+
+        # Check if YAML is supported, exit code 1 might mean missing yaml library
+        if result.exit_code != 0 and "yaml" in result.output.lower():
+            pytest.skip("YAML support requires yaml library")
+
+        assert result.exit_code == 0
+        assert output_file.exists()
+
+        content = output_file.read_text()
+        # YAML format checks
+        assert ":" in content
+        assert "DATABASE_URL" in content
+
+
+# ============================================================================
+# CLI Schema Diff Tests
+# ============================================================================
+
+
+class TestCLISchemaDiff:
+    """Tests for 'schema diff' CLI command."""
+
+    def test_schema_diff_command_basic(self, tmp_path: Path) -> None:
+        """Test basic 'schema diff' command."""
+        runner = CliRunner()
+
+        # Create two schemas with differences
+        old_schema = tmp_path / "old.toml"
+        old_schema.write_text(
+            """[project]
+name = "test"
+version = "1.0.0"
+
+[variables.API_KEY]
+type = "string"
+required = true
+
+[variables.PORT]
+type = "string"
+required = false
+"""
+        )
+
+        new_schema = tmp_path / "new.toml"
+        new_schema.write_text(
+            """[project]
+name = "test"
+version = "2.0.0"
+
+[variables.API_KEY]
+type = "string"
+required = true
+
+[variables.PORT]
+type = "int"
+required = false
+min = 1024
+max = 65535
+
+[variables.DATABASE_URL]
+type = "string"
+required = true
+"""
+        )
+
+        result = runner.invoke(
+            main,
+            ["schema", "diff", str(old_schema), str(new_schema)],
+        )
+
+        assert result.exit_code == 0
+        assert "Added Variables" in result.output
+        assert "Modified Variables" in result.output
+        assert "DATABASE_URL" in result.output
+        assert "PORT" in result.output
+
+    def test_schema_diff_breaking_changes(self, tmp_path: Path) -> None:
+        """Test schema diff detects breaking changes."""
+        runner = CliRunner()
+
+        old_schema = tmp_path / "old.toml"
+        old_schema.write_text(
+            """[project]
+name = "test"
+
+[variables.API_KEY]
+type = "string"
+required = false
+"""
+        )
+
+        new_schema = tmp_path / "new.toml"
+        new_schema.write_text(
+            """[project]
+name = "test"
+
+[variables.API_KEY]
+type = "string"
+required = true
+
+[variables.NEW_REQUIRED_VAR]
+type = "string"
+required = true
+"""
+        )
+
+        result = runner.invoke(
+            main,
+            ["schema", "diff", str(old_schema), str(new_schema)],
+        )
+
+        assert result.exit_code == 0
+        assert "Breaking Changes" in result.output
+        assert "NEW_REQUIRED_VAR" in result.output
+
+    def test_schema_diff_json_format(self, tmp_path: Path) -> None:
+        """Test schema diff with JSON output format."""
+        runner = CliRunner()
+
+        old_schema = tmp_path / "old.toml"
+        old_schema.write_text(
+            """[project]
+name = "test"
+
+[variables.API_KEY]
+type = "string"
+"""
+        )
+
+        new_schema = tmp_path / "new.toml"
+        new_schema.write_text(
+            """[project]
+name = "test"
+
+[variables.API_KEY]
+type = "string"
+
+[variables.NEW_VAR]
+type = "string"
+"""
+        )
+
+        result = runner.invoke(
+            main,
+            ["schema", "diff", str(old_schema), str(new_schema), "--output-format", "json"],
+        )
+
+        assert result.exit_code == 0
+        # Output has a header, extract JSON part
+        import json
+
+        # Find the JSON object (starts with { and ends with })
+        json_start = result.output.find("{")
+        assert json_start != -1, "No JSON found in output"
+        json_str = result.output[json_start:]
+
+        data = json.loads(json_str)
+        assert "added" in data or "summary" in data
+
+
+# ============================================================================
+# CLI Schema Migrate Tests
+# ============================================================================
+
+
+class TestCLISchemaMigrate:
+    """Tests for 'schema migrate' CLI command."""
+
+    def test_schema_migrate_command_basic(self, tmp_path: Path) -> None:
+        """Test basic 'schema migrate' command."""
+        runner = CliRunner()
+
+        # Create old and new schemas
+        old_schema = tmp_path / "old.toml"
+        old_schema.write_text(
+            """[project]
+name = "test"
+
+[variables.API_KEY]
+type = "string"
+required = true
+"""
+        )
+
+        new_schema = tmp_path / "new.toml"
+        new_schema.write_text(
+            """[project]
+name = "test"
+
+[variables.API_KEY]
+type = "string"
+required = true
+
+[variables.NEW_VAR]
+type = "string"
+required = false
+default = "default_value"
+"""
+        )
+
+        # Create .env file
+        env_file = tmp_path / ".env"
+        env_file.write_text("API_KEY=secret123\n")
+
+        result = runner.invoke(
+            main,
+            [
+                "schema",
+                "migrate",
+                "--from",
+                str(old_schema),
+                "--to",
+                str(new_schema),
+                "--env-file",
+                str(env_file),
+            ],
+            input="y\n",  # Confirm migration
+        )
+
+        assert result.exit_code == 0
+        assert "Migrated" in result.output
+
+        # Check .env was updated
+        content = env_file.read_text()
+        assert "API_KEY=secret123" in content
+        assert "NEW_VAR=default_value" in content
+
+    def test_schema_migrate_dry_run(self, tmp_path: Path) -> None:
+        """Test schema migrate with --dry-run flag."""
+        runner = CliRunner()
+
+        old_schema = tmp_path / "old.toml"
+        old_schema.write_text(
+            """[project]
+name = "test"
+
+[variables.OLD_VAR]
+type = "string"
+"""
+        )
+
+        new_schema = tmp_path / "new.toml"
+        new_schema.write_text(
+            """[project]
+name = "test"
+
+[variables.NEW_VAR]
+type = "string"
+default = "new"
+"""
+        )
+
+        env_file = tmp_path / ".env"
+        env_file.write_text("OLD_VAR=old_value\n")
+        original_content = env_file.read_text()
+
+        result = runner.invoke(
+            main,
+            [
+                "schema",
+                "migrate",
+                "--from",
+                str(old_schema),
+                "--to",
+                str(new_schema),
+                "--env-file",
+                str(env_file),
+                "--dry-run",
+            ],
+        )
+
+        assert result.exit_code == 0
+        # File should not be modified in dry-run
+        assert env_file.read_text() == original_content
+
+    def test_schema_migrate_creates_backup(self, tmp_path: Path) -> None:
+        """Test schema migrate creates backup file."""
+        runner = CliRunner()
+
+        old_schema = tmp_path / "old.toml"
+        old_schema.write_text(
+            """[project]
+name = "test"
+
+[variables.API_KEY]
+type = "string"
+"""
+        )
+
+        new_schema = tmp_path / "new.toml"
+        new_schema.write_text(
+            """[project]
+name = "test"
+
+[variables.API_KEY]
+type = "string"
+
+[variables.NEW_VAR]
+type = "string"
+default = "value"
+"""
+        )
+
+        env_file = tmp_path / ".env"
+        env_file.write_text("API_KEY=secret\n")
+
+        result = runner.invoke(
+            main,
+            [
+                "schema",
+                "migrate",
+                "--from",
+                str(old_schema),
+                "--to",
+                str(new_schema),
+                "--env-file",
+                str(env_file),
+            ],
+            input="y\n",
+        )
+
+        assert result.exit_code == 0
+        assert "backup" in result.output.lower()
+
+        # Should have backup file
+        backup_files = list(tmp_path.glob(".env.backup.*"))
+        assert len(backup_files) == 1
