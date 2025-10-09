@@ -5,7 +5,6 @@ This module implements TOML-based schema validation for environment variables,
 enabling declarative configuration management.
 """
 
-import os
 import re
 import tomllib  # Python 3.11+
 from dataclasses import dataclass, field
