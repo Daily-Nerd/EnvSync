@@ -421,25 +421,30 @@ def _detect_format(var_name: str, value: str) -> str | None:
     return None
 
 
-def _is_secret(var_name: str, _value: str) -> bool:
-    """Detect if variable is likely a secret."""
-    name_lower = var_name.lower()
+def _is_secret(var_name: str, value: str) -> bool:
+    """Detect if variable is likely a secret using comprehensive detection.
 
-    secret_indicators = [
-        "key",
-        "secret",
-        "password",
-        "token",
-        "credential",
-        "private",
-        "auth",
-        "api_key",
-        "apikey",
-        "access_key",
-        "encryption",
-    ]
+    Uses the same secret detection engine as 'audit --all' command for consistency.
+    Detects secrets via:
+    - 45+ platform-specific patterns (AWS, GitHub, Stripe, etc.)
+    - Generic credential detection with entropy analysis
+    - High-entropy string detection
+    - Placeholder filtering to avoid false positives
 
-    return any(indicator in name_lower for indicator in secret_indicators)
+    Args:
+        var_name: Environment variable name
+        value: Environment variable value
+
+    Returns:
+        True if variable appears to be a secret
+    """
+    from tripwire.secrets import detect_secrets_in_value
+
+    # Use comprehensive secret detection from secrets.py
+    # This ensures consistency with 'audit --all' command
+    matches = detect_secrets_in_value(var_name, value, line_number=0)
+
+    return len(matches) > 0
 
 
 def _generate_from_schema(output: str, check: bool, force: bool, schema_file: str) -> None:

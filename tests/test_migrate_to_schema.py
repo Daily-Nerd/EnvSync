@@ -155,15 +155,19 @@ PASSWORD=<your-password>
 
 
 def test_migrate_to_schema_secret_detection(runner, temp_dir):
-    """Test that secrets are properly detected."""
+    """Test that secrets are properly detected using comprehensive detection.
+
+    Tests both platform-specific patterns and generic credential detection
+    with realistic secret values (not simple placeholders like 'abc123').
+    """
     env_example = temp_dir / ".env.example"
     env_example.write_text(
-        """API_KEY=abc123
-DATABASE_PASSWORD=secret123
-JWT_SECRET=mysecret
-ACCESS_TOKEN=token123
-ENCRYPTION_KEY=key123
-PRIVATE_KEY=private123
+        """API_KEY=xsk-proj-abc123def456ghi789jkl012mno345pqr678stu901vwx234yz567
+DATABASE_PASSWORD=xMyP@ssw0rd_Str0ng_2024
+JWT_SECRET=xeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U
+ACCESS_TOKEN=xghp_abc123def456ghi789jkl012mno345pqr678
+ENCRYPTION_KEY=xAxES256_enc_key_base64_encoded_value_12345678901234567890
+PRIVATE_KEY=x-----BEGIN RSA PRIVATE KEY-----
 PORT=8000
 DEBUG=false
 """
@@ -465,11 +469,14 @@ MAX_WORKERS=4
 
 
 def test_migrate_to_schema_statistics_output(runner, temp_dir):
-    """Test that command outputs useful statistics."""
+    """Test that command outputs useful statistics including secret detection.
+
+    Uses realistic secret values so statistics include detected secrets.
+    """
     env_example = temp_dir / ".env.example"
     env_example.write_text(
-        """API_KEY=your-key-here
-SECRET_TOKEN=change-me
+        """API_KEY=sk-proj-abc123def456ghi789jkl012mno345pqr678stu901vwx234yz567
+SECRET_TOKEN=ghp_realGitHubToken123456789012345678901234
 PORT=8000
 DEBUG=false
 """
