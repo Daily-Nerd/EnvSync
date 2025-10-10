@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2025-10-10
+
+### Added
+
+- **PyYAML Dependency**: Added PyYAML as a project dependency for enhanced YAML support
+
+### Changed
+
+- **Enhanced Security in `migrate-to-schema`**: Improved security checks when migrating from real .env files
+  - Warns users when source appears to be a real environment file (not .env.example)
+  - Provides clear recommendations to create .env.example first with placeholder values
+  - Requires explicit confirmation to continue with real .env files
+  - Prevents accidental secret exposure in schema files committed to git
+
+### Removed
+
+- Removed legacy EnvSync.md documentation file
+
+### Technical Details
+
+- Added 33 new tests for scanner validation
+- Enhanced CLI error handling and user prompts during migration
+- All tests passing with improved security coverage
+
 ## [0.4.1] - 2025-10-09
 
 ### Added
@@ -141,7 +165,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI implementation with rich output
 - Project initialization (`init` command)
 
-[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/Daily-Nerd/TripWire/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/Daily-Nerd/TripWire/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.2.0...v0.3.0
