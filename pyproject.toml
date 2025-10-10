@@ -25,6 +25,7 @@ classifiers = [
 dependencies = [
     "click>=8.1.8",
     "python-dotenv>=1.1.1",
+    "pyyaml>=6.0.3",
     "rich>=14.1.0",
     "tomli>=2.2.1",
     "tomli-w>=1.0.0",
