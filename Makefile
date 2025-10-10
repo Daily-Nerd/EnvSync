@@ -121,6 +121,10 @@ docs:
 pre-commit:
 	pre-commit run --all-files
 
+pre-commit-update:
+	@echo "Updating pre-commit hooks..."
+	pre-commit autoupdate
+
 # Development workflow
 dev-setup: install-dev setup-dev
 	@echo "✅ Development environment ready!"
