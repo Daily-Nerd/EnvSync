@@ -42,7 +42,8 @@ DEBUG=false
     result = runner.invoke(
         main,
         [
-            "migrate-to-schema",
+            "schema",
+            "from-example",
             "--source",
             str(env_example),
             "--output",
@@ -80,7 +81,8 @@ BOOL_FALSE=false
     result = runner.invoke(
         main,
         [
-            "migrate-to-schema",
+            "schema",
+            "from-example",
             "--source",
             str(env_example),
             "--output",
@@ -124,7 +126,8 @@ PASSWORD=<your-password>
     result = runner.invoke(
         main,
         [
-            "migrate-to-schema",
+            "schema",
+            "from-example",
             "--source",
             str(env_example),
             "--output",
@@ -171,7 +174,8 @@ DEBUG=false
     result = runner.invoke(
         main,
         [
-            "migrate-to-schema",
+            "schema",
+            "from-example",
             "--source",
             str(env_example),
             "--output",
@@ -213,7 +217,8 @@ SERVER_IP=192.168.1.1
     result = runner.invoke(
         main,
         [
-            "migrate-to-schema",
+            "schema",
+            "from-example",
             "--source",
             str(env_example),
             "--output",
@@ -247,7 +252,8 @@ ANOTHER_REQUIRED=
     result = runner.invoke(
         main,
         [
-            "migrate-to-schema",
+            "schema",
+            "from-example",
             "--source",
             str(env_example),
             "--output",
@@ -279,7 +285,8 @@ def test_migrate_to_schema_overwrite_protection(runner, temp_dir):
     result = runner.invoke(
         main,
         [
-            "migrate-to-schema",
+            "schema",
+            "from-example",
             "--source",
             str(env_example),
             "--output",
@@ -304,7 +311,8 @@ def test_migrate_to_schema_with_force(runner, temp_dir):
     result = runner.invoke(
         main,
         [
-            "migrate-to-schema",
+            "schema",
+            "from-example",
             "--source",
             str(env_example),
             "--output",
@@ -328,7 +336,8 @@ def test_migrate_to_schema_missing_source(runner, temp_dir):
     result = runner.invoke(
         main,
         [
-            "migrate-to-schema",
+            "schema",
+            "from-example",
             "--source",
             str(temp_dir / "nonexistent.env"),
         ],
@@ -359,7 +368,8 @@ PORT=8000
     result = runner.invoke(
         main,
         [
-            "migrate-to-schema",
+            "schema",
+            "from-example",
             "--source",
             str(env_example),
             "--output",
@@ -418,7 +428,8 @@ MAX_WORKERS=4
     result = runner.invoke(
         main,
         [
-            "migrate-to-schema",
+            "schema",
+            "from-example",
             "--source",
             str(env_example),
             "--output",
@@ -469,7 +480,8 @@ DEBUG=false
     result = runner.invoke(
         main,
         [
-            "migrate-to-schema",
+            "schema",
+            "from-example",
             "--source",
             str(env_example),
             "--output",

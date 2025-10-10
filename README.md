@@ -357,10 +357,10 @@ strict_secrets = true
 tripwire schema validate --environment production
 
 # Generate .env.example from schema
-tripwire schema generate-example
+tripwire schema to-example
 
 # Migrate legacy .env.example to schema (v0.4.1+)
-tripwire migrate-to-schema
+tripwire schema from-example
 ```
 
 [Learn more about Configuration as Code →](docs/guides/configuration-as-code.md)
@@ -472,7 +472,7 @@ TripWire builds on the excellent work of the Python community, particularly:
 - [x] **Git audit with timeline and remediation** (audit command)
 - [x] **Configuration as Code** (TOML schemas - v0.3.0)
 - [x] **Tool configuration** (`[tool.tripwire]` - v0.4.1)
-- [x] **Schema migration** (migrate-to-schema - v0.4.1)
+- [x] **Schema migration** (schema from-example - v0.4.1)
 
 ### Planned Features 📋
 

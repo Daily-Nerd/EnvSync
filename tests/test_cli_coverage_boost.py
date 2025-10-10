@@ -332,7 +332,7 @@ VAR1 = env.require('VAR1')
 """
             )
 
-            result = runner.invoke(main, ["schema", "import"])
+            result = runner.invoke(main, ["schema", "from-code"])
 
             # Should create some output
             assert result.exit_code in (0, 1)
@@ -348,7 +348,7 @@ VAR1 = env.require('VAR1')
 """
             )
 
-            result = runner.invoke(main, ["schema", "import", "--output=custom.schema.json"])
+            result = runner.invoke(main, ["schema", "from-code", "--output=custom.schema.json"])
 
             assert result.exit_code in (0, 1)
 

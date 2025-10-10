@@ -656,26 +656,26 @@ class TestCLISchemaCommands:
     """Tests for schema-related CLI commands."""
 
     def test_cli_schema_init(self, tmp_path: Path) -> None:
-        """Test 'schema init' command creates file."""
+        """Test 'schema new' command creates file."""
         runner = CliRunner()
 
         with runner.isolated_filesystem(temp_dir=tmp_path):
-            result = runner.invoke(main, ["schema", "init"])
+            result = runner.invoke(main, ["schema", "new"])
 
             assert result.exit_code == 0
             assert Path(".tripwire.toml").exists()
             assert "Created .tripwire.toml" in result.output
 
     def test_cli_schema_init_overwrite(self, tmp_path: Path) -> None:
-        """Test 'schema init' with overwrite protection."""
+        """Test 'schema new' with overwrite protection."""
         runner = CliRunner()
 
         with runner.isolated_filesystem(temp_dir=tmp_path):
             # Create initial file
-            runner.invoke(main, ["schema", "init"])
+            runner.invoke(main, ["schema", "new"])
 
             # Try to create again without confirmation
-            result = runner.invoke(main, ["schema", "init"], input="n\n")
+            result = runner.invoke(main, ["schema", "new"], input="n\n")
 
             assert result.exit_code == 0
             assert "already exists" in result.output
@@ -744,7 +744,7 @@ PORT=8080
         assert "Validation failed" in result.output
 
     def test_cli_schema_generate_example(self, sample_schema_toml: Path, tmp_path: Path) -> None:
-        """Test 'schema generate-example' command creates file."""
+        """Test 'schema to-example' command creates file."""
         runner = CliRunner()
 
         output_file = tmp_path / ".env.example"
@@ -753,7 +753,7 @@ PORT=8080
             main,
             [
                 "schema",
-                "generate-example",
+                "to-example",
                 "--schema-file",
                 str(sample_schema_toml),
                 "--output",
@@ -771,12 +771,12 @@ PORT=8080
         assert "PORT=8000" in content
 
     def test_cli_schema_docs(self, sample_schema_toml: Path) -> None:
-        """Test 'schema docs' command generates documentation."""
+        """Test 'schema to-docs' command generates documentation."""
         runner = CliRunner()
 
         result = runner.invoke(
             main,
-            ["schema", "docs", "--schema-file", str(sample_schema_toml)],
+            ["schema", "to-docs", "--schema-file", str(sample_schema_toml)],
         )
 
         assert result.exit_code == 0
@@ -1019,7 +1019,7 @@ class TestCLISchemaGenerateEnv:
     """Tests for 'schema generate-env' CLI command."""
 
     def test_generate_env_command_basic(self, sample_schema_toml: Path, tmp_path: Path) -> None:
-        """Test basic 'schema generate-env' command."""
+        """Test basic 'schema to-env' command."""
         runner = CliRunner()
         output_file = tmp_path / ".env.dev"
 
@@ -1027,7 +1027,7 @@ class TestCLISchemaGenerateEnv:
             main,
             [
                 "schema",
-                "generate-env",
+                "to-env",
                 "--environment",
                 "development",
                 "--schema-file",
@@ -1055,7 +1055,7 @@ class TestCLISchemaGenerateEnv:
             main,
             [
                 "schema",
-                "generate-env",
+                "to-env",
                 "--environment",
                 "production",
                 "--schema-file",
@@ -1073,7 +1073,7 @@ class TestCLISchemaGenerateEnv:
         assert "Variables requiring manual input" in result.output
 
     def test_generate_env_command_overwrite_protection(self, sample_schema_toml: Path, tmp_path: Path) -> None:
-        """Test generate-env protects against overwriting existing files."""
+        """Test to-env protects against overwriting existing files."""
         runner = CliRunner()
         output_file = tmp_path / ".env.dev"
         output_file.write_text("EXISTING=value\n")
@@ -1082,7 +1082,7 @@ class TestCLISchemaGenerateEnv:
             main,
             [
                 "schema",
-                "generate-env",
+                "to-env",
                 "--environment",
                 "development",
                 "--schema-file",
@@ -1100,7 +1100,7 @@ class TestCLISchemaGenerateEnv:
         assert output_file.read_text() == "EXISTING=value\n"
 
     def test_generate_env_command_force_overwrite(self, sample_schema_toml: Path, tmp_path: Path) -> None:
-        """Test generate-env with --overwrite flag."""
+        """Test to-env with --overwrite flag."""
         runner = CliRunner()
         output_file = tmp_path / ".env.dev"
         output_file.write_text("EXISTING=value\n")
@@ -1109,7 +1109,7 @@ class TestCLISchemaGenerateEnv:
             main,
             [
                 "schema",
-                "generate-env",
+                "to-env",
                 "--environment",
                 "development",
                 "--schema-file",
@@ -1127,7 +1127,7 @@ class TestCLISchemaGenerateEnv:
         assert "Environment: development" in content
 
     def test_generate_env_command_json_format(self, sample_schema_toml: Path, tmp_path: Path) -> None:
-        """Test generate-env with JSON output format."""
+        """Test to-env with JSON output format."""
         runner = CliRunner()
         output_file = tmp_path / ".env.json"
 
@@ -1135,7 +1135,7 @@ class TestCLISchemaGenerateEnv:
             main,
             [
                 "schema",
-                "generate-env",
+                "to-env",
                 "--environment",
                 "development",
                 "--schema-file",
@@ -1347,7 +1347,7 @@ class TestCLISchemaMigrate:
     """Tests for 'schema migrate' CLI command."""
 
     def test_schema_migrate_command_basic(self, tmp_path: Path) -> None:
-        """Test basic 'schema migrate' command."""
+        """Test basic 'schema upgrade' command."""
         runner = CliRunner()
 
         # Create old and new schemas
@@ -1386,7 +1386,7 @@ default = "default_value"
             main,
             [
                 "schema",
-                "migrate",
+                "upgrade",
                 "--from",
                 str(old_schema),
                 "--to",
@@ -1406,7 +1406,7 @@ default = "default_value"
         assert "NEW_VAR=default_value" in content
 
     def test_schema_migrate_dry_run(self, tmp_path: Path) -> None:
-        """Test schema migrate with --dry-run flag."""
+        """Test schema upgrade with --dry-run flag."""
         runner = CliRunner()
 
         old_schema = tmp_path / "old.toml"
@@ -1438,7 +1438,7 @@ default = "new"
             main,
             [
                 "schema",
-                "migrate",
+                "upgrade",
                 "--from",
                 str(old_schema),
                 "--to",
@@ -1454,7 +1454,7 @@ default = "new"
         assert env_file.read_text() == original_content
 
     def test_schema_migrate_creates_backup(self, tmp_path: Path) -> None:
-        """Test schema migrate creates backup file."""
+        """Test schema upgrade creates backup file."""
         runner = CliRunner()
 
         old_schema = tmp_path / "old.toml"
@@ -1488,7 +1488,7 @@ default = "value"
             main,
             [
                 "schema",
-                "migrate",
+                "upgrade",
                 "--from",
                 str(old_schema),
                 "--to",
