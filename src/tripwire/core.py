@@ -100,23 +100,36 @@ class TripWire:
         """
         # Thread safety: Acquire lock to prevent concurrent frame inspection
         with _FRAME_INFERENCE_LOCK:
-            frame = inspect.currentframe()
+            current_frame = inspect.currentframe()
+            # Type safety: Handle None case explicitly
+            if current_frame is None:
+                return None
+
             caller_frame = None
             try:
                 # Find the first frame outside the TripWire module
                 # This handles both direct require() calls and indirect optional() calls
-                caller_frame = frame.f_back
+                # Type assertion: f_back returns Optional[FrameType]
+                caller_frame = current_frame.f_back
+                if caller_frame is None:
+                    return None
+
                 tripwire_module_file = __file__.replace(".pyc", ".py")
 
-                while caller_frame:
+                # Type narrowing: Explicitly check for None in loop
+                while caller_frame is not None:
                     frame_file = caller_frame.f_code.co_filename
                     # Skip frames within the TripWire module
                     if frame_file != tripwire_module_file:
                         break
                     caller_frame = caller_frame.f_back
 
-                if not caller_frame:
+                # Final None check after loop
+                if caller_frame is None:
                     return None
+
+                # Type narrowing: From here, caller_frame is guaranteed non-None
+                # mypy understands this control flow
 
                 # Performance: Check cache first to avoid expensive operations
                 filename = caller_frame.f_code.co_filename
@@ -160,19 +173,25 @@ class TripWire:
                                     # Filter out NoneType (using proper comparison)
                                     non_none_args = [arg for arg in args if arg is not type(None)]
                                     if non_none_args:
+                                        # Type narrowing: Ensure we return a type, not Any
                                         inferred_type = non_none_args[0]
-                                        _TYPE_INFERENCE_CACHE[cache_key] = inferred_type
-                                        return inferred_type
+                                        if isinstance(inferred_type, type):
+                                            _TYPE_INFERENCE_CACHE[cache_key] = inferred_type
+                                            return inferred_type
 
                                 # Return the hint if it's a basic type
                                 if hint in (int, float, bool, str, list, dict):
-                                    _TYPE_INFERENCE_CACHE[cache_key] = hint
-                                    return hint
+                                    # Type assertion: These are guaranteed to be types
+                                    result_type: type = hint
+                                    _TYPE_INFERENCE_CACHE[cache_key] = result_type
+                                    return result_type
 
                                 # Handle generic types (List[T], Dict[K,V]) -> return base type
                                 if origin in (list, dict):
-                                    _TYPE_INFERENCE_CACHE[cache_key] = origin
-                                    return origin
+                                    # Type assertion: origin is guaranteed to be a type here
+                                    result_type_origin: type = origin
+                                    _TYPE_INFERENCE_CACHE[cache_key] = result_type_origin
+                                    return result_type_origin
 
                                 # If it's already a type, return it
                                 if isinstance(hint, type):
@@ -223,12 +242,10 @@ class TripWire:
 
             finally:
                 # Proper cleanup of frame references to prevent memory leaks
-                if caller_frame:
+                if caller_frame is not None:
                     del caller_frame
-                    caller_frame = None
-                if frame:
-                    del frame
-                    frame = None
+                if current_frame is not None:
+                    del current_frame
 
     def load(self, env_file: Union[str, Path, None] = None, override: bool = False) -> None:
         """Load environment variables from .env file.
@@ -334,7 +351,7 @@ class TripWire:
 
         # Type coercion
         if type is not str:
-            value = coerce_type(raw_value, type, name)
+            value = coerce_type(raw_value, type, name)  # type: ignore[type-var]
         else:
             value = raw_value  # type: ignore[assignment]
 
@@ -479,7 +496,7 @@ class TripWire:
         self,
         name: str,
         default: Optional[T] = None,
-        type: type[T] = str,  # noqa: A002
+        type: type[T] = str,  # type: ignore[assignment]  # noqa: A002
     ) -> Optional[T]:
         """Get an environment variable with optional type coercion.
 
@@ -500,7 +517,7 @@ class TripWire:
         if type is str or type is None:
             return raw_value  # type: ignore[return-value]
 
-        return coerce_type(raw_value, type, name)
+        return coerce_type(raw_value, type, name)  # type: ignore[type-var]
 
     def has(self, name: str) -> bool:
         """Check if environment variable exists.

@@ -43,6 +43,8 @@ dev = [
     "safety>=2.3.5",
     "pip-audit>=2.6.1",
     "pip-licenses>=4.3.0",
+    "types-click>=7.1.8",
+    "types-pyyaml>=6.0.12.20250915",
 ]
 
 [project.urls]
@@ -149,13 +151,7 @@ module = "tests.*"
 disallow_untyped_defs = false
 
 # v0.6.0: Type safety improvements - validation.py fully typed
-# TODO: Remove remaining ignore_errors in future release
-[[tool.mypy.overrides]]
-module = [
-  "tripwire.cli",  # Click integration needs stubs
-  "tripwire.core",  # Frame inspection edge cases
-]
-ignore_errors = true
+# v0.7.0: core.py and cli type safety completed - full strict type checking enabled
 
 [tool.black]
 line-length = 100
