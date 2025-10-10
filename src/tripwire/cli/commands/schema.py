@@ -1,0 +1,1688 @@
+"""Schema commands for TripWire CLI.
+
+Manages environment variable schemas (.tripwire.toml files) with commands for
+creation, validation, migration, and documentation generation.
+"""
+
+import json
+import re
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+import click
+from rich.panel import Panel
+from rich.syntax import Syntax
+from rich.table import Table
+
+from tripwire.branding import LOGO_BANNER, get_status_icon
+from tripwire.cli.commands.generate import (
+    _detect_format,
+    _infer_type_and_default,
+    _is_placeholder,
+    _is_secret,
+)
+from tripwire.cli.formatters.docs import (
+    generate_html_docs,
+    generate_json_docs,
+    generate_markdown_docs,
+)
+from tripwire.cli.utils.console import console
+
+
+@click.group()
+def schema() -> None:
+    """Manage environment variable schemas (.tripwire.toml).
+
+    Common Workflows:
+
+      New Project:
+        tripwire schema new              # Create blank schema
+        tripwire schema from-code        # Or generate from code
+
+      Migrate from .env.example:
+        tripwire schema from-example     # Convert to schema
+        tripwire schema validate         # Verify .env
+
+      Keep .env.example in sync:
+        tripwire schema to-example       # Export schema
+        git add .env.example             # Commit
+
+    Quick start: tripwire schema quick-start
+    """
+    pass
+
+
+@schema.command("new")
+@click.option(
+    "--interactive",
+    "-i",
+    is_flag=True,
+    help="Interactive mode with prompts",
+)
+def schema_new(interactive: bool) -> None:
+    """Create a new .tripwire.toml schema file.
+
+    Generates a template configuration schema that you can customize
+    for your project's environment variables.
+
+    Examples:
+        tripwire schema new              # Create blank schema
+        tripwire schema new --interactive # Interactive setup
+    """
+    schema_path = Path(".tripwire.toml")
+
+    if schema_path.exists():
+        console.print("[yellow][!] .tripwire.toml already exists[/yellow]")
+        if not click.confirm("Overwrite existing file?"):
+            console.print("Schema initialization cancelled")
+            return
+
+    # Create starter schema
+    starter_content = """# TripWire Configuration Schema
+# Define your environment variables with validation rules
+
+[project]
+name = "my-project"
+version = "0.1.0"
+description = "Project description"
+
+[validation]
+strict = true  # Fail on unknown variables
+allow_missing_optional = true
+warn_unused = true
+
+[security]
+entropy_threshold = 4.5
+scan_git_history = true
+exclude_patterns = ["TEST_*", "EXAMPLE_*"]
+
+# Example variable definitions
+# Uncomment and customize for your project
+
+# [variables.DATABASE_URL]
+# type = "string"
+# required = true
+# format = "postgresql"
+# description = "PostgreSQL database connection"
+# secret = true
+# examples = ["postgresql://localhost:5432/dev"]
+
+# [variables.DEBUG]
+# type = "bool"
+# required = false
+# default = false
+# description = "Enable debug mode"
+
+# [variables.PORT]
+# type = "int"
+# required = false
+# default = 8000
+# min = 1024
+# max = 65535
+# description = "Server port"
+
+# Environment-specific defaults
+[environments.development]
+# DATABASE_URL = "postgresql://localhost:5432/dev"
+# DEBUG = true
+
+[environments.production]
+# DEBUG = false
+# strict_secrets = true
+"""
+
+    schema_path.write_text(starter_content)
+    console.print("[green][OK][/green] Created .tripwire.toml")
+    console.print("\nNext steps:")
+    console.print("  1. Edit .tripwire.toml to define your environment variables")
+    console.print("  2. Run [cyan]tripwire schema validate[/cyan] to check your .env file")
+    console.print("  3. Run [cyan]tripwire schema to-example[/cyan] to create .env.example from schema")
+
+
+@schema.command("validate")
+@click.option(
+    "--env-file",
+    type=click.Path(exists=True),
+    default=".env",
+    help=".env file to validate",
+)
+@click.option(
+    "--schema-file",
+    type=click.Path(exists=True),
+    default=".tripwire.toml",
+    help="Schema file to validate against",
+)
+@click.option(
+    "--environment",
+    "-e",
+    default="development",
+    help="Environment name (development, production, etc.)",
+)
+@click.option(
+    "--strict",
+    is_flag=True,
+    help="Exit with error if validation fails",
+)
+def schema_validate(env_file: str, schema_file: str, environment: str, strict: bool) -> None:
+    """Validate .env file against schema.
+
+    Checks that all required variables are present and validates
+    types, formats, and constraints defined in .tripwire.toml.
+    """
+    from rich.table import Table
+
+    from tripwire.schema import validate_with_schema
+
+    schema_path = Path(schema_file)
+    if not schema_path.exists():
+        console.print(f"[red]Error:[/red] Schema file not found: {schema_file}")
+        console.print("Run [cyan]tripwire schema new[/cyan] to create one")
+        sys.exit(1)
+
+    console.print(f"[yellow]Validating {env_file} against {schema_file}...[/yellow]\n")
+    console.print(f"Environment: [cyan]{environment}[/cyan]\n")
+
+    is_valid, errors = validate_with_schema(env_file, schema_file, environment)
+
+    if is_valid:
+        status = get_status_icon("valid")
+        console.print(f"{status} [green]Validation passed![/green]")
+        console.print("All environment variables are valid")
+    else:
+        status = get_status_icon("invalid")
+        console.print(f"{status} [red]Validation failed with {len(errors)} error(s):[/red]\n")
+
+        table = Table(title="Validation Errors", show_header=True, header_style="bold red")
+        table.add_column("Error", style="red")
+
+        for error in errors:
+            table.add_row(error)
+
+        console.print(table)
+
+        if strict:
+            sys.exit(1)
+
+
+@schema.command("to-example")
+@click.option(
+    "--schema-file",
+    type=click.Path(exists=True),
+    default=".tripwire.toml",
+    help="Schema file to generate from",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    default=".env.example",
+    help="Output file",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Overwrite existing file",
+)
+@click.option(
+    "--check",
+    is_flag=True,
+    help="Check if output is up to date (CI mode)",
+)
+def schema_to_example(schema_file: str, output: str, force: bool, check: bool) -> None:
+    """Export schema TO .env.example file.
+
+    Creates a .env.example file from your .tripwire.toml schema,
+    including descriptions, examples, and validation rules.
+
+    Examples:
+        tripwire schema to-example           # Generate .env.example
+        tripwire schema to-example --check   # CI mode (verify up-to-date)
+    """
+    from tripwire.schema import load_schema
+
+    schema_path = Path(schema_file)
+    if not schema_path.exists():
+        console.print(f"[red]Error:[/red] Schema file not found: {schema_file}")
+        console.print("Run [cyan]tripwire schema new[/cyan] to create one")
+        sys.exit(1)
+
+    schema = load_schema(schema_path)
+    if not schema:
+        console.print("[red]Error:[/red] Failed to load schema")
+        sys.exit(1)
+
+    env_example_content = schema.generate_env_example()
+    output_path = Path(output)
+
+    # Check mode: compare with existing file
+    if check:
+        console.print("[yellow]Checking if output is up to date...[/yellow]")
+        if not output_path.exists():
+            console.print(f"[red][X][/red] {output} does not exist")
+            sys.exit(1)
+
+        existing_content = output_path.read_text()
+        if existing_content.strip() == env_example_content.strip():
+            console.print(f"[green][OK][/green] {output} is up to date")
+        else:
+            console.print(f"[red][X][/red] {output} is out of date")
+            console.print(f"Run 'tripwire schema to-example --force' to update it")
+            sys.exit(1)
+        return
+
+    if output_path.exists() and not force:
+        console.print(f"[red]Error:[/red] {output} already exists. Use --force to overwrite")
+        sys.exit(1)
+
+    console.print(f"[yellow]Generating .env.example from {schema_file}...[/yellow]\n")
+
+    output_path.write_text(env_example_content)
+
+    console.print(f"[green][OK][/green] Generated {output}")
+    console.print(f"  {len(schema.variables)} variable(s) defined")
+
+    console.print("\n[cyan]Next:[/cyan] Run [cyan]tripwire schema validate[/cyan] to verify your .env file")
+
+
+@schema.command("from-code")
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    default=".tripwire.toml",
+    help="Output schema file",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Overwrite existing file",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Preview without creating file",
+)
+def schema_from_code(output: str, force: bool, dry_run: bool) -> None:
+    """Create schema FROM Python code analysis.
+
+    Scans Python files for env.require() and env.optional() calls
+    and generates a schema file automatically.
+
+    Examples:
+        tripwire schema from-code                # Generate schema from code
+        tripwire schema from-code --dry-run      # Preview without creating
+    """
+    from datetime import datetime
+
+    from tripwire.scanner import deduplicate_variables, scan_directory
+
+    output_path = Path(output)
+
+    # Check if file exists (unless dry-run)
+    if not dry_run and output_path.exists() and not force:
+        console.print(f"[red]Error:[/red] {output} already exists. Use --force to overwrite")
+        sys.exit(1)
+
+    console.print("[yellow]Scanning Python files for environment variables...[/yellow]")
+
+    # Scan current directory
+    try:
+        variables = scan_directory(Path.cwd())
+    except Exception as e:
+        console.print(f"[red]Error scanning files:[/red] {e}")
+        sys.exit(1)
+
+    if not variables:
+        console.print("[yellow]No environment variables found in code[/yellow]")
+        console.print("Make sure you're using env.require() or env.optional() in your code.")
+        sys.exit(1)
+
+    # Deduplicate
+    unique_vars = deduplicate_variables(variables)
+    console.print(f"Found {len(unique_vars)} unique variable(s)")
+
+    # Count required vs optional
+    required_count = sum(1 for v in unique_vars.values() if v.required)
+    optional_count = len(unique_vars) - required_count
+
+    console.print(f"\nGenerating {output}...\n")
+
+    # Generate TOML content
+    lines = [
+        "# Auto-generated by TripWire schema from-code",
+        f"# Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        "# Review and customize this schema for your project",
+        "",
+        "[project]",
+        'name = "your-project"',
+        'version = "0.1.0"',
+        'description = "Generated from code scanning"',
+        "",
+        "[validation]",
+        "strict = true",
+        "allow_missing_optional = true",
+        "",
+        "[security]",
+        "entropy_threshold = 4.5",
+        "scan_git_history = true",
+        "",
+        "# Variables discovered from code",
+        "",
+    ]
+
+    # Add variables sorted by name
+    # Type mapping from Python types to schema types
+    TYPE_MAPPING = {
+        "str": "string",
+        "int": "int",
+        "float": "float",
+        "bool": "bool",
+        "list": "list",
+        "dict": "dict",
+    }
+
+    for var_name in sorted(unique_vars.keys()):
+        var = unique_vars[var_name]
+
+        lines.append(f"[variables.{var_name}]")
+
+        # Type - map Python types to schema types
+        schema_type = TYPE_MAPPING.get(var.var_type, "string")
+        lines.append(f'type = "{schema_type}"')
+
+        # Required
+        lines.append(f"required = {str(var.required).lower()}")
+
+        # Default
+        if var.default is not None:
+            if isinstance(var.default, str):
+                lines.append(f'default = "{var.default}"')
+            elif isinstance(var.default, bool):
+                lines.append(f"default = {str(var.default).lower()}")
+            else:
+                lines.append(f"default = {var.default}")
+
+        # Description
+        if var.description:
+            # Escape quotes in description
+            desc = var.description.replace('"', '\\"')
+            lines.append(f'description = "{desc}"')
+
+        # Secret
+        if var.secret:
+            lines.append("secret = true")
+
+        # Format
+        if var.format:
+            lines.append(f'format = "{var.format}"')
+
+        # Pattern
+        if var.pattern:
+            # Escape backslashes for TOML
+            pattern = var.pattern.replace("\\", "\\\\")
+            lines.append(f'pattern = "{pattern}"')
+
+        # Choices
+        if var.choices:
+            choices_str = ", ".join(f'"{c}"' for c in var.choices)
+            lines.append(f"choices = [{choices_str}]")
+
+        # Min/Max
+        if var.min_val is not None:
+            lines.append(f"min = {var.min_val}")
+        if var.max_val is not None:
+            lines.append(f"max = {var.max_val}")
+
+        # Add source comment
+        lines.append(f"# Found in: {var.file_path}:{var.line_number}")
+
+        lines.append("")  # Blank line between variables
+
+    generated_content = "\n".join(lines)
+
+    # Dry-run mode: show preview and return
+    if dry_run:
+        console.print("\n[cyan]Preview of generated schema:[/cyan]\n")
+        console.print(f"[dim]{generated_content[:500]}...[/dim]")  # Show first 500 chars
+        console.print(f"\n[yellow]Found {len(unique_vars)} variable(s):[/yellow]")
+        console.print(f"  - {required_count} required")
+        console.print(f"  - {optional_count} optional")
+        console.print(f"\n[cyan]To create the file, run without --dry-run[/cyan]")
+        return
+
+    # Write file
+    output_path.write_text(generated_content)
+
+    status = get_status_icon("valid")
+    console.print(f"{status} [green]Generated {output} with {len(unique_vars)} variable(s)[/green]")
+    console.print(f"  - {required_count} required")
+    console.print(f"  - {optional_count} optional")
+
+    # Auto-validate the generated schema
+    console.print("\n[yellow]Validating generated schema...[/yellow]")
+
+    try:
+        # Call schema_check to validate the generated file
+        ctx = click.get_current_context()
+        ctx.invoke(schema_check, schema_file=output)
+    except Exception as e:
+        console.print(f"[red]Schema validation failed:[/red] {e}")
+        console.print("\n[cyan]Next:[/cyan]")
+        console.print(f"  1. Review {output} and fix validation errors")
+        console.print("  2. Run: [cyan]tripwire schema check[/cyan]")
+        sys.exit(1)
+
+    console.print("\n[cyan]Next:[/cyan]")
+    console.print(f"  • Review {output} and customize as needed")
+    console.print("  • Run [cyan]tripwire schema validate[/cyan] to check against your .env files")
+    console.print("  • Run [cyan]tripwire schema to-example[/cyan] to generate .env.example")
+
+
+@schema.command("from-example")
+@click.option(
+    "--source",
+    type=click.Path(exists=True),
+    default=".env.example",
+    help="Source .env.example file to convert",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    default=".tripwire.toml",
+    help="Output schema file",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Overwrite existing file",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Preview without creating file",
+)
+def schema_from_example(source: str, output: str, force: bool, dry_run: bool) -> None:
+    """Create schema FROM .env.example file.
+
+    Converts .env.example placeholders to .tripwire.toml schema
+    definitions with type inference and validation rules.
+
+    Examples:
+        tripwire schema from-example                 # Convert .env.example
+        tripwire schema from-example --dry-run       # Preview first
+        tripwire schema from-example --source .env.template
+    """
+    import tomli_w
+
+    source_path = Path(source)
+    output_path = Path(output)
+
+    # Check if source exists
+    if not source_path.exists():
+        console.print(f"[red]Error:[/red] Source file {source} does not exist")
+        console.print("[yellow]Tip:[/yellow] Use --source to specify a different file")
+        sys.exit(1)
+
+    # Security check: Warn if migrating from .env (not .env.example)
+    is_real_env = source_path.name == ".env" or (
+        source_path.name.startswith(".env.") and not source_path.name.endswith(".example")
+    )
+
+    if is_real_env:
+        console.print("[bold red]WARNING: Source file appears to be a real environment file![/bold red]")
+        console.print()
+        console.print(".env files contain real secrets that should NOT be in schema defaults.")
+        console.print("Schema files (.tripwire.toml) are meant to be committed to git.")
+        console.print()
+        console.print("[yellow]Recommendation:[/yellow] Create .env.example first with placeholder values:")
+        console.print("  1. Copy .env to .env.example: [cyan]cp .env .env.example[/cyan]")
+        console.print("  2. Replace secret values with placeholders (e.g., 'your-api-key-here')")
+        console.print("  3. Run: [cyan]tripwire schema from-example[/cyan]")
+        console.print()
+        console.print("[yellow]Alternative:[/yellow] Use [cyan]tripwire schema from-code[/cyan] to scan code instead")
+        console.print()
+        console.print("[bold yellow]Secret values will be excluded from schema for security.[/bold yellow]")
+        console.print()
+
+        if not click.confirm("Continue anyway?", default=False):
+            console.print("[yellow]Migration cancelled[/yellow]")
+            sys.exit(0)
+
+    # Check if output exists (unless dry-run)
+    if not dry_run and output_path.exists() and not force:
+        console.print(f"[red]Error:[/red] {output} already exists. Use --force to overwrite.")
+        sys.exit(1)
+
+    console.print(f"[yellow]Converting {source} to {output}...[/yellow]")
+
+    # Parse .env.example file
+    env_vars: dict[str, dict[str, Any]] = {}
+    pending_comment: str | None = None
+
+    try:
+        with open(source_path) as f:
+            for line in f:
+                line_stripped = line.strip()
+
+                if not line_stripped:
+                    continue
+
+                # Handle comments
+                if line_stripped.startswith("#"):
+                    comment_text = line_stripped[1:].strip()
+
+                    if not comment_text or comment_text.startswith("="):
+                        continue
+
+                    # Detect section headers
+                    is_section_header = (
+                        len(comment_text.split()) <= 4
+                        and not any(c in comment_text for c in [",", ":", ";", "."])
+                        and comment_text[0].isupper()
+                    )
+
+                    if not is_section_header:
+                        pending_comment = comment_text
+                    continue
+
+                # Handle variable declarations
+                if "=" in line_stripped:
+                    parts = line_stripped.split("=", 1)
+                    var_name = parts[0].strip()
+                    value = parts[1].strip() if len(parts) > 1 else ""
+
+                    current_var = {
+                        "type": "string",
+                        "required": True,
+                        "description": pending_comment or "",
+                    }
+
+                    pending_comment = None
+
+                    # Type inference from value
+                    if value:
+                        current_var["type"], current_var["default"] = _infer_type_and_default(value)
+
+                        if _is_placeholder(value):
+                            current_var.pop("default", None)
+                            current_var["required"] = True
+
+                        # Detect format validators
+                        format_type = _detect_format(var_name, value)
+                        if format_type:
+                            current_var["format"] = format_type
+
+                        # Detect secrets
+                        if _is_secret(var_name, value):
+                            current_var["secret"] = True
+
+                    else:
+                        current_var["required"] = True
+
+                    env_vars[var_name] = current_var
+
+    except Exception as e:
+        console.print(f"[red]Error reading {source}:[/red] {e}")
+        sys.exit(1)
+
+    if not env_vars:
+        console.print("[yellow]No variables found in source file[/yellow]")
+        sys.exit(1)
+
+    # Build TOML structure
+    toml_data: dict[str, Any] = {
+        "project": {
+            "name": Path.cwd().name,
+            "description": "Environment variable schema",
+        },
+        "variables": {},
+    }
+
+    # Convert variables to TOML format
+    for var_name, var_data in env_vars.items():
+        toml_var: dict[str, Any] = {"type": var_data["type"]}
+
+        if var_data.get("required", False):
+            toml_var["required"] = True
+
+        is_secret = var_data.get("secret", False)
+
+        if "default" in var_data:
+            if not is_secret or not is_real_env:
+                toml_var["default"] = var_data["default"]
+
+        if var_data.get("description"):
+            toml_var["description"] = var_data["description"]
+
+        if is_secret:
+            toml_var["secret"] = True
+
+        if var_data.get("format"):
+            toml_var["format"] = var_data["format"]
+
+        toml_data["variables"][var_name] = toml_var
+
+    # Dry-run mode: show preview
+    if dry_run:
+        required_count = sum(1 for v in env_vars.values() if v.get("required", False))
+        optional_count = len(env_vars) - required_count
+        secret_count = sum(1 for v in env_vars.values() if v.get("secret", False))
+
+        console.print(f"\n[cyan]Preview of schema from {source}:[/cyan]\n")
+        console.print(f"[yellow]Found {len(env_vars)} variable(s):[/yellow]")
+        if required_count:
+            console.print(f"  - {required_count} required")
+        if optional_count:
+            console.print(f"  - {optional_count} optional")
+        if secret_count:
+            console.print(f"  - {secret_count} secret(s) detected")
+
+        console.print(f"\n[cyan]Inferred types:[/cyan]")
+        for var_name, var_data in list(env_vars.items())[:5]:  # Show first 5
+            var_type = var_data["type"]
+            has_default = "default" in var_data
+            console.print(f"  • {var_name}: {var_type}" + (" (with default)" if has_default else ""))
+        if len(env_vars) > 5:
+            console.print(f"  ... and {len(env_vars) - 5} more")
+
+        console.print(f"\n[cyan]To create {output}, run without --dry-run[/cyan]")
+        return
+
+    # Write TOML file
+    try:
+        with open(output_path, "wb") as f:
+            tomli_w.dump(toml_data, f)
+
+        console.print(f"[green][OK][/green] Created {output} with {len(env_vars)} variable(s)")
+
+        # Show statistics
+        required_count = sum(1 for v in env_vars.values() if v.get("required", False))
+        optional_count = len(env_vars) - required_count
+        secret_count = sum(1 for v in env_vars.values() if v.get("secret", False))
+
+        if required_count:
+            console.print(f"  - {required_count} required")
+        if optional_count:
+            console.print(f"  - {optional_count} optional")
+        if secret_count:
+            console.print(f"  - {secret_count} secret(s)")
+
+        console.print("\n[cyan]Next:[/cyan]")
+        console.print(f"  • Review {output} and adjust types/validation rules")
+        console.print("  • Run [cyan]tripwire schema validate[/cyan] to check your .env")
+        console.print("  • Run [cyan]tripwire schema to-env[/cyan] to generate .env from schema")
+
+    except Exception as e:
+        console.print(f"[red]Error writing {output}:[/red] {e}")
+        sys.exit(1)
+
+
+@schema.command("check")
+@click.option(
+    "--schema-file",
+    type=click.Path(exists=True),
+    default=".tripwire.toml",
+    help="Schema file to validate",
+)
+def schema_check(schema_file: str) -> None:
+    """Validate .tripwire.toml syntax and structure.
+
+    Checks that the schema file is valid TOML, all format validators
+    exist, and environment references are valid.
+    """
+    import tomllib
+
+    from rich.table import Table
+
+    schema_path = Path(schema_file)
+
+    if not schema_path.exists():
+        console.print(f"[red]Error:[/red] Schema file not found: {schema_file}")
+        console.print("Run [cyan]tripwire schema new[/cyan] to create one")
+        sys.exit(1)
+
+    console.print(f"\nChecking [cyan]{schema_file}[/cyan]...\n")
+
+    errors = []
+    warnings = []
+
+    # Check 1: TOML syntax
+    try:
+        with open(schema_path, "rb") as f:
+            data = tomllib.load(f)
+        status = get_status_icon("valid")
+        console.print(f"{status} TOML syntax is valid")
+    except tomllib.TOMLDecodeError as e:
+        status = get_status_icon("invalid")
+        console.print(f"{status} TOML syntax error: {e}")
+        errors.append(f"TOML syntax error: {e}")
+        # Can't continue if TOML is invalid
+        console.print(f"\n[red][X][/red] Schema validation failed")
+        console.print(f"  {len(errors)} error(s) found\n")
+        console.print("Fix TOML syntax errors and run again.")
+        sys.exit(1)
+
+    # Check 2: Schema structure (required sections)
+    has_structure_error = False
+    if "project" not in data:
+        warnings.append("Missing [project] section (recommended)")
+
+    if "variables" not in data:
+        errors.append("Missing [variables] section - no variables defined")
+        has_structure_error = True
+
+    if not has_structure_error:
+        status = get_status_icon("valid")
+        console.print(f"{status} Schema structure is valid")
+    else:
+        status = get_status_icon("invalid")
+        console.print(f"{status} Schema structure issues found")
+
+    # Check 3: Format validators
+    valid_formats = {"email", "url", "postgresql", "uuid", "ipv4"}
+    format_errors = []
+
+    if "variables" in data:
+        for var_name, var_config in data["variables"].items():
+            if "format" in var_config:
+                fmt = var_config["format"]
+                if fmt not in valid_formats:
+                    format_errors.append(
+                        f"variables.{var_name}: Unknown format '{fmt}' " f"(valid: {', '.join(sorted(valid_formats))})"
+                    )
+
+    if not format_errors:
+        status = get_status_icon("valid")
+        console.print(f"{status} All format validators exist")
+    else:
+        status = get_status_icon("invalid")
+        console.print(f"{status} Format validator issues found")
+        errors.extend(format_errors)
+
+    # Check 4: Type values
+    valid_types = {"string", "int", "float", "bool", "list", "dict"}
+    type_errors = []
+
+    if "variables" in data:
+        for var_name, var_config in data["variables"].items():
+            if "type" in var_config:
+                var_type = var_config["type"]
+                if var_type not in valid_types:
+                    type_errors.append(
+                        f"variables.{var_name}: Unknown type '{var_type}' " f"(valid: {', '.join(sorted(valid_types))})"
+                    )
+
+    if not type_errors:
+        status = get_status_icon("valid")
+        console.print(f"{status} All type values are valid")
+    else:
+        status = get_status_icon("invalid")
+        console.print(f"{status} Type value issues found")
+        errors.extend(type_errors)
+
+    # Check 5: Environment references
+    env_errors = []
+    defined_vars = set(data.get("variables", {}).keys())
+
+    if "environments" in data:
+        for env_name, env_config in data["environments"].items():
+            if isinstance(env_config, dict):
+                for var_name in env_config.keys():
+                    # Skip special keys like strict_secrets
+                    if var_name.startswith("strict_"):
+                        continue
+                    if var_name not in defined_vars:
+                        env_errors.append(f"environments.{env_name}.{var_name}: " f"References undefined variable")
+
+    if not env_errors:
+        status = get_status_icon("valid")
+        console.print(f"{status} Environment references are valid")
+    else:
+        status = get_status_icon("invalid")
+        console.print(f"{status} Environment reference issues found")
+        errors.extend(env_errors)
+
+    # Check 6: Best practices
+    if "variables" in data:
+        for var_name, var_config in data["variables"].items():
+            if "description" not in var_config or not var_config["description"]:
+                warnings.append(f"variables.{var_name}: Missing description (best practice)")
+
+            if var_config.get("secret") and "examples" in var_config:
+                warnings.append(f"variables.{var_name}: Secret variable has examples " "(avoid showing real secrets)")
+
+    # Display errors and warnings
+    console.print()
+
+    if errors:
+        table = Table(title="Errors", show_header=True, header_style="bold red")
+        table.add_column("Error", style="red")
+
+        for error in errors:
+            table.add_row(error)
+
+        console.print(table)
+        console.print()
+
+    if warnings:
+        table = Table(title="Warnings", show_header=True, header_style="bold yellow")
+        table.add_column("Warning", style="yellow")
+
+        for warning in warnings[:10]:  # Limit to 10 warnings
+            table.add_row(warning)
+
+        if len(warnings) > 10:
+            console.print(f"\n  ... and {len(warnings) - 10} more warning(s)")
+
+        console.print(table)
+        console.print()
+
+    # Summary
+    if errors:
+        status = get_status_icon("invalid")
+        console.print(f"{status} [red]Schema validation failed[/red]")
+        console.print(f"  {len(errors)} error(s) found")
+        if warnings:
+            console.print(f"  {len(warnings)} warning(s)")
+        console.print("\nFix these issues and run again.")
+        sys.exit(1)
+    else:
+        status = get_status_icon("valid")
+        console.print(f"{status} [green]Schema is valid[/green]")
+        if warnings:
+            console.print(f"  {len(warnings)} warning(s) (non-blocking)")
+
+
+@schema.command("to-env")
+@click.option(
+    "--environment",
+    "-e",
+    default="development",
+    help="Environment name (development, staging, production)",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    help="Output .env file [default: .env.{environment}]",
+)
+@click.option(
+    "--schema-file",
+    type=click.Path(exists=True),
+    default=".tripwire.toml",
+    help="Schema file to generate from",
+)
+@click.option(
+    "--interactive",
+    "-i",
+    is_flag=True,
+    help="Prompt for secret values",
+)
+@click.option(
+    "--overwrite",
+    is_flag=True,
+    help="Overwrite existing file",
+)
+@click.option(
+    "--validate",
+    is_flag=True,
+    default=True,
+    help="Validate after generation [default: true]",
+)
+@click.option(
+    "--format-output",
+    type=click.Choice(["env", "json", "yaml"]),
+    default="env",
+    help="Output format",
+)
+def schema_to_env(
+    environment: str,
+    output: Optional[str],
+    schema_file: str,
+    interactive: bool,
+    overwrite: bool,
+    validate: bool,
+    format_output: str,
+) -> None:
+    """Export schema TO .env file.
+
+    Creates a .env file for a specific environment using defaults
+    from .tripwire.toml. Optionally prompts for secret values.
+
+    Examples:
+        tripwire schema to-env --environment production
+        tripwire schema to-env -e staging -i         # Interactive mode
+        tripwire schema to-env -e prod --output /tmp/.env.prod
+    """
+    import json
+
+    from tripwire.schema import load_schema, validate_with_schema
+
+    schema_path = Path(schema_file)
+    if not schema_path.exists():
+        console.print(f"[red]Error:[/red] Schema file not found: {schema_file}")
+        console.print("Run [cyan]tripwire schema new[/cyan] to create one")
+        sys.exit(1)
+
+    # Determine output path
+    if not output:
+        output = f".env.{environment}"
+    output_path = Path(output)
+
+    if output_path.exists() and not overwrite:
+        console.print(f"[red]Error:[/red] {output} already exists")
+        console.print("Use --overwrite to replace it")
+        sys.exit(1)
+
+    console.print(f"[yellow]Generating {output} from {schema_file}...[/yellow]\n")
+    console.print(f"Environment: [cyan]{environment}[/cyan]\n")
+
+    # Load schema
+    schema = load_schema(schema_path)
+    if not schema:
+        console.print("[red]Error:[/red] Failed to load schema")
+        sys.exit(1)
+
+    # Check if schema has variables defined
+    if not schema.variables:
+        console.print("[yellow][!]  No variables defined in .tripwire.toml yet[/yellow]")
+        console.print()
+        console.print("[bold]To get started:[/bold]")
+        console.print("  1. Edit .tripwire.toml and uncomment example variables, or")
+        console.print("  2. Add your own variable definitions, or")
+        console.print("  3. Import from code: [cyan]tripwire schema from-code[/cyan]")
+        console.print()
+        console.print("[bold]Example variable definition:[/bold]")
+        console.print()
+        console.print("[cyan][variables.DATABASE_URL]")
+        console.print('type = "string"')
+        console.print("required = true")
+        console.print('format = "postgresql"')
+        console.print('description = "Database connection URL"[/cyan]')
+        console.print()
+        sys.exit(1)
+
+    # Generate content
+    if format_output == "env":
+        env_content, needs_input = schema.generate_env_for_environment(
+            environment=environment,
+            interactive=interactive,
+        )
+
+        # Interactive mode: prompt for values
+        if interactive and needs_input:
+            console.print("[bold cyan]Please provide values for the following variables:[/bold cyan]\n")
+
+            # Build replacements for PROMPT_ME placeholders
+            replacements = {}
+            for var_name, description in needs_input:
+                var_schema = schema.variables.get(var_name)
+                is_secret = var_schema.secret if var_schema else False
+
+                if is_secret:
+                    value = click.prompt(
+                        f"{var_name} ({description})",
+                        hide_input=True,
+                        default="",
+                        show_default=False,
+                    )
+                else:
+                    value = click.prompt(
+                        f"{var_name} ({description})",
+                        default="",
+                        show_default=False,
+                    )
+
+                replacements[var_name] = value
+
+            # Replace PROMPT_ME values
+            for var_name, value in replacements.items():
+                env_content = env_content.replace(f"{var_name}=PROMPT_ME", f"{var_name}={value}")
+
+            console.print()
+
+        # Write file
+        output_path.write_text(env_content)
+
+        status = get_status_icon("valid")
+        console.print(f"{status} [green]Generated {output}[/green]")
+
+        # Count variables
+        required_count = len([v for v in schema.variables.values() if v.required])
+        optional_count = len([v for v in schema.variables.values() if not v.required])
+
+        console.print(f"  - {required_count} required variable(s)")
+        console.print(f"  - {optional_count} optional variable(s)")
+
+        # Show variables requiring manual input
+        if needs_input and not interactive:
+            console.print(f"\n[yellow]Variables requiring manual input:[/yellow]")
+            for var_name, description in needs_input:
+                console.print(f"  - {var_name}: {description or 'No description'}")
+
+    elif format_output == "json":
+        # Generate JSON format
+        env_defaults = schema.get_defaults(environment)
+        json_content = json.dumps(env_defaults, indent=2)
+        output_path.write_text(json_content)
+
+        console.print(f"[green][OK][/green] Generated {output} (JSON format)")
+
+    elif format_output == "yaml":
+        try:
+            import yaml
+        except ImportError:
+            console.print("[red]Error:[/red] PyYAML not installed")
+            console.print("Install it with: [cyan]pip install pyyaml[/cyan]")
+            sys.exit(1)
+
+        # Generate YAML format
+        env_defaults = schema.get_defaults(environment)
+        yaml_content = yaml.dump(env_defaults, default_flow_style=False)
+        output_path.write_text(yaml_content)
+
+        console.print(f"[green][OK][/green] Generated {output} (YAML format)")
+
+    # Validate after generation
+    if validate and format_output == "env":
+        console.print(f"\n[yellow]Validating generated file...[/yellow]")
+
+        is_valid, errors = validate_with_schema(output_path, schema_path, environment)
+
+        if is_valid:
+            status = get_status_icon("valid")
+            console.print(f"{status} [green]Validation passed![/green]")
+        else:
+            status = get_status_icon("invalid")
+            console.print(f"{status} [yellow]Validation warnings:[/yellow]")
+            for error in errors:
+                console.print(f"  - {error}")
+
+    console.print("\n[bold cyan]Next steps:[/bold cyan]")
+    console.print(f"  1. Review {output} and fill in any missing values")
+    if format_output == "env":
+        console.print(
+            f"  2. Validate: [cyan]tripwire schema validate --env-file {output} --environment {environment}[/cyan]"
+        )
+
+
+@schema.command("to-docs")
+@click.option(
+    "--schema-file",
+    type=click.Path(exists=True),
+    default=".tripwire.toml",
+    help="Schema file to document",
+)
+@click.option(
+    "--format",
+    type=click.Choice(["markdown", "html"]),
+    default="markdown",
+    help="Output format",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    help="Output file (default: stdout)",
+)
+def schema_to_docs(schema_file: str, format: str, output: Optional[str]) -> None:
+    """Export schema TO documentation.
+
+    Creates comprehensive documentation for your environment variables
+    based on the schema definitions in .tripwire.toml.
+
+    Examples:
+        tripwire schema to-docs                    # Output to stdout
+        tripwire schema to-docs --output ENV.md    # Save to file
+        tripwire schema to-docs --format html      # HTML output
+    """
+    from tripwire.schema import load_schema
+
+    schema_path = Path(schema_file)
+    if not schema_path.exists():
+        console.print(f"[red]Error:[/red] Schema file not found: {schema_file}")
+        sys.exit(1)
+
+    console.print(f"[yellow]Generating documentation from {schema_file}...[/yellow]\n")
+
+    schema = load_schema(schema_path)
+    if not schema:
+        console.print("[red]Error:[/red] Failed to load schema")
+        sys.exit(1)
+
+    # Generate markdown documentation
+    lines = [
+        f"# {schema.project_name or 'Project'} - Environment Variables",
+        "",
+        f"{schema.project_description}" if schema.project_description else "",
+        "",
+        "## Required Variables",
+        "",
+    ]
+
+    required_vars = [v for v in schema.variables.values() if v.required]
+    optional_vars = [v for v in schema.variables.values() if not v.required]
+
+    if required_vars:
+        lines.append("| Variable | Type | Description | Validation |")
+        lines.append("|----------|------|-------------|------------|")
+
+        for var in sorted(required_vars, key=lambda v: v.name):
+            validation_parts = []
+            if var.format:
+                validation_parts.append(f"Format: {var.format}")
+            if var.pattern:
+                validation_parts.append(f"Pattern: `{var.pattern}`")
+            if var.choices:
+                validation_parts.append(f"Choices: {', '.join(var.choices)}")
+            if var.min is not None or var.max is not None:
+                range_str = f"Range: {var.min or '-∞'} to {var.max or '∞'}"
+                validation_parts.append(range_str)
+
+            validation_str = "; ".join(validation_parts) if validation_parts else "-"
+            lines.append(f"| `{var.name}` | {var.type} | {var.description or '-'} | {validation_str} |")
+    else:
+        lines.append("*No required variables defined*")
+
+    lines.extend(["", "## Optional Variables", ""])
+
+    if optional_vars:
+        lines.append("| Variable | Type | Default | Description | Validation |")
+        lines.append("|----------|------|---------|-------------|------------|")
+
+        for var in sorted(optional_vars, key=lambda v: v.name):
+            validation_parts = []
+            if var.format:
+                validation_parts.append(f"Format: {var.format}")
+            if var.pattern:
+                validation_parts.append(f"Pattern: `{var.pattern}`")
+            if var.choices:
+                validation_parts.append(f"Choices: {', '.join(var.choices)}")
+
+            validation_str = "; ".join(validation_parts) if validation_parts else "-"
+            default_str = str(var.default) if var.default is not None else "-"
+
+            lines.append(
+                f"| `{var.name}` | {var.type} | `{default_str}` | {var.description or '-'} | {validation_str} |"
+            )
+    else:
+        lines.append("*No optional variables defined*")
+
+    lines.extend(
+        [
+            "",
+            "## Environments",
+            "",
+        ]
+    )
+
+    if schema.environments:
+        for env_name in sorted(schema.environments.keys()):
+            lines.append(f"### {env_name}")
+            lines.append("")
+            env_vars = schema.environments[env_name]
+            if env_vars:
+                for var_name, value in env_vars.items():
+                    lines.append(f"- `{var_name}`: `{value}`")
+            else:
+                lines.append("*No environment-specific settings*")
+            lines.append("")
+    else:
+        lines.append("*No environment-specific configurations*")
+
+    doc_content = "\n".join(lines)
+
+    if output:
+        output_path = Path(output)
+        output_path.write_text(doc_content)
+        console.print(f"[green][OK][/green] Documentation written to {output}")
+    else:
+        if format == "markdown":
+            from rich.markdown import Markdown
+
+            console.print(Markdown(doc_content))
+        else:
+            print(doc_content)
+
+
+@schema.command("diff")
+@click.argument("schema1", type=click.Path(exists=True))
+@click.argument("schema2", type=click.Path(exists=True))
+@click.option(
+    "--output-format",
+    type=click.Choice(["table", "json", "markdown"]),
+    default="table",
+    help="Output format",
+)
+@click.option(
+    "--show-non-breaking",
+    is_flag=True,
+    help="Include non-breaking changes",
+)
+def schema_diff(schema1: str, schema2: str, output_format: str, show_non_breaking: bool) -> None:
+    """Compare two schema files and show differences.
+
+    Shows added, removed, and modified variables between schema versions.
+    Highlights breaking changes that require migration.
+
+    Examples:
+
+        tripwire schema diff .tripwire.toml .tripwire.toml.old
+
+        tripwire schema diff schema-v1.toml schema-v2.toml --output-format json
+    """
+    import json
+
+    from rich.table import Table
+
+    from tripwire.schema import TripWireSchema
+    from tripwire.schema_diff import compare_schemas
+
+    console.print(f"\n[bold cyan]Schema Diff: {schema1} vs {schema2}[/bold cyan]\n")
+
+    # Load schemas
+    try:
+        old_schema = TripWireSchema.from_toml(schema1)
+        new_schema = TripWireSchema.from_toml(schema2)
+    except Exception as e:
+        console.print(f"[red]Error loading schemas:[/red] {e}")
+        sys.exit(1)
+
+    # Compare
+    diff = compare_schemas(old_schema, new_schema)
+
+    if output_format == "json":
+        # JSON output
+        result = {
+            "added": [
+                {
+                    "variable": c.variable_name,
+                    "required": c.new_schema.required if c.new_schema else False,
+                    "type": c.new_schema.type if c.new_schema else "unknown",
+                    "breaking": c.breaking,
+                }
+                for c in diff.added_variables
+            ],
+            "removed": [
+                {
+                    "variable": c.variable_name,
+                    "was_required": c.old_schema.required if c.old_schema else False,
+                    "type": c.old_schema.type if c.old_schema else "unknown",
+                    "breaking": c.breaking,
+                }
+                for c in diff.removed_variables
+            ],
+            "modified": [
+                {
+                    "variable": c.variable_name,
+                    "changes": c.changes,
+                    "breaking": c.breaking,
+                }
+                for c in diff.modified_variables
+            ],
+            "summary": diff.summary(),
+        }
+        print(json.dumps(result, indent=2))
+        return
+
+    if output_format == "markdown":
+        # Markdown output
+        lines = [
+            f"# Schema Diff: {schema1} vs {schema2}",
+            "",
+        ]
+
+        if diff.added_variables:
+            lines.append("## Added Variables")
+            lines.append("")
+            lines.append("| Variable | Type | Required | Breaking |")
+            lines.append("|----------|------|----------|----------|")
+            for change in diff.added_variables:
+                schema_type = change.new_schema.type if change.new_schema else "unknown"
+                schema_required = change.new_schema.required if change.new_schema else False
+                lines.append(
+                    f"| `{change.variable_name}` | {schema_type} | "
+                    f"{'Yes' if schema_required else 'No'} | "
+                    f"{'Yes' if change.breaking else 'No'} |"
+                )
+            lines.append("")
+
+        if diff.removed_variables:
+            lines.append("## Removed Variables")
+            lines.append("")
+            lines.append("| Variable | Type | Was Required | Breaking |")
+            lines.append("|----------|------|--------------|----------|")
+            for change in diff.removed_variables:
+                schema_type = change.old_schema.type if change.old_schema else "unknown"
+                schema_required = change.old_schema.required if change.old_schema else False
+                lines.append(
+                    f"| `{change.variable_name}` | {schema_type} | "
+                    f"{'Yes' if schema_required else 'No'} | "
+                    f"{'Yes' if change.breaking else 'No'} |"
+                )
+            lines.append("")
+
+        if diff.modified_variables:
+            lines.append("## Modified Variables")
+            lines.append("")
+            for change in diff.modified_variables:
+                lines.append(f"### `{change.variable_name}`")
+                lines.append("")
+                for desc in change.changes:
+                    lines.append(f"- {desc}")
+                if change.breaking:
+                    lines.append(f"- **Breaking**: {', '.join(r.value for r in change.breaking_reasons)}")
+                lines.append("")
+
+        print("\n".join(lines))
+        return
+
+    # Table output (default)
+    summary = diff.summary()
+
+    # Added variables
+    if diff.added_variables:
+        table = Table(title="Added Variables", show_header=True, header_style="bold green")
+        table.add_column("Variable", style="green")
+        table.add_column("Type")
+        table.add_column("Required")
+        table.add_column("Description")
+
+        for change in diff.added_variables:
+            schema_type = change.new_schema.type if change.new_schema else "unknown"
+            schema_required = change.new_schema.required if change.new_schema else False
+            schema_desc = change.new_schema.description if change.new_schema else "-"
+            table.add_row(
+                change.variable_name,
+                schema_type,
+                "Yes" if schema_required else "No",
+                schema_desc or "-",
+            )
+
+        console.print(table)
+        console.print()
+
+    # Removed variables
+    if diff.removed_variables:
+        table = Table(title="Removed Variables", show_header=True, header_style="bold red")
+        table.add_column("Variable", style="red")
+        table.add_column("Type")
+        table.add_column("Was Required")
+        table.add_column("Description")
+
+        for change in diff.removed_variables:
+            schema_type = change.old_schema.type if change.old_schema else "unknown"
+            schema_required = change.old_schema.required if change.old_schema else False
+            schema_desc = change.old_schema.description if change.old_schema else "-"
+            table.add_row(
+                change.variable_name,
+                schema_type,
+                "Yes" if schema_required else "No",
+                schema_desc or "-",
+            )
+
+        console.print(table)
+        console.print()
+
+    # Modified variables
+    if diff.modified_variables:
+        table = Table(title="Modified Variables", show_header=True, header_style="bold yellow")
+        table.add_column("Variable", style="yellow")
+        table.add_column("Changes")
+
+        for change in diff.modified_variables:
+            if not show_non_breaking and not change.breaking:
+                continue
+
+            changes_text = "\n".join(change.changes)
+            table.add_row(change.variable_name, changes_text)
+
+        console.print(table)
+        console.print()
+
+    # Breaking changes warning
+    if diff.has_breaking_changes:
+        console.print("[bold red]Breaking Changes Detected:[/bold red]")
+        for change in diff.breaking_changes:
+            console.print(f"  - {change.variable_name}: {', '.join(change.changes)}")
+        console.print()
+
+    # Summary
+    console.print(f"[bold]Summary:[/bold]")
+    console.print(f"  Added: {summary['added']}")
+    console.print(f"  Removed: {summary['removed']}")
+    console.print(f"  Modified: {summary['modified']}")
+    console.print(f"  Unchanged: {summary['unchanged']}")
+    console.print(f"  Breaking: {summary['breaking']}")
+
+    if diff.has_breaking_changes:
+        console.print("\n[yellow]Migration recommended:[/yellow]")
+        console.print(f"  Run: [cyan]tripwire schema upgrade --from {schema1} --to {schema2}[/cyan]")
+
+
+@schema.command("upgrade")
+@click.option(
+    "--from",
+    "from_schema",
+    type=click.Path(exists=True),
+    required=True,
+    help="Old schema file",
+)
+@click.option(
+    "--to",
+    "to_schema",
+    type=click.Path(exists=True),
+    required=True,
+    help="New schema file",
+)
+@click.option(
+    "--env-file",
+    type=click.Path(exists=True),
+    default=".env",
+    help=".env file to migrate",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show migration plan without applying",
+)
+@click.option(
+    "--interactive",
+    "-i",
+    is_flag=True,
+    help="Confirm each change",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Apply even with breaking changes",
+)
+@click.option(
+    "--backup/--no-backup",
+    default=True,
+    help="Create backup before migration",
+)
+def schema_upgrade(
+    from_schema: str,
+    to_schema: str,
+    env_file: str,
+    dry_run: bool,
+    interactive: bool,
+    force: bool,
+    backup: bool,  # noqa: ARG001 - Parameter defined by Click decorator
+) -> None:
+    """Upgrade .env between schema versions.
+
+    Updates .env file to match new schema, adding missing variables,
+    removing deprecated ones, and converting types where possible.
+
+    Examples:
+        tripwire schema upgrade --from old.toml --to new.toml
+        tripwire schema upgrade --from old.toml --to new.toml --dry-run
+        tripwire schema upgrade --from old.toml --to new.toml --force
+    """
+    from tripwire.schema_diff import create_migration_plan
+
+    console.print(f"[bold cyan]Migrating {env_file} from schema {from_schema} to {to_schema}...[/bold cyan]\n")
+
+    # Create migration plan
+    try:
+        plan = create_migration_plan(
+            old_schema_path=Path(from_schema),
+            new_schema_path=Path(to_schema),
+            env_file_path=Path(env_file),
+        )
+    except Exception as e:
+        console.print(f"[red]Error creating migration plan:[/red] {e}")
+        sys.exit(1)
+
+    # Check for breaking changes
+    if plan.diff.has_breaking_changes and not force:
+        console.print("[red]Breaking changes detected:[/red]")
+        for change in plan.diff.breaking_changes:
+            console.print(f"  - {change.variable_name}: {', '.join(change.changes)}")
+        console.print()
+        console.print("[yellow]Use --force to proceed with migration[/yellow]")
+        sys.exit(1)
+
+    # Show changes
+    console.print("[bold]Changes to apply:[/bold]\n")
+
+    if plan.diff.added_variables:
+        console.print("[green]Added variables:[/green]")
+        for change in plan.diff.added_variables:
+            if change.new_schema and change.new_schema.default is not None:
+                console.print(f"  + {change.variable_name} (default: {change.new_schema.default})")
+            else:
+                console.print(f"  + {change.variable_name} (needs value)")
+
+    if plan.diff.removed_variables:
+        console.print("\n[red]Removed variables:[/red]")
+        for change in plan.diff.removed_variables:
+            console.print(f"  - {change.variable_name}")
+
+    if plan.diff.modified_variables:
+        console.print("\n[yellow]Modified variables:[/yellow]")
+        for change in plan.diff.modified_variables:
+            console.print(f"  ~ {change.variable_name}: {', '.join(change.changes)}")
+
+    console.print()
+
+    # Dry run mode
+    if dry_run:
+        console.print("[yellow]Dry run - no changes applied[/yellow]")
+        console.print("Run without --dry-run to apply changes")
+        return
+
+    # Interactive confirmation
+    if interactive:
+        if not click.confirm("Apply these changes?"):
+            console.print("Migration cancelled")
+            return
+
+    # Execute migration
+    success, messages = plan.execute(dry_run=False, interactive=interactive)
+
+    if success:
+        for msg in messages:
+            console.print(msg)
+
+        console.print(f"\n[green]Migration completed successfully![/green]")
+
+        if plan.backup_file:
+            console.print(f"Backup saved to: {plan.backup_file}")
+
+        console.print("\n[bold cyan]Next steps:[/bold cyan]")
+        console.print(f"  1. Review {env_file} and fill in any CHANGE_ME placeholders")
+        console.print(f"  2. Validate: [cyan]tripwire schema validate --schema-file {to_schema}[/cyan]")
+    else:
+        console.print(f"[red]Migration failed:[/red]")
+        for msg in messages:
+            console.print(f"  {msg}")
+        sys.exit(1)
+
+
+@schema.command("quick-start")
+@click.option(
+    "--source",
+    type=click.Choice(["code", "example"]),
+    default="code",
+    help="Generate from code or .env.example",
+)
+def schema_quick_start(source: str) -> None:
+    """Quick setup wizard for schema-based workflow.
+
+    Runs complete workflow:
+      1. Create schema (from code or .env.example)
+      2. Validate schema syntax
+      3. Generate .env.example from schema
+      4. Validate .env against schema (if exists)
+
+    Examples:
+        tripwire schema quick-start                  # From code
+        tripwire schema quick-start --source example # From .env.example
+    """
+    ctx = click.get_current_context()
+
+    console.print("[bold cyan]TripWire Schema Quick Start[/bold cyan]\n")
+
+    # Step 1: Create schema
+    if source == "code":
+        console.print("[1/4] Creating schema from Python code...")
+        try:
+            ctx.invoke(schema_from_code, output=".tripwire.toml", force=True, dry_run=False)
+        except SystemExit as e:
+            if e.code != 0:
+                console.print("[red]Failed to create schema[/red]")
+                sys.exit(1)
+    else:
+        console.print("[1/4] Creating schema from .env.example...")
+        try:
+            ctx.invoke(schema_from_example, source=".env.example", output=".tripwire.toml", force=True, dry_run=False)
+        except SystemExit as e:
+            if e.code != 0:
+                console.print("[red]Failed to create schema[/red]")
+                sys.exit(1)
+
+    # Step 2: Validate schema syntax
+    console.print("\n[2/4] Validating schema syntax...")
+    try:
+        ctx.invoke(schema_check, schema_file=".tripwire.toml")
+    except SystemExit as e:
+        if e.code != 0:
+            console.print("[red]Schema validation failed[/red]")
+            sys.exit(1)
+
+    # Step 3: Generate .env.example
+    console.print("\n[3/4] Generating .env.example from schema...")
+    try:
+        ctx.invoke(schema_to_example, output=".env.example", schema_file=".tripwire.toml", force=True, check=False)
+    except SystemExit as e:
+        if e.code != 0:
+            console.print("[red]Failed to generate .env.example[/red]")
+            sys.exit(1)
+
+    # Step 4: Validate .env (if exists)
+    if Path(".env").exists():
+        console.print("\n[4/4] Validating .env against schema...")
+        try:
+            ctx.invoke(
+                schema_validate, env_file=".env", schema_file=".tripwire.toml", environment="development", strict=False
+            )
+        except SystemExit as e:
+            if e.code != 0:
+                console.print("[yellow].env validation failed (non-critical)[/yellow]")
+    else:
+        console.print("\n[4/4] Skipping .env validation (file doesn't exist)")
+
+    console.print("\n[green]Schema setup complete![/green]")
+    console.print("\n[cyan]Next steps:[/cyan]")
+    console.print("  • Review and customize .tripwire.toml")
+    console.print("  • Run [cyan]tripwire schema validate[/cyan] in CI")
+    console.print("  • Keep .env.example in sync with [cyan]tripwire schema to-example[/cyan]")
+
+
+__all__ = ["schema"]
