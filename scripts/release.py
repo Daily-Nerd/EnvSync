@@ -102,8 +102,8 @@ def update_version_in_files(version: str) -> None:
     init_path.write_text(content)
     print(f"Updated version in {init_path} to {version}")
 
-    # Update cli.py
-    cli_path = Path("src/tripwire/cli.py")
+    # Update cli/__init__.py (new modular structure as of v0.7.0)
+    cli_path = Path("src/tripwire/cli/__init__.py")
     content = cli_path.read_text()
 
     # Replace version in @click.version_option decorator
@@ -134,7 +134,7 @@ def commit_changes(version: str, is_prerelease: bool) -> None:
     if is_prerelease:
         commit_msg += " (prerelease)"
 
-    run_command(["git", "add", "pyproject.toml", "src/tripwire/__init__.py", "src/tripwire/cli.py"])
+    run_command(["git", "add", "pyproject.toml", "src/tripwire/__init__.py", "src/tripwire/cli/__init__.py"])
     # Use interactive=True to allow GPG signing prompts to show
     run_command(["git", "commit", "-m", commit_msg], interactive=True)
     print(f"✅ Committed changes: {commit_msg}")
