@@ -9,6 +9,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
+# Resource limits to prevent DOS attacks and memory exhaustion
+MAX_FILES_TO_SCAN = 1000  # Maximum number of files to scan
+MAX_FILE_SIZE = 1_000_000  # 1MB maximum file size to scan
+
 
 @dataclass
 class EnvVarInfo:
@@ -238,9 +242,15 @@ def scan_directory(
         ]
 
     all_variables: List[EnvVarInfo] = []
+    file_count = 0
 
     # Find all Python files
     for py_file in directory.rglob("*.py"):
+        # Security: Enforce maximum file count to prevent resource exhaustion
+        if file_count >= MAX_FILES_TO_SCAN:
+            print(f"Warning: Hit scan limit of {MAX_FILES_TO_SCAN} files. Some files were skipped.")
+            break
+
         # Check if file should be excluded
         relative_path = py_file.relative_to(directory)
         should_exclude = False
@@ -259,10 +269,21 @@ def scan_directory(
             if depth > max_depth:
                 continue
 
+        # Security: Check file size before reading to prevent memory exhaustion
+        try:
+            file_size = py_file.stat().st_size
+            if file_size > MAX_FILE_SIZE:
+                # Skip excessively large files
+                continue
+        except OSError:
+            # Skip files we can't stat
+            continue
+
         # Scan file
         try:
             variables = scan_file(py_file)
             all_variables.extend(variables)
+            file_count += 1
         except (SyntaxError, UnicodeDecodeError):
             # Skip files with syntax errors or encoding issues
             continue

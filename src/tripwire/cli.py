@@ -1025,7 +1025,9 @@ def _display_single_audit_result(
         if step.command:
             console.print()
             # Syntax highlight the command
-            syntax = Syntax(step.command, "bash", theme="monokai", line_numbers=False)
+            # Convert list commands to string for display
+            command_str = " ".join(step.command) if isinstance(step.command, list) else step.command
+            syntax = Syntax(command_str, "bash", theme="monokai", line_numbers=False)
             console.print("   ", syntax)
 
         if step.warning:

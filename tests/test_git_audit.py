@@ -584,7 +584,7 @@ class TestHistoryRewriteCommand:
         files = [".env", "config.py"]
         command, tool_name, warning = generate_history_rewrite_command(files)
 
-        assert isinstance(command, str)
+        assert isinstance(command, list)  # Security fix: returns list for subprocess
         assert isinstance(tool_name, str)
         assert isinstance(warning, str)
         assert tool_name in ["git-filter-repo", "filter-branch"]
@@ -594,9 +594,10 @@ class TestHistoryRewriteCommand:
         files = [".env", "secrets.json"]
         command, tool_name, warning = generate_history_rewrite_command(files)
 
-        # Command should reference the files (possibly quoted)
-        assert ".env" in command or "'.env'" in command
-        assert "secrets.json" in command or "'secrets.json'" in command
+        # Command list should contain the files
+        command_str = " ".join(command)
+        assert ".env" in command_str
+        assert "secrets.json" in command_str
 
     def test_generate_history_rewrite_command_filter_repo_preferred(self) -> None:
         """Test that git-filter-repo is preferred when available."""
@@ -605,7 +606,8 @@ class TestHistoryRewriteCommand:
             command, tool_name, warning = generate_history_rewrite_command(files)
 
             assert tool_name == "git-filter-repo"
-            assert "git filter-repo" in command
+            command_str = " ".join(command)
+            assert "git" in command_str and "filter-repo" in command_str
             assert "--path" in command
             assert "--invert-paths" in command
             assert "DEPRECATED" not in warning
@@ -617,18 +619,20 @@ class TestHistoryRewriteCommand:
             command, tool_name, warning = generate_history_rewrite_command(files)
 
             assert tool_name == "filter-branch"
-            assert "git filter-branch" in command
+            command_str = " ".join(command)
+            assert "git" in command_str and "filter-branch" in command_str
             assert "DEPRECATED" in warning
             assert "git-filter-repo" in warning  # Suggests installing it
 
     def test_generate_history_rewrite_command_with_spaces(self) -> None:
-        """Test that files with spaces are properly escaped."""
+        """Test that files with spaces are rejected for security."""
         files = ["my secret.env", "another file.txt"]
-        command, tool_name, warning = generate_history_rewrite_command(files)
 
-        # Files with spaces should be properly quoted
-        assert "my secret.env" in command or "'my secret.env'" in command
-        assert "another file.txt" in command or "'another file.txt'" in command
+        # Security fix: spaces in file paths should be rejected
+        with pytest.raises(ValueError) as exc_info:
+            generate_history_rewrite_command(files)
+
+        assert "Invalid or potentially dangerous" in str(exc_info.value)
 
 
 class TestDataClasses:

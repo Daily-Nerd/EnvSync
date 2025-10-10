@@ -77,7 +77,7 @@ class RemediationStep:
     title: str
     description: str
     urgency: str  # "CRITICAL", "HIGH", "MEDIUM", "LOW"
-    command: Optional[str] = None
+    command: Optional[str | List[str]] = None  # Can be string or list for subprocess
     warning: Optional[str] = None
 
 
@@ -333,7 +333,7 @@ def analyze_secret_history(
     secret_name: str,
     secret_value: Optional[str] = None,
     repo_path: Path = Path.cwd(),
-    max_commits: int = 1000,
+    max_commits: int = 100,  # Reduced from 1000 to 100 for better performance
 ) -> SecretTimeline:
     """Analyze git history to find when and where a secret was leaked.
 
@@ -438,28 +438,90 @@ def check_filter_repo_available() -> bool:
     return shutil.which("git-filter-repo") is not None
 
 
-def generate_history_rewrite_command(files: List[str]) -> tuple[str, str, str]:
+def _is_valid_git_path(path: str) -> bool:
+    """Validate git file path to prevent command injection.
+
+    Security: Ensures file paths are safe for use in git commands by:
+    - Rejecting shell metacharacters
+    - Preventing path traversal attacks
+    - Enforcing reasonable length limits
+
+    Args:
+        path: File path to validate
+
+    Returns:
+        True if path is safe, False otherwise
+    """
+    # Reject empty or None paths
+    if not path or not isinstance(path, str):
+        return False
+
+    # Reject shell metacharacters that could enable command injection
+    dangerous_chars = [";", "&", "|", ">", "<", "`", "$", "\n", "\r", "\0"]
+    if any(c in path for c in dangerous_chars):
+        return False
+
+    # Reject path traversal attempts
+    if ".." in path or path.startswith("/"):
+        return False
+
+    # Enforce reasonable length limit (typical file paths are < 500 chars)
+    if len(path) > 500:
+        return False
+
+    # Reject paths with unusual characters that might cause issues
+    # Allow only: alphanumeric, underscore, dash, dot, slash
+    import string
+
+    allowed_chars = set(string.ascii_letters + string.digits + "_-./\\")
+    if not all(c in allowed_chars for c in path):
+        return False
+
+    return True
+
+
+def generate_history_rewrite_command(files: List[str]) -> Tuple[List[str], str, str]:
     """Generate command to remove files from git history.
 
     Prefers modern git-filter-repo over deprecated filter-branch.
+
+    Security: Returns command as list (not string) to prevent shell injection.
+    All file paths are validated before inclusion in command.
 
     Args:
         files: List of file paths to remove
 
     Returns:
-        Tuple of (command, tool_name, warning_message)
-        - command: The shell command to execute
+        Tuple of (command_list, tool_name, warning_message)
+        - command_list: Command as list suitable for subprocess.run() without shell=True
         - tool_name: Name of the tool being used ("git-filter-repo" or "filter-branch")
         - warning_message: Important warnings about the operation
 
+    Raises:
+        ValueError: If any file path is invalid or potentially dangerous
+
     Note:
-        File paths are properly shell-escaped to prevent injection attacks.
+        SECURITY: Always use returned list with subprocess.run(cmd, shell=False)
+        NEVER join the list into a string and execute with shell=True
     """
+    # Security: Validate all file paths before constructing command
+    for f in files:
+        if not _is_valid_git_path(f):
+            raise ValueError(
+                f"Invalid or potentially dangerous git file path: {f!r}. "
+                "Paths must not contain shell metacharacters, path traversal sequences, "
+                "or unusual characters."
+            )
+
     # Check if git-filter-repo is available (recommended)
     if check_filter_repo_available():
         # Use git-filter-repo (modern, fast, safe)
-        path_args = " ".join(f"--path {shlex.quote(f)}" for f in files)
-        command = f"git filter-repo {path_args} --invert-paths --force"
+        # Build command as list (NOT string) for safe execution
+        cmd = ["git", "filter-repo"]
+        for f in files:
+            cmd.extend(["--path", f])  # Separate list arguments prevent injection
+        cmd.extend(["--invert-paths", "--force"])
+
         tool_name = "git-filter-repo"
         warning = (
             "[!] This will rewrite git history. Coordinate with your team before proceeding!\n"
@@ -467,8 +529,17 @@ def generate_history_rewrite_command(files: List[str]) -> tuple[str, str, str]:
         )
     else:
         # Fall back to filter-branch (deprecated but widely available)
-        files_str = " ".join(shlex.quote(f) for f in files)
-        command = f"git filter-branch --force --index-filter 'git rm --cached --ignore-unmatch {files_str}' HEAD"
+        # Build command as list for safe execution
+        cmd = ["git", "filter-branch", "--force", "--index-filter"]
+
+        # Build the index-filter sub-command safely
+        index_cmd_parts = ["git", "rm", "--cached", "--ignore-unmatch"]
+        index_cmd_parts.extend(files)
+        index_cmd = " ".join(shlex.quote(part) for part in index_cmd_parts)
+
+        cmd.append(index_cmd)
+        cmd.append("HEAD")
+
         tool_name = "filter-branch"
         warning = (
             "[!] WARNING: git filter-branch is DEPRECATED and slow!\n"
@@ -479,7 +550,7 @@ def generate_history_rewrite_command(files: List[str]) -> tuple[str, str, str]:
             "All developers will need to re-clone or rebase their work."
         )
 
-    return command, tool_name, warning
+    return cmd, tool_name, warning
 
 
 def generate_filter_branch_command(files: List[str]) -> str:

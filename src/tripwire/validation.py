@@ -29,6 +29,12 @@ T = TypeVar("T")
 # Type alias for validator functions
 ValidatorFunc = Callable[[Any], bool]
 
+# Resource limits to prevent DOS attacks and memory exhaustion
+MAX_LIST_STRING_LENGTH = 10_000  # 10KB max for list strings
+MAX_DICT_STRING_LENGTH = 10_000  # 10KB max for dict strings
+MAX_INT_STRING_LENGTH = 100  # Max 100 digits for integers
+MAX_FLOAT_STRING_LENGTH = 100  # Max 100 digits for floats
+
 # Global registry for custom format validators (thread-safe)
 _CUSTOM_VALIDATORS: Dict[str, ValidatorFunc] = {}
 _VALIDATOR_LOCK = threading.Lock()
@@ -109,8 +115,14 @@ def coerce_int(value: str) -> int:
         Integer value
 
     Raises:
-        ValueError: If value cannot be converted to int
+        ValueError: If value cannot be converted to int or exceeds length limit
     """
+    # Security: Prevent integer overflow DOS by limiting string length
+    if len(value) > MAX_INT_STRING_LENGTH:
+        raise ValueError(
+            f"Integer string too long: {len(value)} chars (max: {MAX_INT_STRING_LENGTH}). "
+            "This may indicate a malicious input or configuration error."
+        )
     return int(value)
 
 
@@ -124,8 +136,14 @@ def coerce_float(value: str) -> float:
         Float value
 
     Raises:
-        ValueError: If value cannot be converted to float
+        ValueError: If value cannot be converted to float or exceeds length limit
     """
+    # Security: Prevent float overflow DOS by limiting string length
+    if len(value) > MAX_FLOAT_STRING_LENGTH:
+        raise ValueError(
+            f"Float string too long: {len(value)} chars (max: {MAX_FLOAT_STRING_LENGTH}). "
+            "This may indicate a malicious input or configuration error."
+        )
     return float(value)
 
 
@@ -143,8 +161,18 @@ def coerce_list(value: str, delimiter: str = ",") -> List[str]:
 
     Returns:
         List of strings
+
+    Raises:
+        ValueError: If value exceeds maximum length
     """
     import json
+
+    # Security: Prevent memory exhaustion by limiting list string length
+    if len(value) > MAX_LIST_STRING_LENGTH:
+        raise ValueError(
+            f"List string too large: {len(value)} chars (max: {MAX_LIST_STRING_LENGTH}). "
+            "This may indicate a malicious input or configuration error."
+        )
 
     value = value.strip()
 
@@ -181,9 +209,16 @@ def coerce_dict(value: str) -> Dict[str, Any]:
         Dictionary
 
     Raises:
-        ValueError: If value cannot be parsed
+        ValueError: If value cannot be parsed or exceeds length limit
     """
     import json
+
+    # Security: Prevent memory exhaustion by limiting dict string length
+    if len(value) > MAX_DICT_STRING_LENGTH:
+        raise ValueError(
+            f"Dict string too large: {len(value)} chars (max: {MAX_DICT_STRING_LENGTH}). "
+            "This may indicate a malicious input or configuration error."
+        )
 
     value = value.strip()
 
@@ -272,7 +307,9 @@ def validate_email(value: str) -> bool:
     Returns:
         True if valid email format
     """
-    pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+    # Fixed ReDoS: Added upper bounds to all quantifiers
+    # Local part: max 64 chars (RFC 5321), domain: max 255 chars, TLD: max 24 chars
+    pattern = r"^[a-zA-Z0-9._%+-]{1,64}@[a-zA-Z0-9.-]{1,255}\.[a-zA-Z]{2,24}$"
     return bool(re.match(pattern, value))
 
 
