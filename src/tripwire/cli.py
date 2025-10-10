@@ -104,7 +104,7 @@ def print_help_with_banner(ctx, param, value):
     callback=print_help_with_banner,
     help="Show this message and exit.",
 )
-@click.version_option(version="0.4.0", prog_name="tripwire", message=f"{LOGO_SIMPLE}\nVersion: %(version)s")
+@click.version_option(version="0.4.1", prog_name="tripwire", message=f"{LOGO_SIMPLE}\nVersion: %(version)s")
 def main() -> None:
     """TripWire - Catch config errors before they explode.
 
