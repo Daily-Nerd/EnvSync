@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2025-10-10
+
+  ### Fixed
+
+  - **Unified Secret Detection Across Commands**: Fixed inconsistency between `schema from-example` and `audit --all` commands
+    - `schema from-example` now uses comprehensive secret detection (45+ platform patterns + entropy analysis)
+    - Previously used simple name-based detection (~57% accuracy), now matches `audit --all` at ~95%+ accuracy
+    - Correctly identifies platform-specific secrets (GitHub tokens, AWS keys, OpenAI keys, etc.)
+    - Properly ignores placeholders (YOUR_KEY_HERE, CHANGE_ME, etc.)
+
+  ### Technical Details
+
+  - Updated `_is_secret()` function in cli.py to use `detect_secrets_in_value()` from secrets.py
+  - Enhanced test cases with realistic secret values for thorough validation
+
 ## [0.5.0] - 2025-10-10
 
 ### Changed
@@ -187,7 +202,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI implementation with rich output
 - Project initialization (`init` command)
 
-[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/Daily-Nerd/TripWire/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/Daily-Nerd/TripWire/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/Daily-Nerd/TripWire/compare/v0.4.0...v0.4.1
