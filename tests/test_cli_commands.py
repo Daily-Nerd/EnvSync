@@ -5,6 +5,7 @@ from 31% to 90%+. Focus on edge cases, error handling, and command variations.
 """
 
 import json
+import re
 import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -29,7 +30,9 @@ class TestInitCommand:
 
             # Should succeed but skip existing file
             assert result.exit_code == 0
-            assert "already exists" in result.output or "skipping" in result.output.lower()
+            # Normalize output to handle line breaks on Windows
+            normalized_output = re.sub(r"\s+", " ", result.output)
+            assert "already exists" in normalized_output or "skipping" in normalized_output.lower()
             # Original content should be preserved
             assert "EXISTING=value" in Path(".env").read_text()
 
@@ -135,7 +138,9 @@ class TestScanCommand:
 
             # Should succeed with no findings
             assert result.exit_code == 0
-            assert "no secrets" in result.output.lower() or "clean" in result.output.lower()
+            # Normalize output to handle line breaks on Windows
+            normalized_output = re.sub(r"\s+", " ", result.output)
+            assert "no secrets" in normalized_output.lower() or "clean" in normalized_output.lower()
 
     def test_scan_with_strict_mode(self, tmp_path):
         """Test scan --strict fails on any secret."""
@@ -444,7 +449,9 @@ API_KEY = env.require('API_KEY')
 
             # Should handle gracefully
             assert result.exit_code in (0, 1)
-            assert "no" in result.output.lower() or "found" in result.output.lower()
+            # Normalize output to handle line breaks on Windows
+            normalized_output = result.output.replace("\n", " ")
+            assert "no" in normalized_output.lower() or "found" in normalized_output.lower()
 
     def test_validate_scans_current_directory(self, tmp_path):
         """Test validate scans current directory for code."""
@@ -489,7 +496,9 @@ VAR1 = env.require('VAR1')
             # Check mode should pass
             result = runner.invoke(main, ["generate", "--check"])
             assert result.exit_code == 0
-            assert "up to date" in result.output.lower()
+            # Normalize output to handle line breaks on Windows
+            normalized_output = re.sub(r"\s+", " ", result.output)
+            assert "up to date" in normalized_output.lower()
 
     def test_generate_with_check_mode_out_of_date(self, tmp_path):
         """Test generate --check when file is out of date."""
@@ -518,7 +527,9 @@ VAR2 = env.require('VAR2')
             # Check mode should fail
             result = runner.invoke(main, ["generate", "--check"])
             assert result.exit_code == 1
-            assert "out of date" in result.output.lower() or "outdated" in result.output.lower()
+            # Normalize output to handle line breaks on Windows
+            normalized_output = re.sub(r"\s+", " ", result.output)
+            assert "out of date" in normalized_output.lower() or "outdated" in normalized_output.lower()
 
     def test_generate_with_output_flag(self, tmp_path):
         """Test generate with custom output file."""
@@ -674,7 +685,9 @@ def hello():
 
             # Should handle gracefully
             assert result.exit_code in (0, 1)
-            assert "no" in result.output.lower() or "found" in result.output.lower()
+            # Normalize output to handle line breaks on Windows
+            normalized_output = result.output.replace("\n", " ")
+            assert "no" in normalized_output.lower() or "found" in normalized_output.lower()
 
     def test_docs_with_output_file(self, tmp_path):
         """Test docs with output file."""

@@ -5,6 +5,7 @@ including generation, validation, and team synchronization features.
 """
 
 import fnmatch
+import re
 import secrets
 import sys
 from pathlib import Path
@@ -246,12 +247,34 @@ def init(project_type: str) -> None:
     is_flag=True,
     help="Overwrite existing file",
 )
-def generate(output: str, check: bool, force: bool) -> None:
-    """Generate .env.example file from code.
+@click.option(
+    "--from-schema",
+    is_flag=True,
+    help="Generate from .tripwire.toml instead of code",
+)
+@click.option(
+    "--schema-file",
+    type=click.Path(),
+    default=".tripwire.toml",
+    help="Schema file to use (with --from-schema)",
+)
+def generate(output: str, check: bool, force: bool, from_schema: bool, schema_file: str) -> None:
+    """Generate .env.example from code or schema.
 
-    Scans your Python code for env.require() and env.optional() calls
-    and generates a .env.example file documenting all environment variables.
+    By default, scans your Python code for env.require() and env.optional() calls.
+    Use --from-schema to generate from .tripwire.toml instead.
+
+    Examples:
+        tripwire generate                    # From code (existing behavior)
+        tripwire generate --from-schema      # From .tripwire.toml (NEW)
+        tripwire generate --from-schema --output .env.dev
     """
+    # If from-schema flag is set, use schema-based generation
+    if from_schema:
+        _generate_from_schema(output, check, force, schema_file)
+        return
+
+    # Otherwise, use existing code-based generation
     from tripwire.scanner import (
         deduplicate_variables,
         format_var_for_env_example,
@@ -340,6 +363,348 @@ def generate(output: str, check: bool, force: bool) -> None:
         console.print(f"  - {len(required_vars)} required")
     if optional_vars:
         console.print(f"  - {len(optional_vars)} optional")
+
+
+@main.command()
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    default=".tripwire.toml",
+    help="Output schema file",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Overwrite existing file",
+)
+@click.option(
+    "--source",
+    type=click.Path(exists=True),
+    default=".env.example",
+    help="Source .env.example file to convert",
+)
+def migrate_to_schema(output: str, force: bool, source: str) -> None:
+    """Migrate .env.example to .tripwire.toml schema.
+
+    Converts legacy .env.example placeholders to modern .tripwire.toml
+    schema definitions with type inference and validation rules.
+
+    Examples:
+        tripwire migrate-to-schema
+        tripwire migrate-to-schema --output custom.toml --force
+        tripwire migrate-to-schema --source .env.template
+    """
+    import tomli_w
+
+    source_path = Path(source)
+    output_path = Path(output)
+
+    # Check if source exists
+    if not source_path.exists():
+        console.print(f"[red]Error:[/red] Source file {source} does not exist")
+        console.print("[yellow]Tip:[/yellow] Use --source to specify a different file")
+        sys.exit(1)
+
+    # Check if output exists
+    if output_path.exists() and not force:
+        console.print(f"[red]Error:[/red] {output} already exists. Use --force to overwrite.")
+        sys.exit(1)
+
+    console.print(f"[yellow]Converting {source} to {output}...[/yellow]")
+
+    # Parse .env.example file
+    env_vars: dict[str, dict[str, Any]] = {}
+    current_var: dict[str, Any] | None = None
+    var_name: str | None = None
+
+    try:
+        with open(source_path) as f:
+            for line in f:
+                line_stripped = line.strip()
+
+                # Skip empty lines
+                if not line_stripped:
+                    continue
+
+                # Handle comments (might be descriptions)
+                if line_stripped.startswith("#"):
+                    # Extract description text
+                    comment_text = line_stripped[1:].strip()
+                    # Skip header/separator comments
+                    if comment_text and not comment_text.startswith("=") and current_var is not None:
+                        # Append to description
+                        if "description" in current_var and current_var["description"]:
+                            current_var["description"] += " " + comment_text
+                        else:
+                            current_var["description"] = comment_text
+                    continue
+
+                # Handle variable declarations
+                if "=" in line_stripped:
+                    parts = line_stripped.split("=", 1)
+                    var_name = parts[0].strip()
+                    value = parts[1].strip() if len(parts) > 1 else ""
+
+                    # Initialize variable metadata
+                    current_var = {
+                        "type": "string",
+                        "required": True,
+                        "description": "",
+                    }
+
+                    # Type inference from value
+                    if value:
+                        current_var["type"], current_var["default"] = _infer_type_and_default(value)
+
+                        # If value looks like a placeholder, mark as required without default
+                        if _is_placeholder(value):
+                            current_var.pop("default", None)
+                            current_var["required"] = True
+
+                        # Detect format validators
+                        format_type = _detect_format(var_name, value)
+                        if format_type:
+                            current_var["format"] = format_type
+
+                        # Detect secrets
+                        if _is_secret(var_name, value):
+                            current_var["secret"] = True
+
+                    else:
+                        # Empty value = required variable
+                        current_var["required"] = True
+
+                    env_vars[var_name] = current_var
+
+    except Exception as e:
+        console.print(f"[red]Error reading {source}:[/red] {e}")
+        sys.exit(1)
+
+    if not env_vars:
+        console.print("[yellow]No variables found in source file[/yellow]")
+        sys.exit(1)
+
+    # Build TOML structure
+    toml_data: dict[str, Any] = {
+        "project": {
+            "name": Path.cwd().name,
+            "description": "Environment variable schema",
+        },
+        "variables": {},
+    }
+
+    # Convert variables to TOML format
+    for var_name, var_data in env_vars.items():
+        toml_var: dict[str, Any] = {"type": var_data["type"]}
+
+        if var_data.get("required", False):
+            toml_var["required"] = True
+
+        if "default" in var_data:
+            toml_var["default"] = var_data["default"]
+
+        if var_data.get("description"):
+            toml_var["description"] = var_data["description"]
+
+        if var_data.get("secret", False):
+            toml_var["secret"] = True
+
+        if var_data.get("format"):
+            toml_var["format"] = var_data["format"]
+
+        toml_data["variables"][var_name] = toml_var
+
+    # Write TOML file
+    try:
+        with open(output_path, "wb") as f:
+            tomli_w.dump(toml_data, f)
+
+        console.print(f"[green][OK][/green] Created {output} with {len(env_vars)} variable(s)")
+
+        # Show statistics
+        required_count = sum(1 for v in env_vars.values() if v.get("required", False))
+        optional_count = len(env_vars) - required_count
+        secret_count = sum(1 for v in env_vars.values() if v.get("secret", False))
+
+        if required_count:
+            console.print(f"  - {required_count} required")
+        if optional_count:
+            console.print(f"  - {optional_count} optional")
+        if secret_count:
+            console.print(f"  - {secret_count} secret(s)")
+
+        console.print("\n[cyan]Next steps:[/cyan]")
+        console.print(f"  1. Review {output} and adjust types/validation rules")
+        console.print("  2. Validate: tripwire schema validate")
+        console.print("  3. Generate .env: tripwire schema generate-env")
+
+    except Exception as e:
+        console.print(f"[red]Error writing {output}:[/red] {e}")
+        sys.exit(1)
+
+
+def _infer_type_and_default(value: str) -> tuple[str, Any]:
+    """Infer type and default value from string."""
+    # Try boolean
+    if value.lower() in ("true", "false"):
+        return "bool", value.lower() == "true"
+
+    # Try integer
+    try:
+        int_val = int(value)
+        return "int", int_val
+    except ValueError:
+        pass
+
+    # Try float
+    try:
+        float_val = float(value)
+        return "float", float_val
+    except ValueError:
+        pass
+
+    # Default to string
+    return "string", value
+
+
+def _is_placeholder(value: str) -> bool:
+    """Check if value is a placeholder."""
+    placeholder_patterns = [
+        r"your-.*-here",
+        r"change.?me",
+        r"replace.?me",
+        r"example",
+        r"placeholder",
+        r"<.*>",
+        r"\[.*\]",
+        r"xxx+",
+    ]
+
+    value_lower = value.lower()
+    return any(re.search(pattern, value_lower) for pattern in placeholder_patterns)
+
+
+def _detect_format(var_name: str, value: str) -> str | None:
+    """Detect format validator based on variable name and value."""
+    name_lower = var_name.lower()
+
+    # PostgreSQL URL
+    if "postgresql://" in value or "postgres://" in value:
+        return "postgresql"
+
+    # URL
+    if value.startswith(("http://", "https://", "ftp://")):
+        return "url"
+
+    # Email
+    if "email" in name_lower and "@" in value:
+        return "email"
+
+    # UUID
+    if "uuid" in name_lower or "guid" in name_lower:
+        return "uuid"
+
+    # IPv4
+    if "ip" in name_lower and re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", value):
+        return "ipv4"
+
+    return None
+
+
+def _is_secret(var_name: str, _value: str) -> bool:
+    """Detect if variable is likely a secret."""
+    name_lower = var_name.lower()
+
+    secret_indicators = [
+        "key",
+        "secret",
+        "password",
+        "token",
+        "credential",
+        "private",
+        "auth",
+        "api_key",
+        "apikey",
+        "access_key",
+        "encryption",
+    ]
+
+    return any(indicator in name_lower for indicator in secret_indicators)
+
+
+def _generate_from_schema(output: str, check: bool, force: bool, schema_file: str) -> None:
+    """Generate .env.example from .tripwire.toml schema."""
+    from tripwire.schema import load_schema
+
+    schema_path = Path(schema_file)
+
+    # Check if schema file exists
+    if not schema_path.exists():
+        console.print(f"[red]Error:[/red] Schema file {schema_file} does not exist")
+        console.print(f"[yellow]Tip:[/yellow] Create one with: tripwire schema init")
+        sys.exit(1)
+
+    console.print(f"[yellow]Generating from {schema_file}...[/yellow]")
+
+    # Load schema
+    try:
+        schema = load_schema(schema_path)
+        if schema is None:
+            console.print(f"[red]Error:[/red] Failed to load schema from {schema_file}")
+            sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error loading schema:[/red] {e}")
+        sys.exit(1)
+
+    # Generate .env.example content from schema
+    try:
+        generated_content = schema.generate_env_example()
+    except Exception as e:
+        console.print(f"[red]Error generating content:[/red] {e}")
+        sys.exit(1)
+
+    output_path = Path(output)
+
+    # Check mode: compare with existing file
+    if check:
+        console.print("[yellow]Checking if output is up to date...[/yellow]")
+        if not output_path.exists():
+            console.print(f"[red][X][/red] {output} does not exist")
+            sys.exit(1)
+
+        existing_content = output_path.read_text()
+        if existing_content.strip() == generated_content.strip():
+            console.print(f"[green][OK][/green] {output} is up to date")
+        else:
+            console.print(f"[red][X][/red] {output} is out of date")
+            console.print(f"Run 'tripwire generate --from-schema --force' to update it")
+            sys.exit(1)
+        return
+
+    # Check if file exists
+    if output_path.exists() and not force:
+        console.print(f"[red]Error:[/red] {output} already exists. Use --force to overwrite.")
+        sys.exit(1)
+
+    # Write file
+    try:
+        output_path.write_text(generated_content)
+        var_count = len(schema.variables)
+        console.print(f"[green][OK][/green] Generated {output} with {var_count} variable(s)")
+
+        # Show breakdown
+        required_count = sum(1 for v in schema.variables.values() if v.required)
+        optional_count = var_count - required_count
+
+        if required_count:
+            console.print(f"  - {required_count} required")
+        if optional_count:
+            console.print(f"  - {optional_count} optional")
+
+    except Exception as e:
+        console.print(f"[red]Error writing {output}:[/red] {e}")
+        sys.exit(1)
 
 
 @main.command()

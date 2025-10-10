@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2025-10-09
+
+### Added
+
+- **Tool Configuration System**: TripWire now supports configuration via `pyproject.toml [tool.tripwire]`
+  - `default_format`: Set default output format for CLI commands
+  - `strict_mode`: Exit 1 on warnings
+  - `schema_file`: Specify custom .tripwire.toml location
+  - `scan_git_history`: Enable/disable git scanning
+  - `max_commits`: Configure git scan depth
+  - `default_environment`: Set default environment name
+
+- **`tripwire migrate-to-schema` Command**: Migrate legacy .env.example to modern .tripwire.toml schema
+  - Automatic type inference (int, float, bool, string)
+  - Secret detection based on variable names
+  - Format detection (postgresql, url, email, ipv4)
+  - Placeholder detection (your-*-here, change-me)
+  - Statistics output showing migration results
+
+- **Enhanced `tripwire generate` Command**: New `--from-schema` flag
+  - Generate .env.example from .tripwire.toml schema
+  - Complements existing code-scanning functionality
+  - Example: `tripwire generate --from-schema`
+
+### Changed
+
+- Fixed broken link in README.md (audit documentation reference)
+- Clarified roadmap to distinguish implemented vs planned TOML features
+
+### Technical Details
+
+- Added `src/tripwire/tool_config.py` module for configuration management
+- Added 24 new tests (833 total tests, all passing)
+- 100% test coverage on new features
+- Maintains backward compatibility with existing workflows
+
 ## [0.4.0] - 2025-10-09
 
 ### Added
@@ -105,7 +141,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI implementation with rich output
 - Project initialization (`init` command)
 
-[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/Daily-Nerd/TripWire/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.1.0...v0.2.0
