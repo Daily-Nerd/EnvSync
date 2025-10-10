@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import click
 from rich.console import Console
 
-from tripwire.branding import LOGO_BANNER, LOGO_SIMPLE, get_status_icon, print_status
+from tripwire.branding import LOGO_BANNER, LOGO_SIMPLE, get_status_icon
 from tripwire.config.models import ConfigValue
 
 # On Windows, force UTF-8 encoding for Rich console to support Unicode characters
@@ -86,7 +86,7 @@ DEBUG=false
 }
 
 
-def print_help_with_banner(ctx, param, value):
+def print_help_with_banner(ctx, _param, value):
     """Show banner before help text."""
     if value and not ctx.resilient_parsing:
         console.print(f"[cyan]{LOGO_BANNER}[/cyan]")
@@ -406,6 +406,32 @@ def migrate_to_schema(output: str, force: bool, source: str) -> None:
         console.print("[yellow]Tip:[/yellow] Use --source to specify a different file")
         sys.exit(1)
 
+    # Security check: Warn if migrating from .env (not .env.example)
+    # .env files typically contain real secrets, while .env.example contains placeholders
+    is_real_env = source_path.name == ".env" or (
+        source_path.name.startswith(".env.") and not source_path.name.endswith(".example")
+    )
+
+    if is_real_env:
+        console.print("[bold red]⚠️  WARNING: Source file appears to be a real environment file![/bold red]")
+        console.print()
+        console.print(".env files contain real secrets that should NOT be in schema defaults.")
+        console.print("Schema files (.tripwire.toml) are meant to be committed to git.")
+        console.print()
+        console.print("[yellow]Recommendation:[/yellow] Create .env.example first with placeholder values:")
+        console.print("  1. Copy .env to .env.example: [cyan]cp .env .env.example[/cyan]")
+        console.print("  2. Replace secret values with placeholders (e.g., 'your-api-key-here')")
+        console.print("  3. Run: [cyan]tripwire migrate-to-schema[/cyan]")
+        console.print()
+        console.print("[yellow]Alternative:[/yellow] Use [cyan]tripwire schema import[/cyan] to scan code instead")
+        console.print()
+        console.print("[bold yellow]Secret values will be excluded from schema for security.[/bold yellow]")
+        console.print()
+
+        if not click.confirm("Continue anyway?", default=False):
+            console.print("[yellow]Migration cancelled[/yellow]")
+            sys.exit(0)
+
     # Check if output exists
     if output_path.exists() and not force:
         console.print(f"[red]Error:[/red] {output} already exists. Use --force to overwrite.")
@@ -415,8 +441,7 @@ def migrate_to_schema(output: str, force: bool, source: str) -> None:
 
     # Parse .env.example file
     env_vars: dict[str, dict[str, Any]] = {}
-    current_var: dict[str, Any] | None = None
-    var_name: str | None = None
+    pending_comment: str | None = None  # Track comment for next variable
 
     try:
         with open(source_path) as f:
@@ -427,17 +452,25 @@ def migrate_to_schema(output: str, force: bool, source: str) -> None:
                 if not line_stripped:
                     continue
 
-                # Handle comments (might be descriptions)
+                # Handle comments
                 if line_stripped.startswith("#"):
-                    # Extract description text
+                    # Extract comment text
                     comment_text = line_stripped[1:].strip()
+
                     # Skip header/separator comments
-                    if comment_text and not comment_text.startswith("=") and current_var is not None:
-                        # Append to description
-                        if "description" in current_var and current_var["description"]:
-                            current_var["description"] += " " + comment_text
-                        else:
-                            current_var["description"] = comment_text
+                    if not comment_text or comment_text.startswith("="):
+                        continue
+
+                    # Detect if this is a section header (capitalized, short, no inline description)
+                    is_section_header = (
+                        len(comment_text.split()) <= 4  # Short (1-4 words)
+                        and not any(c in comment_text for c in [",", ":", ";", "."])  # No punctuation
+                        and comment_text[0].isupper()  # Starts with capital
+                    )
+
+                    if not is_section_header:
+                        # This is a variable description (not a section header)
+                        pending_comment = comment_text
                     continue
 
                 # Handle variable declarations
@@ -450,8 +483,11 @@ def migrate_to_schema(output: str, force: bool, source: str) -> None:
                     current_var = {
                         "type": "string",
                         "required": True,
-                        "description": "",
+                        "description": pending_comment or "",  # Use pending comment if available
                     }
+
+                    # Clear pending comment after using it
+                    pending_comment = None
 
                     # Type inference from value
                     if value:
@@ -501,13 +537,21 @@ def migrate_to_schema(output: str, force: bool, source: str) -> None:
         if var_data.get("required", False):
             toml_var["required"] = True
 
+        # Security: Exclude defaults for secrets when migrating from real .env files
+        is_secret = var_data.get("secret", False)
+
         if "default" in var_data:
-            toml_var["default"] = var_data["default"]
+            # Only include default if:
+            # 1. Not a secret, OR
+            # 2. Is a secret but source is .env.example (placeholders are safe)
+            if not is_secret or not is_real_env:
+                toml_var["default"] = var_data["default"]
+            # else: secret from real .env file - exclude default for security
 
         if var_data.get("description"):
             toml_var["description"] = var_data["description"]
 
-        if var_data.get("secret", False):
+        if is_secret:
             toml_var["secret"] = True
 
         if var_data.get("format"):
@@ -856,7 +900,7 @@ def sync(env_file: str, example: str, dry_run: bool, interactive: bool) -> None:
         sys.exit(1)
 
     # Compare files
-    missing, extra, common = compare_env_files(env_path, example_path)
+    missing, extra, _ = compare_env_files(env_path, example_path)
 
     if not missing and not extra:
         status = get_status_icon("valid")
@@ -1507,7 +1551,6 @@ def validate(env_file: str) -> None:
     )
 
     missing = []
-    invalid = []
 
     for var in required_vars:
         if not os.getenv(var.name):
@@ -1608,7 +1651,7 @@ def generate_markdown_docs(variables: Dict[str, Any]) -> str:
     Returns:
         Markdown formatted documentation
     """
-    from tripwire.scanner import EnvVarInfo, format_default_value
+    from tripwire.scanner import format_default_value
 
     lines = [
         "# Environment Variables",
@@ -2097,13 +2140,24 @@ def schema_import(output: str, force: bool) -> None:
     ]
 
     # Add variables sorted by name
+    # Type mapping from Python types to schema types
+    TYPE_MAPPING = {
+        "str": "string",
+        "int": "int",
+        "float": "float",
+        "bool": "bool",
+        "list": "list",
+        "dict": "dict",
+    }
+
     for var_name in sorted(unique_vars.keys()):
         var = unique_vars[var_name]
 
         lines.append(f"[variables.{var_name}]")
 
-        # Type
-        lines.append(f'type = "{var.var_type}"')
+        # Type - map Python types to schema types
+        schema_type = TYPE_MAPPING.get(var.var_type, "string")
+        lines.append(f'type = "{schema_type}"')
 
         # Required
         lines.append(f"required = {str(var.required).lower()}")
@@ -2161,9 +2215,23 @@ def schema_import(output: str, force: bool) -> None:
     console.print(f"  - {required_count} required")
     console.print(f"  - {optional_count} optional")
 
+    # Auto-validate the generated schema
+    console.print("\n[yellow]Validating generated schema...[/yellow]")
+
+    try:
+        # Call schema_check to validate the generated file
+        ctx = click.get_current_context()
+        ctx.invoke(schema_check, schema_file=output)
+    except Exception as e:
+        console.print(f"[red]Schema validation failed:[/red] {e}")
+        console.print("\n[bold cyan]Next steps:[/bold cyan]")
+        console.print(f"  1. Review {output} and fix validation errors")
+        console.print("  2. Run: [cyan]tripwire schema check[/cyan]")
+        sys.exit(1)
+
     console.print("\n[bold cyan]Next steps:[/bold cyan]")
     console.print(f"  1. Review {output} and customize as needed")
-    console.print("  2. Run: [cyan]tripwire schema validate[/cyan]")
+    console.print("  2. Run: [cyan]tripwire schema validate[/cyan] to check against your .env files")
 
 
 @schema.command("check")
@@ -2433,6 +2501,25 @@ def schema_generate_env(
     schema = load_schema(schema_path)
     if not schema:
         console.print("[red]Error:[/red] Failed to load schema")
+        sys.exit(1)
+
+    # Check if schema has variables defined
+    if not schema.variables:
+        console.print("[yellow][!]  No variables defined in .tripwire.toml yet[/yellow]")
+        console.print()
+        console.print("[bold]To get started:[/bold]")
+        console.print("  1. Edit .tripwire.toml and uncomment example variables, or")
+        console.print("  2. Add your own variable definitions, or")
+        console.print("  3. Import from code: [cyan]tripwire schema import[/cyan]")
+        console.print()
+        console.print("[bold]Example variable definition:[/bold]")
+        console.print()
+        console.print("[cyan][variables.DATABASE_URL]")
+        console.print('type = "string"')
+        console.print("required = true")
+        console.print('format = "postgresql"')
+        console.print('description = "Database connection URL"[/cyan]')
+        console.print()
         sys.exit(1)
 
     # Generate content
@@ -2927,7 +3014,7 @@ def schema_migrate(
     dry_run: bool,
     interactive: bool,
     force: bool,
-    backup: bool,
+    backup: bool,  # noqa: ARG001 - Parameter defined by Click decorator
 ) -> None:
     """Migrate .env file between schema versions.
 
@@ -3054,7 +3141,6 @@ def install_hooks(framework: str, force: bool, uninstall: bool) -> None:
 
         tripwire install-hooks --uninstall
     """
-    import os
     import shutil
     import stat
     from datetime import datetime

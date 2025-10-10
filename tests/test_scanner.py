@@ -431,3 +431,36 @@ def hello():
         assert len(variables) == 0
     finally:
         temp_path.unlink()
+
+
+def test_scan_file_all_python_types():
+    """Test scanning file with all Python type annotations."""
+    code = """
+from tripwire import env
+
+STR_VAR = env.require('STR_VAR', type=str)
+INT_VAR = env.require('INT_VAR', type=int)
+FLOAT_VAR = env.require('FLOAT_VAR', type=float)
+BOOL_VAR = env.require('BOOL_VAR', type=bool)
+LIST_VAR = env.require('LIST_VAR', type=list)
+DICT_VAR = env.require('DICT_VAR', type=dict)
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write(code)
+        f.flush()
+        temp_path = Path(f.name)
+
+    try:
+        variables = scan_file(temp_path)
+
+        assert len(variables) == 6
+
+        type_map = {v.name: v.var_type for v in variables}
+        assert type_map["STR_VAR"] == "str"
+        assert type_map["INT_VAR"] == "int"
+        assert type_map["FLOAT_VAR"] == "float"
+        assert type_map["BOOL_VAR"] == "bool"
+        assert type_map["LIST_VAR"] == "list"
+        assert type_map["DICT_VAR"] == "dict"
+    finally:
+        temp_path.unlink()
