@@ -2,6 +2,7 @@
 
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 from rich.console import Console
@@ -13,6 +14,9 @@ from tripwire.cli.formatters.audit import (
 )
 from tripwire.cli.utils.console import console
 from tripwire.secrets import SecretMatch
+
+if TYPE_CHECKING:
+    from tripwire.git_audit import SecretTimeline
 
 
 @click.command()
@@ -128,7 +132,7 @@ def scan(strict: bool, depth: int) -> None:
 
 
 def _display_combined_timeline(
-    results: list[tuple[SecretMatch, "SecretTimeline"]],  # type: ignore[name-defined]
+    results: list[tuple[SecretMatch, "SecretTimeline"]],
     console: Console,
 ) -> None:
     """Display combined visual timeline for multiple secrets.
@@ -195,7 +199,7 @@ def _display_combined_timeline(
 
 def _display_single_audit_result(
     secret_name: str,
-    timeline: "SecretTimeline",  # type: ignore[name-defined]
+    timeline: "SecretTimeline",
     console: Console,
 ) -> None:
     """Display audit results for a single secret.
