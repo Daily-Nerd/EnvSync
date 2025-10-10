@@ -215,7 +215,6 @@ We deeply appreciate security researchers who responsibly disclose vulnerabiliti
 
 - **Security Issues**: GitHub Security Advisories (preferred)
 - **General Security Questions**: GitHub Discussions
-- **Urgent Security Concerns**: support@dailynerd.com
 
 ---
 
