@@ -108,10 +108,10 @@ jobs:
             exit 1
           fi
 
-          # Check cli.py version using Python for more reliable parsing
-          CLI_VERSION=$(python3 -c "import re; content=open('src/tripwire/cli.py').read(); match=re.search(r'@click\.version_option\(version=\"([^\"]+)\"', content); print(match.group(1) if match else '')")
+          # Check cli/__init__.py version using Python for more reliable parsing (v0.7.0+ modular structure)
+          CLI_VERSION=$(python3 -c "import re; content=open('src/tripwire/cli/__init__.py').read(); match=re.search(r'@click\.version_option\(version=\"([^\"]+)\"', content); print(match.group(1) if match else '')")
           if [ "$VERSION" != "$CLI_VERSION" ]; then
-            echo "::error::Version mismatch: tag=$VERSION but cli.py=$CLI_VERSION"
+            echo "::error::Version mismatch: tag=$VERSION but cli/__init__.py=$CLI_VERSION"
             exit 1
           fi
 
