@@ -1,50 +1,75 @@
-# TripWire Configuration Schema
-# Define your environment variables with validation rules
-
 [project]
-name = "my-project"
-version = "0.1.0"
-description = "Project description"
+name = "TripWire"
+description = "Environment variable schema"
 
-[validation]
-strict = true  # Fail on unknown variables
-allow_missing_optional = true
-warn_unused = true
+[variables.DEBUG]
+type = "bool"
+required = true
+default = false
+description = "Example: Debug mode"
 
-[security]
-entropy_threshold = 4.5
-scan_git_history = true
-exclude_patterns = ["TEST_*", "EXAMPLE_*"]
-
-# Example variable definitions
-# Uncomment and customize for your project
-
-[variables.DATABASE_URL]
+[variables.HELPER_TEXT]
 type = "string"
 required = true
-format = "postgresql"
-description = "PostgreSQL database connection"
+default = "\"This is some helper text\""
+
+[variables.DB_HOST]
+type = "string"
+required = true
+default = "localhost"
+
+[variables.DB_PORT]
+type = "int"
+required = true
+default = 5432
+
+[variables.DB_USER]
+type = "string"
+required = true
+default = "username"
+
+[variables.DB_PASSWORD]
+type = "string"
+required = true
+default = "password"
 secret = true
 
-# [variables.DEBUG]
-# type = "bool"
-# required = false
-# default = false
-# description = "Enable debug mode"
+[variables.API_TOKEN]
+type = "string"
+required = true
+secret = true
 
-# [variables.PORT]
-# type = "int"
-# required = false
-# default = 8000
-# min = 1024
-# max = 65535
-# description = "Server port"
+[variables.EXPOSE]
+type = "bool"
+required = true
+default = false
 
-# Environment-specific defaults
-[environments.development]
-# DATABASE_URL = "postgresql://localhost:5432/dev"
-# DEBUG = true
+[variables.CREDENTIALS]
+type = "string"
+required = true
+secret = true
 
-[environments.production]
-# DEBUG = false
-# strict_secrets = true
+[variables.SECRET_KEY]
+type = "string"
+required = true
+secret = true
+
+[variables.LOG_LEVEL]
+type = "string"
+required = true
+default = "info"
+
+[variables.OUTPUT_DIR]
+type = "string"
+required = true
+default = "./output"
+
+[variables.MAX_RETRIES]
+type = "int"
+required = true
+default = 3
+
+[variables.TIMEOUT]
+type = "int"
+required = true
+default = 30
