@@ -166,11 +166,22 @@ class EnvVarScanner(ast.NodeVisitor):
         elif isinstance(node, ast.List):
             return [self._extract_value(elt) for elt in node.elts]
         elif isinstance(node, ast.Dict):
-            return {self._extract_value(k): self._extract_value(v) for k, v in zip(node.keys, node.values)}
+            # Dict keys can be None in some cases (e.g., **dict unpacking)
+            result = {}
+            for k, v in zip(node.keys, node.values):
+                if k is not None:
+                    key = self._extract_value(k)
+                    value = self._extract_value(v)
+                    if key is not None:
+                        result[key] = value
+            return result
         elif isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
             # Handle negative numbers
             if isinstance(node.operand, ast.Constant):
-                return -node.operand.value
+                val = node.operand.value
+                # Only negate numeric types
+                if isinstance(val, (int, float)):
+                    return -val
         return None
 
     def _extract_type_name(self, type_value: Any) -> str:

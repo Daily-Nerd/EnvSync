@@ -9,7 +9,7 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, TypedDict
 
 # Resource limits to prevent DOS attacks
 MAX_ENTROPY_STRING_LENGTH = 10_000  # 10KB max for entropy calculation
@@ -139,6 +139,17 @@ class SecretMatch:
     line_number: int
     severity: str
     recommendation: str
+
+
+class CredentialPattern(TypedDict):
+    """Type definition for credential pattern dictionaries."""
+
+    type: SecretType
+    keywords: List[str]
+    min_length: int
+    min_entropy: float
+    severity: str
+    exclude_keywords: List[str]
 
 
 # Secret detection patterns (patterns as strings for documentation)
@@ -457,7 +468,7 @@ SECRET_PATTERNS: List[SecretPattern] = [
 
 # Performance optimization: Pre-compile all secret patterns at module load time
 # This provides 10-20x speedup compared to compiling patterns on every check
-_COMPILED_SECRET_PATTERNS: List[Tuple[SecretType, re.Pattern, str, str]] = [
+_COMPILED_SECRET_PATTERNS: List[Tuple[SecretType, re.Pattern[str], str, str]] = [
     (
         p.secret_type,
         re.compile(p.pattern, re.IGNORECASE | re.MULTILINE),
@@ -558,7 +569,7 @@ def detect_generic_credential(variable_name: str, value: str, line_number: int) 
     var_name_upper = variable_name.upper()
 
     # Define credential type patterns with their characteristics
-    credential_patterns = [
+    credential_patterns: List[CredentialPattern] = [
         {
             "type": SecretType.GENERIC_PASSWORD,
             "keywords": ["PASSWORD", "PASSWD", "PWD"],

@@ -11,7 +11,7 @@ import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, Iterator, List, Optional, Set, Tuple
 
 from tripwire.exceptions import GitAuditError, GitCommandError, NotGitRepositoryError
 
@@ -329,6 +329,91 @@ def get_affected_branches(commit_hash: str, repo_path: Path) -> List[str]:
     return branches
 
 
+def audit_secret_stream(
+    secret_name: str,
+    secret_value: Optional[str] = None,
+    repo_path: Path = Path.cwd(),
+    max_commits: int = 100,
+) -> "Iterator[FileOccurrence]":
+    """Stream secret occurrences one at a time (memory efficient).
+
+    This streaming version is designed for large repositories (Linux kernel, Chromium, etc.)
+    and uses constant memory (O(1)) instead of loading all results into memory at once.
+
+    Args:
+        secret_name: Name of environment variable
+        secret_value: Optional actual secret value
+        repo_path: Path to git repository
+        max_commits: Maximum commits to scan
+
+    Yields:
+        FileOccurrence objects as they're found
+
+    Raises:
+        NotGitRepositoryError: If path is not a git repository
+        GitCommandError: If git commands fail
+
+    Example:
+        >>> for occurrence in audit_secret_stream("AWS_KEY", repo_path=Path(".")):
+        ...     print(f"Found in {occurrence.file_path}:{occurrence.line_number}")
+
+    Note:
+        For small to medium repositories, use analyze_secret_history() which provides
+        complete timeline analysis. Use this function only when memory is constrained.
+    """
+    check_git_repository(repo_path)
+
+    # Build search pattern
+    if secret_value:
+        secret_pattern = re.escape(secret_value)
+    else:
+        secret_pattern = rf"{re.escape(secret_name)}\s*[:=]\s*['\"]?[^\s'\";]+['\"]?"
+
+    # Stream commit hashes using Popen for efficient iteration
+    proc = subprocess.Popen(
+        ["git", "log", "-G", secret_pattern, "--all", "--format=%H"],
+        cwd=repo_path,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    try:
+        count = 0
+        for line in proc.stdout:  # type: ignore[union-attr]
+            if count >= max_commits:
+                break
+
+            commit_hash = line.strip()
+            if not commit_hash:
+                continue
+
+            # Stream occurrences from this commit
+            for occurrence in find_secret_in_commit(commit_hash, secret_pattern, repo_path):
+                yield occurrence
+
+            count += 1
+
+    finally:
+        # CRITICAL: Terminate process if iteration stopped early
+        if proc.poll() is None:  # Still running
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+
+    # Check for errors after completion
+    if proc.returncode and proc.returncode != 0:
+        stderr = proc.stderr.read() if proc.stderr else ""
+        raise GitCommandError(
+            command="git log -G",
+            stderr=stderr,
+            returncode=proc.returncode,
+        )
+
+
 def analyze_secret_history(
     secret_name: str,
     secret_value: Optional[str] = None,
@@ -336,6 +421,10 @@ def analyze_secret_history(
     max_commits: int = 100,  # Reduced from 1000 to 100 for better performance
 ) -> SecretTimeline:
     """Analyze git history to find when and where a secret was leaked.
+
+    .. deprecated:: 0.6.0
+       For large repositories, consider using :func:`audit_secret_stream` which uses
+       constant memory instead of loading all results at once.
 
     Args:
         secret_name: Name of the environment variable (e.g., "AWS_SECRET_KEY")
