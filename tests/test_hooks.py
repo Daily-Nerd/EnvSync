@@ -58,7 +58,9 @@ class TestHookInstallation:
         result = runner.invoke(main, ["install-hooks"])
 
         assert result.exit_code == 1
-        assert "Not a git repository" in result.output
+        # Normalize output to handle line breaks on Windows
+        normalized_output = result.output.replace("\n", " ")
+        assert "Not a git repository" in normalized_output
 
     def test_install_hooks_with_existing_hook(self, git_repo: Path) -> None:
         """Test that install-hooks handles existing hooks."""
@@ -71,7 +73,9 @@ class TestHookInstallation:
         result = runner.invoke(main, ["install-hooks"])
 
         assert result.exit_code == 1
-        assert "already exists" in result.output
+        # Normalize output to handle line breaks on Windows
+        normalized_output = result.output.replace("\n", " ")
+        assert "already exists" in normalized_output
 
     def test_install_hooks_force_overwrite(self, git_repo: Path) -> None:
         """Test force overwrite of existing hooks."""
@@ -135,7 +139,9 @@ class TestHookInstallation:
 
         assert result.exit_code == 0
         assert hook_file.exists()  # Should not be removed
-        assert "not managed by TripWire" in result.output
+        # Normalize output to handle line breaks on Windows
+        normalized_output = result.output.replace("\n", " ")
+        assert "not managed by TripWire" in normalized_output
 
 
 class TestPreCommitFramework:
@@ -168,7 +174,9 @@ class TestPreCommitFramework:
         result = runner.invoke(main, ["install-hooks", "--framework", "pre-commit"])
 
         assert result.exit_code == 1
-        assert "not installed" in result.output
+        # Normalize output to handle line breaks on Windows
+        normalized_output = result.output.replace("\n", " ")
+        assert "not installed" in normalized_output
 
     def test_precommit_existing_config(self, git_repo: Path, monkeypatch) -> None:
         """Test handling existing pre-commit config."""
@@ -183,7 +191,9 @@ class TestPreCommitFramework:
         result = runner.invoke(main, ["install-hooks", "--framework", "pre-commit"])
 
         assert result.exit_code == 1
-        assert "already exists" in result.output
+        # Normalize output to handle line breaks on Windows
+        normalized_output = result.output.replace("\n", " ")
+        assert "already exists" in normalized_output
 
 
 class TestHookScriptContent:

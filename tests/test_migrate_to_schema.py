@@ -287,7 +287,9 @@ def test_migrate_to_schema_overwrite_protection(runner, temp_dir):
     )
 
     assert result.exit_code == 1
-    assert "already exists" in result.output
+    # Normalize output to handle line breaks on Windows
+    normalized_output = result.output.replace("\n", " ")
+    assert "already exists" in normalized_output
 
 
 def test_migrate_to_schema_with_force(runner, temp_dir):
@@ -334,7 +336,9 @@ def test_migrate_to_schema_missing_source(runner, temp_dir):
     # Click returns exit code 2 for invalid path
     assert result.exit_code in (1, 2)
     # Error message may come from Click or our code
-    assert "does not exist" in result.output or "Error" in result.output
+    # Normalize output to handle line breaks on Windows
+    normalized_output = result.output.replace("\n", " ")
+    assert "does not exist" in normalized_output or "Error" in normalized_output
 
 
 def test_migrate_to_schema_with_comments(runner, temp_dir):
@@ -474,6 +478,8 @@ DEBUG=false
 
     assert result.exit_code == 0
     # Check for statistics in output
-    assert "4 variable(s)" in result.output
-    assert "required" in result.output
-    assert "secret(s)" in result.output
+    # Normalize output to handle line breaks on Windows
+    normalized_output = result.output.replace("\n", " ")
+    assert "4 variable(s)" in normalized_output
+    assert "required" in normalized_output
+    assert "secret(s)" in normalized_output
