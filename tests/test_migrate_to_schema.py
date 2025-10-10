@@ -1,5 +1,6 @@
 """Tests for migrate-to-schema command functionality."""
 
+import re
 import tempfile
 import tomllib
 from pathlib import Path
@@ -288,7 +289,7 @@ def test_migrate_to_schema_overwrite_protection(runner, temp_dir):
 
     assert result.exit_code == 1
     # Normalize output to handle line breaks on Windows
-    normalized_output = result.output.replace("\n", " ")
+    normalized_output = re.sub(r"\s+", " ", result.output)
     assert "already exists" in normalized_output
 
 
@@ -337,7 +338,7 @@ def test_migrate_to_schema_missing_source(runner, temp_dir):
     assert result.exit_code in (1, 2)
     # Error message may come from Click or our code
     # Normalize output to handle line breaks on Windows
-    normalized_output = result.output.replace("\n", " ")
+    normalized_output = re.sub(r"\s+", " ", result.output)
     assert "does not exist" in normalized_output or "Error" in normalized_output
 
 
@@ -479,7 +480,7 @@ DEBUG=false
     assert result.exit_code == 0
     # Check for statistics in output
     # Normalize output to handle line breaks on Windows
-    normalized_output = result.output.replace("\n", " ")
+    normalized_output = re.sub(r"\s+", " ", result.output)
     assert "4 variable(s)" in normalized_output
     assert "required" in normalized_output
     assert "secret(s)" in normalized_output

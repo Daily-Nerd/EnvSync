@@ -5,6 +5,7 @@ from 31% to 90%+. Focus on edge cases, error handling, and command variations.
 """
 
 import json
+import re
 import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -30,7 +31,7 @@ class TestInitCommand:
             # Should succeed but skip existing file
             assert result.exit_code == 0
             # Normalize output to handle line breaks on Windows
-            normalized_output = result.output.replace("\n", " ")
+            normalized_output = re.sub(r"\s+", " ", result.output)
             assert "already exists" in normalized_output or "skipping" in normalized_output.lower()
             # Original content should be preserved
             assert "EXISTING=value" in Path(".env").read_text()
@@ -138,7 +139,7 @@ class TestScanCommand:
             # Should succeed with no findings
             assert result.exit_code == 0
             # Normalize output to handle line breaks on Windows
-            normalized_output = result.output.replace("\n", " ")
+            normalized_output = re.sub(r"\s+", " ", result.output)
             assert "no secrets" in normalized_output.lower() or "clean" in normalized_output.lower()
 
     def test_scan_with_strict_mode(self, tmp_path):
@@ -496,7 +497,7 @@ VAR1 = env.require('VAR1')
             result = runner.invoke(main, ["generate", "--check"])
             assert result.exit_code == 0
             # Normalize output to handle line breaks on Windows
-            normalized_output = result.output.replace("\n", " ")
+            normalized_output = re.sub(r"\s+", " ", result.output)
             assert "up to date" in normalized_output.lower()
 
     def test_generate_with_check_mode_out_of_date(self, tmp_path):
@@ -527,7 +528,7 @@ VAR2 = env.require('VAR2')
             result = runner.invoke(main, ["generate", "--check"])
             assert result.exit_code == 1
             # Normalize output to handle line breaks on Windows
-            normalized_output = result.output.replace("\n", " ")
+            normalized_output = re.sub(r"\s+", " ", result.output)
             assert "out of date" in normalized_output.lower() or "outdated" in normalized_output.lower()
 
     def test_generate_with_output_flag(self, tmp_path):

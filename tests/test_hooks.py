@@ -1,6 +1,7 @@
 """Tests for pre-commit hooks installation and management."""
 
 import os
+import re
 import stat
 import sys
 from pathlib import Path
@@ -59,7 +60,7 @@ class TestHookInstallation:
 
         assert result.exit_code == 1
         # Normalize output to handle line breaks on Windows
-        normalized_output = result.output.replace("\n", " ")
+        normalized_output = re.sub(r"\s+", " ", result.output)
         assert "Not a git repository" in normalized_output
 
     def test_install_hooks_with_existing_hook(self, git_repo: Path) -> None:
@@ -74,7 +75,7 @@ class TestHookInstallation:
 
         assert result.exit_code == 1
         # Normalize output to handle line breaks on Windows
-        normalized_output = result.output.replace("\n", " ")
+        normalized_output = re.sub(r"\s+", " ", result.output)
         assert "already exists" in normalized_output
 
     def test_install_hooks_force_overwrite(self, git_repo: Path) -> None:
@@ -140,7 +141,7 @@ class TestHookInstallation:
         assert result.exit_code == 0
         assert hook_file.exists()  # Should not be removed
         # Normalize output to handle line breaks on Windows
-        normalized_output = result.output.replace("\n", " ")
+        normalized_output = re.sub(r"\s+", " ", result.output)
         assert "not managed by TripWire" in normalized_output
 
 
@@ -175,7 +176,7 @@ class TestPreCommitFramework:
 
         assert result.exit_code == 1
         # Normalize output to handle line breaks on Windows
-        normalized_output = result.output.replace("\n", " ")
+        normalized_output = re.sub(r"\s+", " ", result.output)
         assert "not installed" in normalized_output
 
     def test_precommit_existing_config(self, git_repo: Path, monkeypatch) -> None:
@@ -192,7 +193,7 @@ class TestPreCommitFramework:
 
         assert result.exit_code == 1
         # Normalize output to handle line breaks on Windows
-        normalized_output = result.output.replace("\n", " ")
+        normalized_output = re.sub(r"\s+", " ", result.output)
         assert "already exists" in normalized_output
 
 
