@@ -40,10 +40,10 @@ help:
 
 # Installation
 install:
-	pip install -e .
+	uv pip install -e .
 
 install-dev:
-	pip install -e ".[dev]"
+	uv pip install -e ".[dev]"
 
 setup-dev:
 	python scripts/setup-dev.py
