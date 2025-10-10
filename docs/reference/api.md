@@ -463,7 +463,7 @@ except EnvironmentError as e:
 Work with `.tripwire.toml` schemas programmatically.
 
 ```python
-from tripwire.schema from-code Schema
+from tripwire.schema import Schema
 
 # Load schema
 schema = Schema.load(".tripwire.toml")
