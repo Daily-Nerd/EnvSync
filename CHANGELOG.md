@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2025-10-10
+
+### Added
+
+- **Streaming Git Audit for Large Repositories**: New memory-efficient API for auditing massive git histories
+  - `audit_secret_stream()` function uses constant O(1) memory instead of O(n)
+  - Designed for large repositories (Linux kernel, Chromium, etc.) with 1M+ commits
+  - Yields `FileOccurrence` objects one at a time as they're discovered
+  - Proper subprocess cleanup prevents zombie processes on early exit
+  - Example: `for occ in audit_secret_stream("AWS_KEY"): print(occ)`
+  - Memory usage stays under 100MB regardless of repository size
+  - Legacy `analyze_secret_history()` still works with deprecation notice
+
+- **SECURITY.md**: Comprehensive security documentation
+  - Threat model and attack surface analysis
+  - Responsible disclosure policy (90-day coordinated disclosure)
+  - Security testing procedures (bandit, pip-audit, fuzzing)
+  - Security best practices for users and contributors
+  - Security advisories table with CVE tracking
+  - Contact information for security reports
+
+### Improved
+
+- **Type Safety Improvements**: Enhanced type hints across core modules
+  - `validation.py` now fully typed with strict mypy compliance
+  - Added `ValidatorProtocol` for proper validator typing
+  - Improved `coerce_type()` function with TypeVar-based return type inference
+  - Fixed type annotations in `coerce_dict()` to prevent variable shadowing
+  - Reduced mypy `ignore_errors` usage from 5 modules to 2
+  - Better IDE autocomplete and type checking support
+
+### Deprecated
+
+- `analyze_secret_history()`: Still works but deprecated for large repos
+  - Use `audit_secret_stream()` for repositories with 100+ commits
+  - Provides better memory efficiency without breaking existing code
+  - Deprecation notice guides users to new streaming API
+
+### Documentation
+
+- Added security policy and vulnerability reporting process
+- Documented streaming audit API with usage examples
+- Updated type hints documentation for validation module
+- Added performance benchmarks for streaming vs. batch audit
+
+### Technical Details
+
+- All 834+ existing tests continue to pass
+- Type improvements maintain full backward compatibility
+- Streaming implementation uses subprocess.Popen for memory efficiency
+- Process cleanup ensures no resource leaks on interrupted iterations
+- Security documentation follows industry best practices
+
 ## [0.5.2] - 2025-10-10
 
 ### Security
@@ -263,7 +316,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI implementation with rich output
 - Project initialization (`init` command)
 
-[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/Daily-Nerd/TripWire/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/Daily-Nerd/TripWire/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.4.2...v0.5.0

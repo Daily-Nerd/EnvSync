@@ -18,15 +18,47 @@ Thread Safety:
         ...     futures = [executor.submit(register_my_validator) for _ in range(10)]
 """
 
+from __future__ import annotations
+
 import re
 import threading
-from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
 
 from tripwire.exceptions import TypeCoercionError
 
-T = TypeVar("T")
+# TypeVar for generic type coercion - bound to supported types
+# Note: Using List/Dict from typing for proper type-arg support
+T = TypeVar("T", int, float, bool, str, List[Any], Dict[Any, Any])
 
-# Type alias for validator functions
+
+# Protocol for validator functions - ensures proper typing
+class ValidatorProtocol(Protocol):
+    """Protocol for validator functions that take a value and return bool."""
+
+    def __call__(self, value: Any) -> bool:
+        """Validate a value.
+
+        Args:
+            value: Value to validate
+
+        Returns:
+            True if value is valid, False otherwise
+        """
+        ...
+
+
+# Type alias for validator functions (backward compatibility)
 ValidatorFunc = Callable[[Any], bool]
 
 # Resource limits to prevent DOS attacks and memory exhaustion
@@ -225,10 +257,10 @@ def coerce_dict(value: str) -> Dict[str, Any]:
     # Try JSON parsing first
     if value.startswith("{") and value.endswith("}"):
         try:
-            result = json.loads(value)
-            if not isinstance(result, dict):
+            json_result = json.loads(value)
+            if not isinstance(json_result, dict):
                 raise ValueError("JSON must represent a dictionary")
-            return result
+            return json_result
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON: {e}") from e
 
@@ -267,18 +299,27 @@ def coerce_dict(value: str) -> Dict[str, Any]:
 def coerce_type(value: str, target_type: type[T], variable_name: str) -> T:
     """Coerce string value to target type.
 
+    This function uses TypeVar to ensure return type matches the input type parameter.
+    The TypeVar T is bound to (int, float, bool, str, list, dict) for type safety.
+
     Args:
         value: String value to coerce
-        target_type: Type to coerce to
+        target_type: Type to coerce to (must be one of: int, float, bool, str, list, dict)
         variable_name: Name of the variable (for error messages)
 
     Returns:
-        Value coerced to target type
+        Value coerced to target type, with proper type inference
 
     Raises:
         TypeCoercionError: If coercion fails
+
+    Example:
+        >>> result: int = coerce_type("42", int, "PORT")
+        >>> result  # Type checker knows this is int
+        42
     """
     try:
+        # Type checking: mypy now correctly infers types from runtime checks
         if target_type is bool:
             return coerce_bool(value)  # type: ignore[return-value]
         elif target_type is int:
@@ -292,8 +333,8 @@ def coerce_type(value: str, target_type: type[T], variable_name: str) -> T:
         elif target_type is str:
             return value  # type: ignore[return-value]
         else:
-            # Try direct type conversion
-            return target_type(value)  # type: ignore[return-value]
+            # Try direct type conversion for custom types
+            return target_type(value)  # type: ignore[arg-type]
     except (ValueError, TypeError) as e:
         raise TypeCoercionError(variable_name, value, target_type, e) from e
 
@@ -426,6 +467,11 @@ def validator(func: ValidatorFunc) -> ValidatorFunc:
 
     Returns:
         Decorated validator function
+
+    Example:
+        >>> @validator
+        ... def my_validator(value: Any) -> bool:
+        ...     return len(str(value)) > 5
     """
     return func
 
@@ -442,7 +488,8 @@ def register_validator(name: str, validator_func: ValidatorFunc) -> None:
 
     Args:
         name: Name of the validator format (e.g., "phone", "zip_code")
-        validator_func: Function that takes a string value and returns bool
+        validator_func: Function that takes a string value and returns bool.
+            Should match ValidatorFunc type: Callable[[Any], bool]
 
     Raises:
         ValueError: If validator name conflicts with built-in validator

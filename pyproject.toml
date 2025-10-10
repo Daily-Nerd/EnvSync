@@ -1,6 +1,6 @@
 [project]
 name = "tripwire-py"
-version = "0.5.2"
+version = "0.6.0-rc1"
 description = "Catch config errors before they explode - Python environment variable management with import-time validation, type safety, and secret detection"
 authors = [
     { name = "Kibukx" }
@@ -148,13 +148,12 @@ strict_concatenate = true
 module = "tests.*"
 disallow_untyped_defs = false
 
+# v0.6.0: Type safety improvements - validation.py fully typed
+# TODO: Remove remaining ignore_errors in future release
 [[tool.mypy.overrides]]
 module = [
-  "tripwire.secrets",
-  "tripwire.scanner",
-  "tripwire.validation",
-  "tripwire.cli",
-  "tripwire.core",
+  "tripwire.cli",  # Click integration needs stubs
+  "tripwire.core",  # Frame inspection edge cases
 ]
 ignore_errors = true
 
