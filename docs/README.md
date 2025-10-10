@@ -31,7 +31,7 @@ New to TripWire? Start here:
   - Core commands (init, generate, check, sync, diff)
   - Secret management (scan, audit)
   - Schema commands (init, validate, check, import, generate-example)
-  - Migration tools (migrate-to-schema)
+  - Migration tools (schema from-example)
 
 - **[Configuration as Code](guides/configuration-as-code.md)** - Schema-based configuration
   - `.tripwire.toml` schemas
@@ -183,14 +183,14 @@ Deep dives for power users:
 
 ### What's New
 
-- **[v0.4.1](../CHANGELOG.md#041)** - Tool configuration, migrate-to-schema command
+- **[v0.4.1](../CHANGELOG.md#041)** - Tool configuration, schema from-example command
 - **[v0.4.0](../CHANGELOG.md#040)** - Type inference, diff command, unified config abstraction
 - **[v0.3.0](../CHANGELOG.md#030)** - Configuration as Code (TOML schemas)
 - **[v0.2.0](../CHANGELOG.md#020)** - Git audit with timeline and remediation
 
 ### Migration Guides
 
-- [Migrate to v0.4.1](guides/cli-reference.md#tripwire-migrate-to-schema) - Legacy `.env.example` to schema
+- [Migrate to v0.4.1](guides/cli-reference.md#tripwire-schema from-example) - Legacy `.env.example` to schema
 - [Type Inference Migration](reference/type-inference.md) - Adopting automatic type inference
 
 ---
@@ -287,7 +287,7 @@ Can't find what you need? Try these strategies:
 - Type inference → [Type Inference (v0.4.0)](reference/type-inference.md)
 - Diff command → [CLI Reference - diff (v0.4.0)](guides/cli-reference.md#tripwire-diff)
 - Tool configuration → [Configuration (v0.4.1)](reference/configuration.md)
-- Schema migration → [CLI Reference - migrate-to-schema (v0.4.1)](guides/cli-reference.md#tripwire-migrate-to-schema)
+- Schema migration → [CLI Reference - schema from-example (v0.4.1)](guides/cli-reference.md#tripwire-schema from-example)
 
 ---
 

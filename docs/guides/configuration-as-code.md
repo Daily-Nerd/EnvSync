@@ -94,7 +94,7 @@ All environment variables are valid
 ### 4. Generate .env.example Automatically
 
 ```bash
-tripwire schema generate-example
+tripwire schema to-example
 ```
 
 Creates comprehensive `.env.example` with descriptions, types, examples, and validation rules.
@@ -235,19 +235,19 @@ Validation Errors
 └──────────────────────────────────────────┘
 ```
 
-### `tripwire schema generate-example`
+### `tripwire schema to-example`
 
 Generate `.env.example` from schema.
 
 ```bash
 # Generate .env.example
-tripwire schema generate-example
+tripwire schema to-example
 
 # Force overwrite
-tripwire schema generate-example --force
+tripwire schema to-example --force
 
 # Custom output file
-tripwire schema generate-example --output .env.template
+tripwire schema to-example --output .env.template
 ```
 
 **Generated output includes:**
@@ -277,19 +277,19 @@ DATABASE_URL=postgresql://localhost:5432/dev
 PORT=8000
 ```
 
-### `tripwire schema docs`
+### `tripwire schema to-docs`
 
 Generate documentation from schema.
 
 ```bash
 # Generate markdown docs to stdout
-tripwire schema docs
+tripwire schema to-docs
 
 # Save to file
-tripwire schema docs --output ENV_VARS.md
+tripwire schema to-docs --output ENV_VARS.md
 
 # HTML format
-tripwire schema docs --format html --output docs.html
+tripwire schema to-docs --format html --output docs.html
 ```
 
 **Output includes:**
@@ -381,13 +381,13 @@ jobs:
         run: pip install tripwire-py
 
       - name: Generate .env.example from schema
-        run: tripwire schema generate-example --output /tmp/generated.env.example
+        run: tripwire schema to-example --output /tmp/generated.env.example
 
       - name: Check if .env.example is up to date
         run: |
           if ! diff -q .env.example /tmp/generated.env.example; then
             echo "::error::.env.example is out of sync with schema!"
-            echo "Run: tripwire schema generate-example --force"
+            echo "Run: tripwire schema to-example --force"
             diff .env.example /tmp/generated.env.example
             exit 1
           fi
@@ -452,13 +452,13 @@ jobs:
       - name: Install TripWire
         run: pip install tripwire-py
       - name: Generate docs
-        run: tripwire schema docs --output /tmp/ENV_VARS.md
+        run: tripwire schema to-docs --output /tmp/ENV_VARS.md
       - name: Check if docs are current
         run: |
           if [ -f docs/ENV_VARS.md ]; then
             if ! diff -q docs/ENV_VARS.md /tmp/ENV_VARS.md; then
               echo "::warning::Documentation is out of sync"
-              echo "Run: tripwire schema docs --output docs/ENV_VARS.md"
+              echo "Run: tripwire schema to-docs --output docs/ENV_VARS.md"
             fi
           fi
 
@@ -507,7 +507,7 @@ git clone repo-url
 cd repo
 
 # 2. Initialize environment
-tripwire schema generate-example
+tripwire schema to-example
 cp .env.example .env
 
 # 3. Validate setup
@@ -530,7 +530,7 @@ Keep environment variable documentation in sync automatically:
 
 ```bash
 # Generate documentation
-tripwire schema docs --output docs/ENV_VARS.md
+tripwire schema to-docs --output docs/ENV_VARS.md
 
 # Commit to repo
 git add docs/ENV_VARS.md
@@ -659,7 +659,7 @@ Update your workflow to use schema:
 tripwire generate
 
 # New
-tripwire schema generate-example
+tripwire schema to-example
 ```
 
 ### From Code Scanning to Schema

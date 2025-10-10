@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2025-10-10
+
+### Changed
+
+- **Schema Command Reorganization**: Renamed commands for better clarity and consistency
+  - `migrate-to-schema` → `schema from-example` (moved to schema group)
+  - `schema generate-example` → `schema to-example` (clearer directionality)
+  - `schema import` → `schema from-code` (explicit about source)
+  - All schema operations now use clear `from-*/to-*` naming pattern
+
+### Documentation
+
+- Updated all documentation and examples to reflect new command names
+- Enhanced CLI help text with improved user guidance
+- Updated README, guides, and API reference
+
+### Technical Details
+
+- Comprehensive test updates for new command structure
+- Maintains backward compatibility through command aliases
+- 12 files updated across codebase
+
 ## [0.4.2] - 2025-10-10
 
 ### Added
@@ -165,7 +187,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI implementation with rich output
 - Project initialization (`init` command)
 
-[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/Daily-Nerd/TripWire/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/Daily-Nerd/TripWire/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.3.0...v0.4.0

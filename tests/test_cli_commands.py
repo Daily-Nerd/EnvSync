@@ -815,7 +815,7 @@ DEBUG = env.optional('DEBUG', default=False, type=bool)
 """
             )
 
-            result = runner.invoke(main, ["schema", "import"])
+            result = runner.invoke(main, ["schema", "from-code"])
 
             # Should create schema file
             assert result.exit_code == 0
@@ -837,7 +837,7 @@ API_KEY = env.require('API_KEY')
             # Create existing schema file
             Path("tripwire.schema.json").write_text('{"version": "1.0"}')
 
-            result = runner.invoke(main, ["schema", "import", "--force"])
+            result = runner.invoke(main, ["schema", "from-code", "--force"])
 
             # Should overwrite with --force
             assert result.exit_code in (0, 1)

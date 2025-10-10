@@ -21,13 +21,13 @@ Complete reference for all TripWire CLI commands with examples and best practice
   - [schema init](#tripwire-schema-init)
   - [schema validate](#tripwire-schema-validate)
   - [schema check](#tripwire-schema-check)
-  - [schema import](#tripwire-schema-import)
-  - [schema generate-example](#tripwire-schema-generate-example)
+  - [schema from-code](#tripwire-schema-import)
+  - [schema to-example](#tripwire-schema-generate-example)
 - [Validation](#validation)
   - [validate](#tripwire-validate)
   - [docs](#tripwire-docs)
 - [Migration](#migration)
-  - [migrate-to-schema](#tripwire-migrate-to-schema)
+  - [schema from-example](#tripwire-schema from-example)
 
 ---
 
@@ -513,7 +513,7 @@ tripwire schema init --force
 Next steps:
   1. Edit .tripwire.toml to define your environment variables
   2. Run tripwire schema validate to check your .env file
-  3. Run tripwire schema generate-example to create .env.example from schema
+  3. Run tripwire schema to-example to create .env.example from schema
 ```
 
 **Generated File:**
@@ -619,13 +619,13 @@ Checking .tripwire.toml...
 
 ---
 
-### `tripwire schema import`
+### `tripwire schema from-code`
 
 Generate `.tripwire.toml` schema from your code.
 
 **Syntax:**
 ```bash
-tripwire schema import [OPTIONS]
+tripwire schema from-code [OPTIONS]
 ```
 
 **Options:**
@@ -636,13 +636,13 @@ tripwire schema import [OPTIONS]
 
 ```bash
 # Generate schema from code
-tripwire schema import
+tripwire schema from-code
 
 # Custom output
-tripwire schema import --output custom.toml
+tripwire schema from-code --output custom.toml
 
 # Force overwrite
-tripwire schema import --force
+tripwire schema from-code --force
 ```
 
 **Output:**
@@ -663,13 +663,13 @@ Next steps:
 
 ---
 
-### `tripwire schema generate-example`
+### `tripwire schema to-example`
 
 Generate `.env.example` from `.tripwire.toml` schema.
 
 **Syntax:**
 ```bash
-tripwire schema generate-example [OPTIONS]
+tripwire schema to-example [OPTIONS]
 ```
 
 **Options:**
@@ -681,13 +681,13 @@ tripwire schema generate-example [OPTIONS]
 
 ```bash
 # Generate .env.example from schema
-tripwire schema generate-example
+tripwire schema to-example
 
 # Custom output
-tripwire schema generate-example --output .env.dev
+tripwire schema to-example --output .env.dev
 
 # Force overwrite
-tripwire schema generate-example --force
+tripwire schema to-example --force
 ```
 
 **Output:**
@@ -792,13 +792,13 @@ This document describes all environment variables used in this project.
 
 ## Migration
 
-### `tripwire migrate-to-schema`
+### `tripwire schema from-example`
 
 Migrate legacy `.env.example` to modern `.tripwire.toml` schema. (New in v0.4.1)
 
 **Syntax:**
 ```bash
-tripwire migrate-to-schema [OPTIONS]
+tripwire schema from-example [OPTIONS]
 ```
 
 **Options:**
@@ -810,13 +810,13 @@ tripwire migrate-to-schema [OPTIONS]
 
 ```bash
 # Migrate .env.example to schema
-tripwire migrate-to-schema
+tripwire schema from-example
 
 # Custom input/output
-tripwire migrate-to-schema --env-example .env.sample --output schema.toml
+tripwire schema from-example --env-example .env.sample --output schema.toml
 
 # Force overwrite
-tripwire migrate-to-schema --force
+tripwire schema from-example --force
 ```
 
 **Output:**
