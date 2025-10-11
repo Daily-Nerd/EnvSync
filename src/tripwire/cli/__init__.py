@@ -9,15 +9,16 @@ from tripwire.branding import LOGO_BANNER, LOGO_SIMPLE
 
 # Import all commands
 from tripwire.cli.commands import (
-    audit,
     check,
+    deprecated_audit,
+    deprecated_scan,
     diff,
     docs,
     generate,
     init,
     install_hooks,
-    scan,
     schema,
+    security,
     sync,
     validate,
 )
@@ -50,13 +51,16 @@ main.add_command(generate.generate)
 main.add_command(check.check)
 main.add_command(validate.validate)
 main.add_command(sync.sync)
-main.add_command(scan.scan)
-main.add_command(audit.audit)
 main.add_command(docs.docs)
 main.add_command(diff.diff)
 main.add_command(install_hooks.install_hooks, name="install-hooks")
 
-# Register schema command group
+# Register command groups
 main.add_command(schema.schema)
+main.add_command(security)
+
+# Register deprecated aliases for backwards compatibility
+main.add_command(deprecated_scan)
+main.add_command(deprecated_audit)
 
 __all__ = ["main"]

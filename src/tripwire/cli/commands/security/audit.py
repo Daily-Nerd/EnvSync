@@ -1,4 +1,4 @@
-"""Audit command for TripWire CLI."""
+"""Security audit command for TripWire CLI."""
 
 import json
 import sys
@@ -15,7 +15,7 @@ from tripwire.cli.formatters.audit import (
 from tripwire.cli.utils.console import console
 
 
-@click.command()
+@click.command(name="audit")
 @click.argument("secret_name", required=False)
 @click.option(
     "--all",
@@ -34,6 +34,11 @@ from tripwire.cli.utils.console import console
     help="Maximum commits to analyze",
 )
 @click.option(
+    "--strict",
+    is_flag=True,
+    help="Exit with error if secrets found in git history",
+)
+@click.option(
     "--json",
     "output_json",
     is_flag=True,
@@ -44,22 +49,26 @@ def audit(
     scan_all: bool,
     value: Optional[str],
     max_commits: int,
+    strict: bool,
     output_json: bool,
 ) -> None:
-    """Audit git history for secret leaks.
+    """Deep forensic analysis of git history for secret leaks.
 
-    Shows when a secret was added, committed, pushed, and provides
-    remediation steps to remove it from git history.
+    Comprehensive investigation tool for security incidents. Analyzes git
+    history to show when secrets were added, how long they were exposed,
+    and provides detailed remediation steps.
+
+    For quick security checks, use 'tripwire security scan' instead.
 
     Examples:
 
-        tripwire audit --all
+        tripwire security audit --all
 
-        tripwire audit AWS_SECRET_ACCESS_KEY
+        tripwire security audit AWS_SECRET_ACCESS_KEY
 
-        tripwire audit API_KEY --value "sk-abc123..."
+        tripwire security audit API_KEY --value "sk-abc123..."
 
-        tripwire audit DATABASE_URL --json
+        tripwire security audit DATABASE_URL --json
     """
     import json
 
@@ -182,6 +191,12 @@ def audit(
         for secret, timeline in all_results:
             display_single_audit_result(secret.variable_name, timeline, console)
 
+        # Exit with error in strict mode if secrets found in git history
+        if strict:
+            has_leaked_secrets = any(timeline.total_occurrences > 0 for _, timeline in all_results)
+            if has_leaked_secrets:
+                sys.exit(1)
+
         return
 
     # Single secret mode
@@ -237,6 +252,10 @@ def audit(
 
     # Display single secret result using helper function
     display_single_audit_result(secret_name, timeline, console)
+
+    # Exit with error in strict mode if secret found in git history
+    if strict and timeline.total_occurrences > 0:
+        sys.exit(1)
 
 
 __all__ = ["audit"]

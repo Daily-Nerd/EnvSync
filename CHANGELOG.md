@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2025-10-10
+
+### Added
+
+- **Security Command Group**: Introduced `tripwire security` parent command for better organization
+  - `tripwire security scan` - Quick security check designed for pre-commit hooks and CI/CD
+  - `tripwire security audit` - Deep forensic analysis for security incident investigation
+  - Clear separation between fast scanning and comprehensive auditing
+  - Enhanced `audit` command with `--strict` flag for exit-on-error behavior
+
+- **Pre-commit Hooks**: Added TripWire-specific hooks for schema validation and secret scanning
+  - Better integration with development workflow
+  - Enhanced status messaging with context-aware risk levels
+
+### Changed
+
+- **Command Organization**: Security commands moved to `cli/commands/security/` subfolder
+  - Better code organization and scalability
+  - Follows pattern established by schema command group
+
+### Improved
+
+- **Boolean Type Inference**: Enhanced detection of boolean values in schema generation
+  - Comprehensive pattern matching including various boolean representations
+  - Better whitespace handling
+
+### Deprecated
+
+- **Top-level Security Commands**: `tripwire scan` and `tripwire audit` are now deprecated
+  - Commands still functional but display deprecation warnings
+  - Users should migrate to `tripwire security scan` and `tripwire security audit`
+  - Deprecated commands hidden from help output but remain available
+  - Will be removed in v1.0.0
+
+### Technical Details
+
+- Maintained 100% backward compatibility with deprecated aliases
+- Updated pre-commit configuration to use new command structure
+- Enhanced help text with clear use case distinctions
+- All existing tests continue to pass
+
 ## [0.7.1] - 2025-10-10
 
 ### Security
@@ -385,7 +426,8 @@ utils/ subdirectories
 - CLI implementation with rich output
 - Project initialization (`init` command)
 
-[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/Daily-Nerd/TripWire/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.5.2...v0.6.0

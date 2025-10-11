@@ -115,7 +115,7 @@ repos:
 
       - id: tripwire-secret-scan
         name: TripWire Secret Scan
-        entry: tripwire scan --strict
+        entry: tripwire security scan --strict
         language: system
         pass_filenames: false
         always_run: true

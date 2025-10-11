@@ -1,4 +1,4 @@
-"""Scan command for TripWire CLI."""
+"""Security scan command for TripWire CLI."""
 
 import sys
 from pathlib import Path
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from tripwire.git_audit import SecretTimeline
 
 
-@click.command()
+@click.command(name="scan")
 @click.option(
     "--strict",
     is_flag=True,
@@ -29,10 +29,13 @@ if TYPE_CHECKING:
     help="Number of git commits to scan",
 )
 def scan(strict: bool, depth: int) -> None:
-    """Scan for secrets in git history.
+    """Quick security check for secrets in .env and git history.
 
-    Detects potential secrets (API keys, tokens, passwords) in your
-    git repository to prevent accidental commits.
+    Fast scan designed for pre-commit hooks and CI/CD pipelines.
+    Detects potential secrets (API keys, tokens, passwords) to prevent
+    accidental commits.
+
+    For deep forensic analysis, use 'tripwire security audit' instead.
     """
     from rich.panel import Panel
     from rich.table import Table
