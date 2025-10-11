@@ -650,9 +650,10 @@ def schema_from_example(source: str, output: str, force: bool, dry_run: bool) ->
 
         is_secret = var_data.get("secret", False)
 
-        if "default" in var_data:
-            if not is_secret or not is_real_env:
-                toml_var["default"] = var_data["default"]
+        # Security: Never include defaults for secrets in schema (v0.7.1)
+        # Secrets must be explicitly configured in .env files, not committed to git
+        if "default" in var_data and not is_secret:
+            toml_var["default"] = var_data["default"]
 
         if var_data.get("description"):
             toml_var["description"] = var_data["description"]
@@ -709,6 +710,7 @@ def schema_from_example(source: str, output: str, force: bool, dry_run: bool) ->
             console.print(f"  - {optional_count} optional")
         if secret_count:
             console.print(f"  - {secret_count} secret(s)")
+            console.print("  [dim](secrets have no defaults for security)[/dim]")
 
         console.print("\n[cyan]Next:[/cyan]")
         console.print(f"  • Review {output} and adjust types/validation rules")
@@ -853,6 +855,12 @@ def schema_check(schema_file: str) -> None:
 
             if var_config.get("secret") and "examples" in var_config:
                 warnings.append(f"variables.{var_name}: Secret variable has examples " "(avoid showing real secrets)")
+
+    # Check 7: Security - secrets should not have defaults (v0.7.1)
+    if "variables" in data:
+        for var_name, var_config in data["variables"].items():
+            if var_config.get("secret") and "default" in var_config:
+                warnings.append(f"variables.{var_name}: Secret has default value (security risk - remove default)")
 
     # Display errors and warnings
     console.print()

@@ -550,12 +550,17 @@ def detect_generic_credential(variable_name: str, value: str, line_number: int) 
     - SERVER_SECRET=production_key_2024
     - API_TOKEN=secure_token_xyz
     - ENCRYPTION_KEY=base64encodedkey
+    - DB_PASSWORD=password (placeholder detection)
+    - CREDENTIALS=your-credentials-here (placeholder detection)
 
     Uses a multi-factor approach:
-    1. Variable name matching (PASSWORD, SECRET, TOKEN, KEY, etc.)
-    2. Value validation (length, entropy, format)
-    3. Dynamic entropy thresholds based on credential type
-    4. False positive filtering (DEBUG=true, PORT=8080, etc.)
+    1. Placeholder detection for secret variables (v0.7.1+)
+       - Detects common placeholders (password, your-*-here, etc.) when variable name contains secret keywords
+       - Bypasses entropy/complexity checks for known placeholder patterns
+    2. Variable name matching (PASSWORD, SECRET, TOKEN, KEY, CREDENTIALS, etc.)
+    3. Value validation (length, entropy, format)
+    4. Dynamic entropy thresholds based on credential type
+    5. False positive filtering (DEBUG=true, PORT=8080, etc.)
 
     Args:
         variable_name: Environment variable name
@@ -588,7 +593,16 @@ def detect_generic_credential(variable_name: str, value: str, line_number: int) 
         },
         {
             "type": SecretType.GENERIC_API_SECRET,
-            "keywords": ["SECRET", "API_SECRET", "CLIENT_SECRET", "APP_SECRET", "API_KEY", "APIKEY"],
+            "keywords": [
+                "SECRET",
+                "API_SECRET",
+                "CLIENT_SECRET",
+                "APP_SECRET",
+                "API_KEY",
+                "APIKEY",
+                "CREDENTIALS",
+                "CREDENTIAL",
+            ],
             "min_length": 16,
             "min_entropy": 3.5,
             "severity": "high",
@@ -603,6 +617,85 @@ def detect_generic_credential(variable_name: str, value: str, line_number: int) 
             "exclude_keywords": ["PUBLIC", "PATH", "FILE"],
         },
     ]
+
+    # Bug fix (v0.7.1): Detect placeholder values for secret variables
+    # Common placeholders like "password", "your-api-key-here" have low entropy
+    # but should still be marked as secrets based on variable name context
+
+    # Special case: If value is a common placeholder AND variable name has secret keywords,
+    # mark as secret regardless of entropy/complexity (these are placeholder values for secrets)
+    common_placeholder_values = [
+        "password",
+        "secret",
+        "token",
+        "key",
+        "credentials",
+        "changeme",
+        "change_me",
+        "example",
+        "placeholder",
+        "your-password-here",
+        "your-secret-here",
+        "your-token-here",
+        "your-key-here",
+        "your-credentials-here",
+    ]
+
+    value_lower = value.lower()
+
+    # Check for exact matches or pattern matches
+    is_common_placeholder = (
+        value_lower in common_placeholder_values
+        or re.match(r"^your[-_].+[-_]here$", value_lower)
+        or re.match(r"^(password|secret|token|key|credentials?)$", value_lower, re.IGNORECASE)
+    )
+
+    if is_common_placeholder:
+        # Check if variable name contains ANY secret-related keyword
+        all_keywords = [
+            "PASSWORD",
+            "PASSWD",
+            "PWD",
+            "TOKEN",
+            "ACCESS_TOKEN",
+            "AUTH_TOKEN",
+            "SECRET",
+            "API_SECRET",
+            "CLIENT_SECRET",
+            "API_KEY",
+            "APIKEY",
+            "CREDENTIALS",
+            "CREDENTIAL",
+            "ENCRYPTION_KEY",
+            "PRIVATE_KEY",
+        ]
+
+        if any(keyword in var_name_upper for keyword in all_keywords):
+            # Determine appropriate secret type and severity
+            if any(kw in var_name_upper for kw in ["PASSWORD", "PASSWD", "PWD"]):
+                secret_type = SecretType.GENERIC_PASSWORD
+                severity = "critical"
+            elif any(kw in var_name_upper for kw in ["TOKEN", "ACCESS_TOKEN", "AUTH_TOKEN"]):
+                secret_type = SecretType.GENERIC_TOKEN
+                severity = "high"
+            elif any(kw in var_name_upper for kw in ["CREDENTIALS", "CREDENTIAL"]):
+                secret_type = SecretType.GENERIC_API_SECRET
+                severity = "high"
+            elif any(kw in var_name_upper for kw in ["ENCRYPTION_KEY", "PRIVATE_KEY", "SIGNING_KEY"]):
+                secret_type = SecretType.GENERIC_ENCRYPTION_KEY
+                severity = "critical"
+            else:
+                secret_type = SecretType.GENERIC_API_SECRET
+                severity = "high"
+
+            return SecretMatch(
+                secret_type=secret_type,
+                variable_name=variable_name,
+                value=redact_value(value),
+                line_number=line_number,
+                severity=severity,
+                recommendation=get_recommendation(secret_type),
+            )
 
     # False positive filters - common non-secret variable patterns
     false_positive_patterns = [

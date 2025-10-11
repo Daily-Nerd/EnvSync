@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2025-10-10
+
+### Security
+
+- **Secrets Never Stored in Schema Files**: Critical security fix to prevent accidental secret exposure
+  - `schema from-example` now excludes default values for all detected secrets
+  - Secrets are marked as `secret = true` but never include `default` field in .tripwire.toml
+  - Prevents committing real credentials when migrating from .env instead of .env.example
+  - `schema check` warns when secrets have defaults (bad practice)
+  - Protects against accidental exposure of API keys, passwords, tokens in version control
+
+### Added
+
+- **Enhanced Secret Detection**: Improved secret identification in schema generation
+  - Comprehensive detection using 45+ platform-specific patterns
+  - Entropy analysis for unknown secret types
+  - Validates secrets exclude defaults while non-secrets preserve them
+  - 282 new tests for schema security behavior
+
+### Documentation
+
+- Removed urgent security contact email from SECURITY.md per project policy
+
+### Technical Details
+
+- Updated `schema from-example` command to filter secret defaults
+- Added validation in `schema check` to warn about secrets with defaults
+- All 885+ tests passing with security improvements
+
 ## [0.7.0] - 2025-10-10
 
 ### Changed
@@ -356,7 +385,8 @@ utils/ subdirectories
 - CLI implementation with rich output
 - Project initialization (`init` command)
 
-[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/Daily-Nerd/TripWire/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/Daily-Nerd/TripWire/compare/v0.5.1...v0.5.2
