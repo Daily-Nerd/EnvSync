@@ -103,7 +103,8 @@ class TestCacheRaceCondition:
 
     def test_cache_lru_eviction(self) -> None:
         """Test that cache implements LRU eviction to prevent unbounded growth."""
-        from tripwire.core import _CACHE_MAX_SIZE, _TYPE_INFERENCE_CACHE, env
+        from tripwire.core import env
+        from tripwire.core.inference import _CACHE_MAX_SIZE, _TYPE_INFERENCE_CACHE
 
         # Clear cache first
         _TYPE_INFERENCE_CACHE.clear()

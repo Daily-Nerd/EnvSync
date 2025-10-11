@@ -25,6 +25,7 @@ from typing import (
 
 from dotenv import load_dotenv
 
+from tripwire.core.registry import VariableMetadata, VariableRegistry
 from tripwire.exceptions import (
     EnvFileNotFoundError,
     MissingVariableError,
@@ -127,7 +128,7 @@ class TripWire:
         self.strict = strict
         self.detect_secrets = detect_secrets
         self._loaded_files: List[Path] = []
-        self._registry: Dict[str, Dict[str, Any]] = {}
+        self._registry = VariableRegistry()
 
         if auto_load and self.env_file.exists():
             self.load(self.env_file)
@@ -868,21 +869,36 @@ class TripWire:
             description: Description
             secret: Whether variable is secret
         """
-        self._registry[name] = {
-            "required": required,
-            "type": type_.__name__,
-            "default": default,
-            "description": description,
-            "secret": secret,
-        }
+        metadata = VariableMetadata(
+            name=name,
+            required=required,
+            type_name=type_.__name__,
+            default=default,
+            description=description,
+            secret=secret,
+        )
+        self._registry.register(metadata)
 
     def get_registry(self) -> Dict[str, Dict[str, Any]]:
         """Get the registry of all registered variables.
 
         Returns:
-            Registry dictionary
+            Registry dictionary in legacy format for backward compatibility
         """
-        return self._registry.copy()
+        # Convert VariableRegistry to legacy dict format for backward compatibility
+        all_metadata = self._registry.get_all()
+        legacy_format: Dict[str, Dict[str, Any]] = {}
+
+        for name, metadata in all_metadata.items():
+            legacy_format[name] = {
+                "required": metadata.required,
+                "type": metadata.type_name,
+                "default": metadata.default,
+                "description": metadata.description,
+                "secret": metadata.secret,
+            }
+
+        return legacy_format
 
 
 # Module-level singleton instance for convenient usage

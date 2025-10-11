@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2025-10-11
+
+### Added
+
+- **Core Architecture Refactoring**: Introduced modular core component structure following SOLID principles
+  - `core/registry.py` - Thread-safe variable registration and metadata storage
+  - `core/loader.py` - Environment file loading with source abstraction
+  - `core/inference.py` - Type inference engine using strategy pattern with frame inspection and caching
+  - `core/validation_orchestrator.py` - Validation rule chain using Chain of Responsibility pattern
+  - Backward compatible: Legacy `TripWire` class moved to `_core_legacy.py`
+
+- **Enhanced Type Inference**: Implemented `TypeInferenceEngine` with caching and strategy pattern
+  - Performance-optimized frame inspection for type detection
+  - Pluggable inference strategies for future extensibility
+  - Thread-safe caching layer for improved performance
+
+- **Validation Orchestrator**: Reusable validation rule system
+  - `FormatValidationRule` - Format-specific validation (email, URL, etc.)
+  - `PatternValidationRule` - Regex pattern matching
+  - `ChoicesValidationRule` - Enum/choice validation
+  - `RangeValidationRule` - Numeric range validation
+  - `LengthValidationRule` - String length constraints
+  - `CustomValidationRule` - User-defined validation functions
+  - Composable validation chains for complex rules
+
+- **Variable Registry**: Centralized metadata management
+  - Thread-safe variable registration
+  - Enhanced introspection capabilities
+  - Better documentation generation support
+
+### Technical Details
+
+- Added 1,600+ lines of new core architecture code
+- Added 1,601 lines of comprehensive tests across 4 new test modules
+- 100% backward compatibility maintained via `_core_legacy.py`
+- All existing functionality preserved while enabling future extensibility
+
 ## [0.8.1] - 2025-10-11
 
 ### Security
@@ -458,7 +495,8 @@ utils/ subdirectories
 - CLI implementation with rich output
 - Project initialization (`init` command)
 
-[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/Daily-Nerd/TripWire/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/Daily-Nerd/TripWire/compare/v0.7.0...v0.7.1
