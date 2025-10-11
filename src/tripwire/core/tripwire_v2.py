@@ -133,11 +133,21 @@ class TripWireV2:
             self._loader = loader
 
         # Auto-load if enabled
-        if auto_load and self.env_file.exists():
-            self._loader.load_all()
-            # Track loaded file for backward compatibility
-            if self.env_file not in self._loaded_files:
-                self._loaded_files.append(self.env_file)
+        # Note: When using custom loader, we always call load_all() regardless of self.env_file
+        # The custom loader knows which files to load
+        if auto_load:
+            if loader is not None:
+                # Custom loader injected - always load (loader knows what files to load)
+                self._loader.load_all()
+                # Track loaded files from the custom loader
+                loaded_files = self._loader.get_loaded_files()
+                self._loaded_files.extend(loaded_files)
+            elif self.env_file.exists():
+                # Default loader - only load if env_file exists
+                self._loader.load_all()
+                # Track loaded file for backward compatibility
+                if self.env_file not in self._loaded_files:
+                    self._loaded_files.append(self.env_file)
 
     def require(
         self,
