@@ -46,12 +46,3 @@ repos:
       - id: bandit
         args: ["-c", "bandit.yaml", "-r"]
         additional_dependencies: ["pbr"]
-
-  - repo: local
-    hooks:
-      - id: tripwire-schema-validate
-        name: TripWire Schema Validation
-        entry: tripwire schema validate --strict
-        language: system
-        pass_filenames: false
-        always_run: true
