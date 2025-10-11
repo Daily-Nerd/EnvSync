@@ -35,7 +35,7 @@ from tripwire.cli.utils import console, print_help_with_banner
     callback=print_help_with_banner,
     help="Show this message and exit.",
 )
-@click.version_option(version="0.8.1", prog_name="tripwire", message=f"{LOGO_SIMPLE}\nVersion: %(version)s")
+@click.version_option(version="0.9.0", prog_name="tripwire", message=f"{LOGO_SIMPLE}\nVersion: %(version)s")
 def main() -> None:
     """TripWire - Catch config errors before they explode.
 
