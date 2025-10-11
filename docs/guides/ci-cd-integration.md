@@ -2,7 +2,44 @@
 
 # CI/CD Integration Guide
 
-Automate TripWire validation in your CI/CD pipeline.
+TripWire pre-commit hooks work seamlessly in both local development and CI/CD environments **without any configuration changes**. This guide shows you how to leverage TripWire's intelligent `--strict` mode for zero-config CI/CD integration.
+
+## Quick Start
+
+TripWire's `--strict` flag provides intelligent behavior that adapts to context:
+
+- **CI/CD**: Passes if `.env` missing (correctly not committed) ✅
+- **Local dev**: Validates `.env` if present ✅
+- **Pre-commit**: Skips `.gitignore`'d files ✅
+
+**One command works everywhere:**
+
+```yaml
+# Works in GitHub Actions, GitLab CI, Jenkins, locally, etc.
+tripwire schema validate --strict
+```
+
+---
+
+## The Problem (Solved)
+
+Traditional pre-commit hooks fail in CI/CD pipelines because `.env` files don't exist there (and shouldn't - they contain real secrets).
+
+**Before TripWire 0.7.2**, you needed workarounds:
+
+```yaml
+# Old workaround - DON'T DO THIS
+- run: if [ -f .env ]; then tripwire schema validate; fi
+```
+
+**With TripWire >= 0.7.2**, just use `--strict`:
+
+```yaml
+# New approach - CLEAN & SIMPLE
+- run: tripwire schema validate --strict
+```
+
+The same command works in local dev, pre-commit hooks, AND all CI/CD platforms.
 
 ---
 
@@ -30,11 +67,14 @@ jobs:
       - name: Install TripWire
         run: pip install tripwire-py
 
+      - name: Validate schema (CI/CD compatible)
+        run: tripwire schema validate --strict
+
       - name: Check .env.example is up to date
-        run: tripwire generate --check
+        run: tripwire schema to-example --check
 
       - name: Scan for secrets
-        run: tripwire scan --strict
+        run: tripwire security scan --strict
 ```
 
 ### Complete Workflow

@@ -1,5 +1,13 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
+#
+# TripWire Pre-Commit Hooks:
+#   - Schema validation: Validates .env against .tripwire.toml schema
+#     * In strict mode: Passes if .env missing (CI/CD), skips .gitignore'd files
+#     * Local mode: Validates .env if present
+#   - Secret scanning: Detects secrets in .env and git history
+#     * In strict mode: Skips .gitignore'd files to avoid local dev noise
+#
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
