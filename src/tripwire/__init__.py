@@ -12,9 +12,16 @@ Advanced usage:
     >>> from tripwire import TripWire
     >>> custom_env = TripWire(env_file=".env.production")
     >>> db_url = custom_env.require("DATABASE_URL", format="postgresql")
+
+Version 0.9.0+ uses the modern TripWireV2 implementation by default.
+The legacy implementation is available as TripWireLegacy for backward compatibility.
 """
 
-from tripwire.core import TripWire, env
+# Legacy implementation (deprecated, will be removed in v1.0.0)
+from tripwire._core_legacy import TripWireLegacy
+
+# Modern implementation (v0.9.0+)
+from tripwire.core import TripWire, TripWireV2, env
 from tripwire.exceptions import (
     DriftError,
     EnvFileNotFoundError,
@@ -29,9 +36,12 @@ from tripwire.validation import validator
 __version__ = "0.8.1"
 
 __all__ = [
-    # Core
-    "TripWire",
-    "env",
+    # Core (Modern Implementation)
+    "TripWire",  # Modern implementation (TripWireV2 alias, default)
+    "TripWireV2",  # Modern implementation (explicit name)
+    "env",  # Module-level singleton (uses modern implementation)
+    # Legacy Implementation (Deprecated)
+    "TripWireLegacy",  # Legacy implementation (deprecated, removed in v1.0.0)
     # Exceptions
     "TripWireError",
     "MissingVariableError",

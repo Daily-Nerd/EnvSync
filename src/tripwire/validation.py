@@ -459,6 +459,29 @@ def validate_choices(value: str, choices: List[str]) -> bool:
     return value in choices
 
 
+def validate_length(
+    value: str,
+    min_length: Optional[int] = None,
+    max_length: Optional[int] = None,
+) -> bool:
+    """Validate string length is within bounds.
+
+    Args:
+        value: String value to validate
+        min_length: Minimum length (inclusive), or None for no minimum
+        max_length: Maximum length (inclusive), or None for no maximum
+
+    Returns:
+        True if string length is within bounds
+    """
+    length = len(value)
+    if min_length is not None and length < min_length:
+        return False
+    if max_length is not None and length > max_length:
+        return False
+    return True
+
+
 def validator(func: ValidatorFunc) -> ValidatorFunc:
     """Decorator for creating custom validator functions.
 
