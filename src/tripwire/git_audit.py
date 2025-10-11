@@ -8,12 +8,100 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
+import warnings
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Set, Tuple
 
 from tripwire.exceptions import GitAuditError, GitCommandError, NotGitRepositoryError
+
+# ReDoS Protection: Maximum pattern length before sanitization
+_MAX_PATTERN_LENGTH: int = 1024
+
+# ReDoS Protection: Dangerous regex patterns that can cause catastrophic backtracking
+_REDOS_PATTERNS: List[str] = [
+    r"\(\w+\+\)+",  # Nested quantifiers: (a+)+
+    r"\(\w+\*\)+",  # Nested quantifiers: (a*)*
+    r"\(\w+\?\)+",  # Nested quantifiers: (a?)+
+    r"\{\d+,\d+\}",  # Bounded repetition: .{10,100}
+    r"\{\d+,\}",  # Unbounded repetition: .{1000,}
+    r"\(\.\+\)+",  # Nested any-quantifiers: (.+)+
+    r"\(\.\*\)+",  # Nested any-quantifiers: (.*)*
+]
+
+# Memory Protection: Default maximum memory usage for analyze_secret_history()
+_DEFAULT_MAX_MEMORY_MB: int = 100
+
+# Memory Protection: Estimated bytes per FileOccurrence object
+# Based on: strings (file_path ~50, author ~30, email ~30, message ~100, context ~100)
+# + metadata (dates, ints) + dataclass overhead
+_BYTES_PER_OCCURRENCE: int = 512
+
+
+def sanitize_git_pattern(pattern: str, max_length: int = _MAX_PATTERN_LENGTH) -> str:
+    """Sanitize a pattern for use in git commands to prevent ReDoS attacks.
+
+    Git's -G flag interprets patterns as regular expressions, which can be exploited
+    with malicious patterns that cause catastrophic backtracking (ReDoS), hanging
+    git processes indefinitely.
+
+    This function detects and removes dangerous regex patterns to prevent:
+    - ReDoS attacks via nested quantifiers like (a+)+, (a*)*
+    - Excessive memory usage from very long patterns
+    - Command injection via special regex characters
+
+    Args:
+        pattern: Regex pattern to sanitize
+        max_length: Maximum pattern length (default: 1024 chars)
+
+    Returns:
+        Sanitized pattern safe for git commands
+
+    Security:
+        - Enforces max_length to prevent memory exhaustion
+        - Detects nested quantifiers that cause exponential backtracking
+        - Falls back to re.escape() for suspicious patterns
+        - Prevents unbounded repetition patterns like .{1000,}
+
+    Example:
+        >>> sanitize_git_pattern("(a+)+b++++c")  # ReDoS pattern
+        '\\(a\\+\\)\\+b\\+\\+\\+\\+c'  # Escaped, safe literal search
+
+        >>> sanitize_git_pattern("normal_secret_123")
+        'normal_secret_123'  # Safe pattern unchanged
+    """
+    # Security: Enforce maximum length to prevent memory exhaustion
+    if len(pattern) > max_length:
+        # Truncate to max_length and escape for safety
+        pattern = pattern[:max_length]
+        return re.escape(pattern)
+
+    # Security: Detect dangerous ReDoS patterns
+    for redos_pattern in _REDOS_PATTERNS:
+        if re.search(redos_pattern, pattern):
+            # Found dangerous pattern, escape everything for literal search
+            return re.escape(pattern)
+
+    # Security: Check for excessive consecutive quantifiers (e.g., ++++, ****)
+    # These can cause exponential backtracking even without nesting
+    if re.search(r"[+*?]{4,}", pattern):
+        # 4+ consecutive quantifiers is suspicious
+        return re.escape(pattern)
+
+    # Security: Check for very large bounded repetition (e.g., .{10000})
+    bounded_repetition_match = re.search(r"\{(\d+)(?:,(\d+))?\}", pattern)
+    if bounded_repetition_match:
+        min_count = int(bounded_repetition_match.group(1))
+        max_count = int(bounded_repetition_match.group(2)) if bounded_repetition_match.group(2) else min_count
+
+        # If repetition count is > 1000, it's potentially dangerous
+        if max_count > 1000 or min_count > 1000:
+            return re.escape(pattern)
+
+    # Pattern appears safe, return as-is
+    return pattern
 
 
 @dataclass
@@ -79,6 +167,32 @@ class RemediationStep:
     urgency: str  # "CRITICAL", "HIGH", "MEDIUM", "LOW"
     command: Optional[str | List[str]] = None  # Can be string or list for subprocess
     warning: Optional[str] = None
+
+
+def _estimate_occurrence_size(occurrence: FileOccurrence) -> int:
+    """Estimate memory size of a FileOccurrence object in bytes.
+
+    Args:
+        occurrence: FileOccurrence object to measure
+
+    Returns:
+        Estimated size in bytes
+
+    Note:
+        This is a conservative estimate. Actual memory usage may vary
+        due to Python's memory management overhead.
+    """
+    # Base estimate from class overhead
+    size = _BYTES_PER_OCCURRENCE
+
+    # Add actual string lengths (they may be shorter or longer than estimate)
+    size += sys.getsizeof(occurrence.file_path)
+    size += sys.getsizeof(occurrence.author)
+    size += sys.getsizeof(occurrence.author_email)
+    size += sys.getsizeof(occurrence.commit_message)
+    size += sys.getsizeof(occurrence.context)
+
+    return size
 
 
 def run_git_command(
@@ -369,9 +483,13 @@ def audit_secret_stream(
     else:
         secret_pattern = rf"{re.escape(secret_name)}\s*[:=]\s*['\"]?[^\s'\";]+['\"]?"
 
+    # Security: Sanitize pattern to prevent ReDoS attacks
+    # Git's -G flag interprets patterns as regex, malicious patterns can hang git
+    sanitized_pattern = sanitize_git_pattern(secret_pattern)
+
     # Stream commit hashes using Popen for efficient iteration
     proc = subprocess.Popen(
-        ["git", "log", "-G", secret_pattern, "--all", "--format=%H"],
+        ["git", "log", "-G", sanitized_pattern, "--all", "--format=%H"],
         cwd=repo_path,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -389,7 +507,7 @@ def audit_secret_stream(
                 continue
 
             # Stream occurrences from this commit
-            for occurrence in find_secret_in_commit(commit_hash, secret_pattern, repo_path):
+            for occurrence in find_secret_in_commit(commit_hash, sanitized_pattern, repo_path):
                 yield occurrence
 
             count += 1
@@ -419,6 +537,7 @@ def analyze_secret_history(
     secret_value: Optional[str] = None,
     repo_path: Path = Path.cwd(),
     max_commits: int = 100,  # Reduced from 1000 to 100 for better performance
+    max_memory_mb: int = _DEFAULT_MAX_MEMORY_MB,
 ) -> SecretTimeline:
     """Analyze git history to find when and where a secret was leaked.
 
@@ -431,6 +550,7 @@ def analyze_secret_history(
         secret_value: Optional actual secret value to search for (more accurate)
         repo_path: Path to git repository
         max_commits: Maximum number of commits to analyze
+        max_memory_mb: Maximum memory to use in MB (default: 100MB). Prevents OOM crashes.
 
     Returns:
         SecretTimeline with all occurrences and metadata
@@ -438,6 +558,10 @@ def analyze_secret_history(
     Raises:
         NotGitRepositoryError: If path is not a git repository
         GitCommandError: If git commands fail
+
+    Warning:
+        If memory limit is reached, returns partial results with a warning.
+        Use audit_secret_stream() for large repositories to avoid memory limits.
     """
     check_git_repository(repo_path)
 
@@ -452,12 +576,16 @@ def analyze_secret_history(
         # Look for: SECRET_NAME=value or SECRET_NAME: value or "SECRET_NAME": "value"
         secret_pattern = rf"{re.escape(secret_name)}\s*[:=]\s*['\"]?[^\s'\";]+['\"]?"
 
+    # Security: Sanitize pattern to prevent ReDoS attacks
+    # Git's -G flag interprets patterns as regex, malicious patterns can hang git
+    sanitized_pattern = sanitize_git_pattern(secret_pattern)
+
     # Find all commits that potentially contain the secret
     result = run_git_command(
         [
             "log",
             "-G",
-            secret_pattern,
+            sanitized_pattern,
             "--all",
             "--format=%H",
             f"--max-count={max_commits}",
@@ -470,18 +598,40 @@ def analyze_secret_history(
     if result.returncode == 0 and result.stdout.strip():
         commit_hashes = result.stdout.strip().split("\n")
 
-    # Collect all occurrences
+    # Collect all occurrences with memory tracking
     all_occurrences: List[FileOccurrence] = []
     seen_occurrences: Set[Tuple[str, str, int]] = set()
+    estimated_memory_bytes: int = 0
+    max_memory_bytes: int = max_memory_mb * 1024 * 1024  # Convert MB to bytes
+    memory_limit_reached: bool = False
 
     for commit_hash in commit_hashes:
-        occurrences = find_secret_in_commit(commit_hash, secret_pattern, repo_path)
+        occurrences = find_secret_in_commit(commit_hash, sanitized_pattern, repo_path)
 
         for occ in occurrences:
             key = (occ.commit_hash, occ.file_path, occ.line_number)
             if key not in seen_occurrences:
+                # Security: Check memory limit before adding
+                occurrence_size = _estimate_occurrence_size(occ)
+                if estimated_memory_bytes + occurrence_size > max_memory_bytes:
+                    # Memory limit reached, stop collecting to prevent OOM
+                    memory_limit_reached = True
+                    warnings.warn(
+                        f"Memory limit of {max_memory_mb}MB reached while analyzing git history. "
+                        f"Returning partial results ({len(all_occurrences)} occurrences). "
+                        f"For large repositories, use audit_secret_stream() instead to avoid memory limits.",
+                        RuntimeWarning,
+                        stacklevel=2,
+                    )
+                    break
+
                 seen_occurrences.add(key)
                 all_occurrences.append(occ)
+                estimated_memory_bytes += occurrence_size
+
+        # Exit outer loop if memory limit reached
+        if memory_limit_reached:
+            break
 
     # Sort occurrences by date
     all_occurrences.sort(key=lambda x: x.commit_date)

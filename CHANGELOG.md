@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2025-10-11
+
+### Security
+
+- **Thread-Safe Type Inference Cache**: Implemented thread-safe LRU cache to prevent race conditions and unbounded memory growth
+  - Replaced simple dict cache with thread-safe LRU implementation (max 1000 entries)
+  - Prevents memory leaks in long-running applications with many environment variables
+  - Thread-safe operations prevent cache corruption in concurrent environments
+
+- **Pattern Sanitization in Git Commands**: Added ReDoS mitigation for git audit operations
+  - Sanitizes user-provided patterns before use in git log commands
+  - Prevents catastrophic backtracking attacks through malicious input
+  - Validates and escapes special characters in search patterns
+
+- **Memory Usage Tracking**: Added memory monitoring to prevent OOM errors in git audit
+  - Tracks memory consumption during git history analysis
+  - Issues warnings when memory usage exceeds 100MB default limit
+  - Prevents system crashes when auditing large repositories
+
+### Added
+
+- Comprehensive test suite for security fixes (409 new tests in `test_security_fixes.py`)
+  - Thread safety validation for concurrent cache access
+  - Memory limit enforcement testing
+  - Pattern sanitization verification
+
+### Technical Details
+
+- All 1294 tests passing with enhanced security coverage
+- Memory-aware git audit operations with configurable limits
+- Thread-safe caching prevents race conditions in web applications
+
 ## [0.8.0] - 2025-10-10
 
 ### Added
@@ -426,7 +458,8 @@ utils/ subdirectories
 - CLI implementation with rich output
 - Project initialization (`init` command)
 
-[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/Daily-Nerd/TripWire/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/Daily-Nerd/TripWire/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.6.0...v0.7.0

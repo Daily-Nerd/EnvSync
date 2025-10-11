@@ -45,10 +45,60 @@ T = TypeVar("T")
 # in multi-threaded environments (web servers, async workers, etc.)
 _FRAME_INFERENCE_LOCK = threading.Lock()
 
+# Separate lock for cache operations to prevent race conditions
+# (CHECK-USE-SET pattern requires atomic operations)
+_TYPE_INFERENCE_CACHE_LOCK = threading.Lock()
+
 # Performance optimization: Cache type inference results to avoid expensive operations
 # Key: (filename, line_number) -> Value: inferred type (or None if inference failed)
 # This provides significant speedup when same variable location is accessed multiple times
+# Implements LRU eviction to prevent unbounded memory growth
 _TYPE_INFERENCE_CACHE: Dict[Tuple[str, int], Optional[type]] = {}
+
+# Maximum cache entries before LRU eviction (prevents unbounded memory growth)
+_CACHE_MAX_SIZE: int = 1000
+
+
+def _cache_get_or_compute(
+    cache_key: Tuple[str, int],
+    compute_fn: Callable[[], Optional[type]],
+) -> Optional[type]:
+    """Thread-safe cache lookup with LRU eviction.
+
+    This function implements the CHECK-USE-SET pattern atomically using a lock
+    to prevent race conditions where multiple threads could miss the cache
+    simultaneously and duplicate expensive computations.
+
+    Args:
+        cache_key: Cache key (filename, line_number)
+        compute_fn: Function to compute value if cache miss
+
+    Returns:
+        Cached or computed type, or None if computation fails
+
+    Security:
+        - Thread-safe: Uses lock to prevent race conditions
+        - Memory-safe: Implements LRU eviction at _CACHE_MAX_SIZE entries
+        - No unbounded growth: Evicts oldest entry when full
+    """
+    with _TYPE_INFERENCE_CACHE_LOCK:
+        # CHECK: Try cache first (within lock to prevent TOCTOU)
+        if cache_key in _TYPE_INFERENCE_CACHE:
+            # Move to end for LRU (most recently used)
+            value = _TYPE_INFERENCE_CACHE.pop(cache_key)
+            _TYPE_INFERENCE_CACHE[cache_key] = value
+            return value
+
+        # COMPUTE: Cache miss, compute the value
+        computed_value = compute_fn()
+
+        # SET: Store in cache with LRU eviction
+        if len(_TYPE_INFERENCE_CACHE) >= _CACHE_MAX_SIZE:
+            # Evict oldest entry (first item in dict, since Python 3.7+ preserves insertion order)
+            _TYPE_INFERENCE_CACHE.pop(next(iter(_TYPE_INFERENCE_CACHE)))
+
+        _TYPE_INFERENCE_CACHE[cache_key] = computed_value
+        return computed_value
 
 
 class TripWire:
@@ -91,9 +141,8 @@ class TripWire:
 
         Thread Safety:
             Uses a global lock to prevent race conditions when multiple threads
-            simultaneously inspect frames. This is critical in web servers and
-            async applications where concurrent require() calls can corrupt
-            frame references.
+            simultaneously inspect frames. Cache operations use a separate lock
+            to prevent CHECK-USE-SET race conditions.
 
         Returns:
             Inferred type or None if cannot determine
@@ -131,114 +180,99 @@ class TripWire:
                 # Type narrowing: From here, caller_frame is guaranteed non-None
                 # mypy understands this control flow
 
-                # Performance: Check cache first to avoid expensive operations
+                # Performance: Use thread-safe cache with LRU eviction
                 filename = caller_frame.f_code.co_filename
                 lineno = caller_frame.f_lineno
                 cache_key = (filename, lineno)
 
-                if cache_key in _TYPE_INFERENCE_CACHE:
-                    # Cache hit - return cached result immediately
-                    return _TYPE_INFERENCE_CACHE[cache_key]
+                # Define computation function for cache miss
+                def compute_type() -> Optional[type]:
+                    """Compute type from frame (called only on cache miss)."""
+                    # Get module for type hints (safest approach)
+                    module = inspect.getmodule(caller_frame)
+                    if module:
+                        # Try get_type_hints first (safe and recommended)
+                        try:
+                            hints = get_type_hints(module)
+                        except Exception:
+                            # Fallback if type hints can't be resolved
+                            hints = {}
 
-                # Cache miss - perform expensive type inference
-                # Get module for type hints (safest approach)
-                module = inspect.getmodule(caller_frame)
-                if module:
-                    # Try get_type_hints first (safe and recommended)
-                    try:
-                        hints = get_type_hints(module)
-                    except Exception:
-                        # Fallback if type hints can't be resolved
-                        hints = {}
+                        # Parse source line to find variable name
+                        line = linecache.getline(filename, lineno).strip()
 
-                    # Parse source line to find variable name
-                    filename = caller_frame.f_code.co_filename
-                    lineno = caller_frame.f_lineno
+                        # Extract variable name from pattern: VAR_NAME: type = ...
+                        if ":" in line and "=" in line:
+                            var_part = line.split("=")[0].strip()
+                            if ":" in var_part:
+                                var_name = var_part.split(":")[0].strip()
+
+                                # Check if we have type hint for this variable
+                                if var_name in hints:
+                                    hint = hints[var_name]
+
+                                    # Handle Optional[T] -> extract T
+                                    origin = get_origin(hint)
+                                    if origin is Union:
+                                        args = get_args(hint)
+                                        # Filter out NoneType (using proper comparison)
+                                        non_none_args = [arg for arg in args if arg is not type(None)]
+                                        if non_none_args:
+                                            # Type narrowing: Ensure we return a type, not Any
+                                            inferred_type = non_none_args[0]
+                                            if isinstance(inferred_type, type):
+                                                return inferred_type
+
+                                    # Return the hint if it's a basic type
+                                    if hint in (int, float, bool, str, list, dict):
+                                        # Type assertion: These are guaranteed to be types
+                                        result_type: type = hint
+                                        return result_type
+
+                                    # Handle generic types (List[T], Dict[K,V]) -> return base type
+                                    if origin in (list, dict):
+                                        # Type assertion: origin is guaranteed to be a type here
+                                        result_type_origin: type = origin
+                                        return result_type_origin
+
+                                    # If it's already a type, return it
+                                    if isinstance(hint, type):
+                                        return hint
+
+                    # Fallback: Parse annotation string with safe type mapping (NO EVAL)
                     line = linecache.getline(filename, lineno).strip()
 
-                    # Extract variable name from pattern: VAR_NAME: type = ...
-                    if ":" in line and "=" in line:
-                        var_part = line.split("=")[0].strip()
-                        if ":" in var_part:
-                            var_name = var_part.split(":")[0].strip()
+                    # Simple pattern matching for: VAR_NAME: type = ...
+                    if ":" not in line or "=" not in line:
+                        return None
 
-                            # Check if we have type hint for this variable
-                            if var_name in hints:
-                                hint = hints[var_name]
+                    var_part = line.split("=")[0].strip()
+                    if ":" not in var_part:
+                        return None
 
-                                # Handle Optional[T] -> extract T
-                                origin = get_origin(hint)
-                                if origin is Union:
-                                    args = get_args(hint)
-                                    # Filter out NoneType (using proper comparison)
-                                    non_none_args = [arg for arg in args if arg is not type(None)]
-                                    if non_none_args:
-                                        # Type narrowing: Ensure we return a type, not Any
-                                        inferred_type = non_none_args[0]
-                                        if isinstance(inferred_type, type):
-                                            _TYPE_INFERENCE_CACHE[cache_key] = inferred_type
-                                            return inferred_type
+                    # Extract the type annotation string
+                    type_str = var_part.split(":", 1)[1].strip()
 
-                                # Return the hint if it's a basic type
-                                if hint in (int, float, bool, str, list, dict):
-                                    # Type assertion: These are guaranteed to be types
-                                    result_type: type = hint
-                                    _TYPE_INFERENCE_CACHE[cache_key] = result_type
-                                    return result_type
+                    # Safe mapping for basic types only (NO EVAL!)
+                    type_map = {
+                        "int": int,
+                        "float": float,
+                        "bool": bool,
+                        "str": str,
+                        "list": list,
+                        "dict": dict,
+                    }
 
-                                # Handle generic types (List[T], Dict[K,V]) -> return base type
-                                if origin in (list, dict):
-                                    # Type assertion: origin is guaranteed to be a type here
-                                    result_type_origin: type = origin
-                                    _TYPE_INFERENCE_CACHE[cache_key] = result_type_origin
-                                    return result_type_origin
+                    # Check for Optional[T] pattern (extract T)
+                    if type_str.startswith("Optional[") and type_str.endswith("]"):
+                        inner_type = type_str[9:-1].strip()
+                        return type_map.get(inner_type, None)
 
-                                # If it's already a type, return it
-                                if isinstance(hint, type):
-                                    _TYPE_INFERENCE_CACHE[cache_key] = hint
-                                    return hint
+                    # Check for direct type match
+                    return type_map.get(type_str, None)
 
-                # Fallback: Parse annotation string with safe type mapping (NO EVAL)
-                filename = caller_frame.f_code.co_filename
-                lineno = caller_frame.f_lineno
-                line = linecache.getline(filename, lineno).strip()
-
-                # Simple pattern matching for: VAR_NAME: type = ...
-                if ":" not in line or "=" not in line:
-                    return None
-
-                var_part = line.split("=")[0].strip()
-                if ":" not in var_part:
-                    return None
-
-                # Extract the type annotation string
-                type_str = var_part.split(":", 1)[1].strip()
-
-                # Safe mapping for basic types only (NO EVAL!)
-                type_map = {
-                    "int": int,
-                    "float": float,
-                    "bool": bool,
-                    "str": str,
-                    "list": list,
-                    "dict": dict,
-                }
-
-                # Check for Optional[T] pattern (extract T)
-                if type_str.startswith("Optional[") and type_str.endswith("]"):
-                    inner_type = type_str[9:-1].strip()
-                    inferred_type = type_map.get(inner_type, None)
-                    _TYPE_INFERENCE_CACHE[cache_key] = inferred_type
-                    return inferred_type
-
-                # Check for direct type match
-                inferred_type = type_map.get(type_str, None)
-
-                # Performance: Cache the result (including None for failed inferences)
-                # This prevents repeated expensive operations for the same location
-                _TYPE_INFERENCE_CACHE[cache_key] = inferred_type
-
-                return inferred_type
+                # Use thread-safe cache with LRU eviction
+                return _cache_get_or_compute(cache_key, compute_type)
 
             finally:
                 # Proper cleanup of frame references to prevent memory leaks
