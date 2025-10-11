@@ -797,7 +797,7 @@ def generate_remediation_steps(
             title="Install pre-commit hooks",
             description="Prevent future leaks by scanning commits before they're pushed.",
             urgency="LOW",
-            command="tripwire install-hooks  # Coming soon!",
+            command="tripwire install-hooks",
         )
     )
 

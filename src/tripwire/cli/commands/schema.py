@@ -29,6 +29,7 @@ from tripwire.cli.formatters.docs import (
     generate_markdown_docs,
 )
 from tripwire.cli.utils.console import console
+from tripwire.cli.utils.helpers import should_skip_file_in_hook
 
 
 @click.group()
@@ -144,7 +145,7 @@ exclude_patterns = ["TEST_*", "EXAMPLE_*"]
 @schema.command("validate")
 @click.option(
     "--env-file",
-    type=click.Path(exists=True),
+    type=click.Path(),  # Removed exists=True to handle missing files gracefully
     default=".env",
     help=".env file to validate",
 )
@@ -163,13 +164,28 @@ exclude_patterns = ["TEST_*", "EXAMPLE_*"]
 @click.option(
     "--strict",
     is_flag=True,
-    help="Exit with error if validation fails",
+    help="Strict mode for pre-commit hooks (skip gitignored files, pass if file missing in CI/CD)",
 )
-def schema_validate(env_file: str, schema_file: str, environment: str, strict: bool) -> None:
+@click.option(
+    "--fail-if-missing",
+    is_flag=True,
+    help="Exit with error if env file doesn't exist (overrides strict mode behavior)",
+)
+def schema_validate(env_file: str, schema_file: str, environment: str, strict: bool, fail_if_missing: bool) -> None:
     """Validate .env file against schema.
 
     Checks that all required variables are present and validates
     types, formats, and constraints defined in .tripwire.toml.
+
+    Behavior:
+        Local dev: Validates .env if exists, fails with helpful message if missing
+        CI/CD (--strict): Passes if .env missing (correctly not committed), validates if present
+        Pre-commit: Skips .gitignore'd files, validates committed files only
+
+    Examples:
+        tripwire schema validate                    # Local validation
+        tripwire schema validate --strict           # Pre-commit/CI mode
+        tripwire schema validate --fail-if-missing  # Force failure if missing
     """
     from rich.table import Table
 
@@ -181,6 +197,37 @@ def schema_validate(env_file: str, schema_file: str, environment: str, strict: b
         console.print("Run [cyan]tripwire schema new[/cyan] to create one")
         sys.exit(1)
 
+    env_path = Path(env_file)
+
+    # Smart behavior: Handle missing .env file based on context
+    if not env_path.exists():
+        if strict and not fail_if_missing:
+            # CI/CD context: .env correctly not committed - PASS
+            console.print(f"[dim]{env_file} not found (expected in CI/CD - not committed to git)[/dim]")
+            console.print("[green][OK][/green] Validation passed (no file to validate)")
+            console.print("[dim]Note: This is expected in CI/CD where .env is not committed[/dim]")
+            return
+        elif fail_if_missing:
+            # Explicitly requested to fail if missing
+            console.print(f"[red]Error:[/red] {env_file} does not exist")
+            console.print(f"Create one with: [cyan]tripwire schema to-env --environment {environment}[/cyan]")
+            sys.exit(1)
+        else:
+            # Local dev: Provide helpful guidance
+            console.print(f"[yellow]Warning:[/yellow] {env_file} not found")
+            console.print("\nTo create a .env file from your schema:")
+            console.print(f"  [cyan]tripwire schema to-env --environment {environment}[/cyan]")
+            console.print("\nOr copy from template:")
+            console.print("  [cyan]cp .env.example .env[/cyan]")
+            sys.exit(1)
+
+    # File exists - check if should skip in strict mode (pre-commit hooks)
+    if strict and should_skip_file_in_hook(env_path):
+        console.print(f"[dim]Skipping {env_file} (in .gitignore - won't be committed)[/dim]")
+        console.print("[green][OK][/green] Validation skipped for ignored file")
+        return
+
+    # Perform actual validation
     console.print(f"[yellow]Validating {env_file} against {schema_file}...[/yellow]\n")
     console.print(f"Environment: [cyan]{environment}[/cyan]\n")
 
@@ -1520,7 +1567,7 @@ def schema_upgrade(
     dry_run: bool,
     interactive: bool,
     force: bool,
-    backup: bool,  # noqa: ARG001 - Parameter defined by Click decorator
+    backup: bool,
 ) -> None:
     """Upgrade .env between schema versions.
 
@@ -1592,7 +1639,7 @@ def schema_upgrade(
             return
 
     # Execute migration
-    success, messages = plan.execute(dry_run=False, interactive=interactive)
+    success, messages = plan.execute(dry_run=False, interactive=interactive, create_backup=backup)
 
     if success:
         for msg in messages:

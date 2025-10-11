@@ -269,6 +269,8 @@ class TestTypedConvenienceMethods:
         env_file.write_text("TIMEOUT=30.5\n")
 
         monkeypatch.chdir(tmp_path)
+        # Clear environment to avoid pollution from project .env
+        monkeypatch.delenv("TIMEOUT", raising=False)
         env = TripWire(env_file=str(env_file))
 
         timeout = env.require_float("TIMEOUT")
@@ -310,6 +312,8 @@ class TestTypedConvenienceMethods:
         env_file.write_text("")
 
         monkeypatch.chdir(tmp_path)
+        # Clear environment to avoid pollution from project .env
+        monkeypatch.delenv("LOG_LEVEL", raising=False)
         env = TripWire(env_file=str(env_file))
 
         log_level = env.optional_str("LOG_LEVEL", default="INFO")

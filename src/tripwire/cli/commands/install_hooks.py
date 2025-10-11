@@ -102,6 +102,16 @@ def install_hooks(framework: str, force: bool, uninstall: bool) -> None:
         config_content = """# TripWire Pre-Commit Hooks
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
+#
+# Hook Behavior:
+#   - Schema validation (--strict):
+#     * CI/CD: Passes if .env missing (correctly not committed)
+#     * Pre-commit: Skips .gitignore'd files
+#     * Local: Validates .env if present
+#   - Secret scanning (--strict):
+#     * Skips .gitignore'd files to avoid local dev noise
+#     * Scans git history for leaked secrets
+#
 
 repos:
   - repo: local
@@ -112,13 +122,15 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+        description: Validates .env against schema (CI/CD compatible - passes if .env missing)
 
       - id: tripwire-secret-scan
         name: TripWire Secret Scan
-        entry: tripwire scan --strict
+        entry: tripwire security scan --strict
         language: system
         pass_filenames: false
         always_run: true
+        description: Scans for secrets in .env and git history (skips .gitignore'd files)
 """
 
         pre_commit_config.write_text(config_content)

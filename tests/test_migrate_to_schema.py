@@ -110,6 +110,108 @@ BOOL_FALSE=false
     assert data["variables"]["BOOL_FALSE"]["default"] is False
 
 
+def test_migrate_to_schema_comprehensive_boolean_inference(runner, temp_dir):
+    """Test comprehensive boolean type inference (v0.7.1 fix).
+
+    Verifies that all common boolean patterns are correctly detected:
+    - true/false
+    - yes/no
+    - on/off
+    - enabled/disabled
+    - 1/0 (should be bool, not int)
+    - Case insensitive variations
+    """
+    env_example = temp_dir / ".env.example"
+    env_example.write_text(
+        """# True value patterns
+BOOL_TRUE_LOWER=true
+BOOL_TRUE_UPPER=TRUE
+BOOL_YES=yes
+BOOL_YES_UPPER=YES
+BOOL_ON=on
+BOOL_ON_UPPER=ON
+BOOL_ENABLED=enabled
+BOOL_ENABLED_UPPER=ENABLED
+BOOL_ONE=1
+
+# False value patterns
+BOOL_FALSE_LOWER=false
+BOOL_FALSE_UPPER=FALSE
+BOOL_NO=no
+BOOL_NO_UPPER=NO
+BOOL_OFF=off
+BOOL_OFF_UPPER=OFF
+BOOL_DISABLED=disabled
+BOOL_DISABLED_UPPER=DISABLED
+BOOL_ZERO=0
+
+# Non-boolean values (should remain other types)
+INT_VAR=42
+FLOAT_VAR=3.14
+STRING_VAR=hello
+"""
+    )
+
+    output_file = temp_dir / ".tripwire.toml"
+
+    result = runner.invoke(
+        main,
+        [
+            "schema",
+            "from-example",
+            "--source",
+            str(env_example),
+            "--output",
+            str(output_file),
+        ],
+    )
+
+    assert result.exit_code == 0
+
+    with open(output_file, "rb") as f:
+        data = tomllib.load(f)
+
+    # Verify all true value patterns are detected as bool
+    true_vars = [
+        "BOOL_TRUE_LOWER",
+        "BOOL_TRUE_UPPER",
+        "BOOL_YES",
+        "BOOL_YES_UPPER",
+        "BOOL_ON",
+        "BOOL_ON_UPPER",
+        "BOOL_ENABLED",
+        "BOOL_ENABLED_UPPER",
+        "BOOL_ONE",
+    ]
+    for var in true_vars:
+        assert data["variables"][var]["type"] == "bool", f"{var} should be bool"
+        assert data["variables"][var]["default"] is True, f"{var} should default to True"
+
+    # Verify all false value patterns are detected as bool
+    false_vars = [
+        "BOOL_FALSE_LOWER",
+        "BOOL_FALSE_UPPER",
+        "BOOL_NO",
+        "BOOL_NO_UPPER",
+        "BOOL_OFF",
+        "BOOL_OFF_UPPER",
+        "BOOL_DISABLED",
+        "BOOL_DISABLED_UPPER",
+        "BOOL_ZERO",
+    ]
+    for var in false_vars:
+        assert data["variables"][var]["type"] == "bool", f"{var} should be bool"
+        assert data["variables"][var]["default"] is False, f"{var} should default to False"
+
+    # Verify non-boolean values remain their original types
+    assert data["variables"]["INT_VAR"]["type"] == "int"
+    assert data["variables"]["INT_VAR"]["default"] == 42
+    assert data["variables"]["FLOAT_VAR"]["type"] == "float"
+    assert data["variables"]["FLOAT_VAR"]["default"] == 3.14
+    assert data["variables"]["STRING_VAR"]["type"] == "string"
+    assert data["variables"]["STRING_VAR"]["default"] == "hello"
+
+
 def test_migrate_to_schema_placeholder_detection(runner, temp_dir):
     """Test that placeholders are detected and marked as required."""
     env_example = temp_dir / ".env.example"

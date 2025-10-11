@@ -282,13 +282,16 @@ class MigrationPlan:
     env_file: Path
     backup_file: Optional[Path] = None
 
-    def execute(self, dry_run: bool = False, interactive: bool = False) -> Tuple[bool, List[str]]:
+    def execute(
+        self, dry_run: bool = False, interactive: bool = False, create_backup: bool = True
+    ) -> Tuple[bool, List[str]]:
         """
         Execute migration plan.
 
         Args:
             dry_run: If True, don't actually modify files
             interactive: If True, confirm each change
+            create_backup: If True, create backup before migration
 
         Returns:
             (success, list_of_messages)
@@ -302,8 +305,8 @@ class MigrationPlan:
         env_content = self.env_file.read_text()
         env_vars = self._parse_env_file(env_content)
 
-        # Create backup if not dry run
-        if not dry_run:
+        # Create backup if not dry run and backup requested
+        if not dry_run and create_backup:
             backup_path = (
                 self.env_file.parent / f"{self.env_file.name}.backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             )

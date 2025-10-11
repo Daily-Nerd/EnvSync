@@ -163,7 +163,7 @@ class TestPreCommitFramework:
         # Check content
         content = (git_repo / ".pre-commit-config.yaml").read_text()
         assert "tripwire schema validate" in content
-        assert "tripwire scan" in content
+        assert "tripwire security scan" in content
 
     def test_precommit_framework_not_installed(self, git_repo: Path, monkeypatch) -> None:
         """Test error when pre-commit framework not installed."""

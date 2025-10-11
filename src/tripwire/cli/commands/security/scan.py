@@ -1,4 +1,4 @@
-"""Scan command for TripWire CLI."""
+"""Security scan command for TripWire CLI."""
 
 import sys
 from pathlib import Path
@@ -8,18 +8,15 @@ import click
 from rich.console import Console
 
 from tripwire.branding import get_status_icon
-from tripwire.cli.formatters.audit import (
-    display_combined_timeline,
-    display_single_audit_result,
-)
 from tripwire.cli.utils.console import console
+from tripwire.cli.utils.helpers import should_skip_file_in_hook
 from tripwire.secrets import SecretMatch
 
 if TYPE_CHECKING:
     from tripwire.git_audit import SecretTimeline
 
 
-@click.command()
+@click.command(name="scan")
 @click.option(
     "--strict",
     is_flag=True,
@@ -32,46 +29,80 @@ if TYPE_CHECKING:
     help="Number of git commits to scan",
 )
 def scan(strict: bool, depth: int) -> None:
-    """Scan for secrets in git history.
+    """Quick security check for secrets in .env and git history.
 
-    Detects potential secrets (API keys, tokens, passwords) in your
-    git repository to prevent accidental commits.
+    Fast scan designed for pre-commit hooks and CI/CD pipelines.
+    Detects potential secrets (API keys, tokens, passwords) to prevent
+    accidental commits.
+
+    For deep forensic analysis, use 'tripwire security audit' instead.
     """
+    from rich.panel import Panel
     from rich.table import Table
 
+    from tripwire.cli.utils.helpers import is_file_in_gitignore
     from tripwire.secrets import get_severity_color, scan_env_file, scan_git_history
 
     console.print("[yellow]Scanning for secrets...[/yellow]\n")
 
     # Scan current .env file
     env_path = Path(".env")
-    findings: list[SecretMatch] = []
+    env_findings: list[SecretMatch] = []
+    env_is_ignored = False
 
     if env_path.exists():
-        console.print("Scanning .env file...")
-        env_findings = scan_env_file(env_path)
-        findings.extend(env_findings)
-
-        if env_findings:
-            status = get_status_icon("invalid")
-            console.print(f"{status} Found {len(env_findings)} potential secret(s) in .env\n")
+        # In strict mode (pre-commit hooks), skip files in .gitignore
+        if strict and should_skip_file_in_hook(env_path):
+            console.print(f"[dim]Skipping {env_path} (in .gitignore - won't be committed)[/dim]\n")
         else:
-            status = get_status_icon("valid")
-            console.print(f"{status} No secrets found in .env\n")
+            console.print("Scanning .env file...")
+            env_findings = scan_env_file(env_path)
+            env_is_ignored = is_file_in_gitignore(env_path)
+
+            if env_findings:
+                status = get_status_icon("info") if env_is_ignored else get_status_icon("invalid")
+                console.print(f"{status} Found {len(env_findings)} potential secret(s) in .env\n")
+            else:
+                status = get_status_icon("valid")
+                console.print(f"{status} No secrets found in .env\n")
 
     # Scan git history
+    git_findings_list: list[dict[str, str]] = []
     if Path(".git").exists():
         console.print(f"Scanning last {depth} commits in git history...")
-        git_findings: list[dict[str, str]] = scan_git_history(Path.cwd(), depth=depth)
+        git_findings_list = scan_git_history(Path.cwd(), depth=depth)
 
-        if git_findings:
-            console.print(f"[red]Found {len(git_findings)} potential secret(s) in git history[/red]\n")
+        if git_findings_list:
+            console.print(f"[red]Found {len(git_findings_list)} potential secret(s) in git history[/red]\n")
+        else:
+            status = get_status_icon("valid")
+            console.print(f"{status} No secrets found in git history\n")
 
-            # Show unique findings by converting git findings to SecretMatch objects
+    # Determine risk level based on where secrets are found
+    has_git_history_secrets = len(git_findings_list) > 0
+    has_env_secrets = len(env_findings) > 0
+
+    # Calculate risk level
+    if has_git_history_secrets:
+        risk_level = "CRITICAL"
+    elif has_env_secrets and not env_is_ignored:
+        risk_level = "MEDIUM"
+    elif has_env_secrets and env_is_ignored:
+        risk_level = "LOW"
+    else:
+        risk_level = "NONE"
+
+    # Display findings with context-aware messaging
+    if risk_level != "NONE":
+        # Prepare all findings for table
+        all_findings: list[SecretMatch] = list(env_findings)
+
+        # Add git findings to table
+        if git_findings_list:
             from tripwire.secrets import SecretType
 
             seen: set[tuple[str, str]] = set()
-            for git_finding in git_findings:
+            for git_finding in git_findings_list:
                 key = (git_finding["variable"], git_finding["type"])
                 if key not in seen:
                     seen.add(key)
@@ -81,7 +112,7 @@ def scan(strict: bool, depth: int) -> None:
                     except ValueError:
                         secret_type = SecretType.GENERIC_API_KEY
 
-                    findings.append(
+                    all_findings.append(
                         SecretMatch(
                             secret_type=secret_type,
                             variable_name=git_finding["variable"],
@@ -91,19 +122,15 @@ def scan(strict: bool, depth: int) -> None:
                             recommendation=f"Found in commit {git_finding['commit']}. Rotate this secret immediately.",
                         )
                     )
-        else:
-            status = get_status_icon("valid")
-            console.print(f"{status} No secrets found in git history\n")
 
-    # Display findings
-    if findings:
+        # Display findings table
         table = Table(title="Detected Secrets", show_header=True, header_style="bold red")
         table.add_column("Variable", style="cyan")
         table.add_column("Type", style="yellow")
         table.add_column("Severity", style="red")
         table.add_column("Recommendation")
 
-        for finding in findings:
+        for finding in all_findings:
             severity_color = get_severity_color(finding.severity)
             table.add_row(
                 finding.variable_name,
@@ -115,15 +142,63 @@ def scan(strict: bool, depth: int) -> None:
         console.print(table)
         console.print()
 
-        # Summary
-        console.print(f"[red]Total: {len(findings)} potential secret(s) detected[/red]")
-        console.print("\n[yellow]Recommendations:[/yellow]")
-        console.print("  1. Rotate all detected secrets immediately")
-        console.print("  2. Use a secret manager (AWS Secrets Manager, Vault, etc.)")
-        console.print("  3. Never commit secrets to version control")
-        console.print("  4. Add .env to .gitignore (if not already)")
+        # Context-aware status and recommendations
+        if risk_level == "CRITICAL":
+            # Secrets in git history - CRITICAL
+            console.print(
+                Panel(
+                    "[bold red]CRITICAL: Secrets found in version control![/bold red]\n\n"
+                    f"Location: Git history ({len(git_findings_list)} commits)\n"
+                    f".env status: {'In .gitignore ✓' if env_is_ignored else 'NOT in .gitignore ✗'}\n\n"
+                    "[bold]⚠️  IMMEDIATE ACTION REQUIRED:[/bold]\n"
+                    "  1. Rotate ALL detected secrets immediately\n"
+                    "  2. Remove secrets from git history (use git filter-branch or BFG Repo-Cleaner)\n"
+                    "  3. Add .env files to .gitignore if not already\n"
+                    "  4. Never commit secrets to version control\n"
+                    "  5. Use a secret manager for production (AWS Secrets Manager, Vault, etc.)",
+                    border_style="red",
+                    title="[!!] Security Alert",
+                )
+            )
+        elif risk_level == "MEDIUM":
+            # Secrets in committed files (not in .gitignore)
+            console.print(
+                Panel(
+                    "[bold yellow]WARNING: Secrets in committed files![/bold yellow]\n\n"
+                    "Location: .env (NOT in .gitignore ✗)\n"
+                    "Git History: No secrets found ✓\n\n"
+                    "[bold]Action Required:[/bold]\n"
+                    "  1. Add .env to .gitignore immediately\n"
+                    "  2. Remove .env from git index (git rm --cached .env)\n"
+                    "  3. Consider rotating secrets if .env was previously committed\n"
+                    "  4. Use .env.example for team templates (with placeholder values)\n"
+                    "  5. Never commit real secrets to version control",
+                    border_style="yellow",
+                    title="[!] Configuration Warning",
+                )
+            )
+        elif risk_level == "LOW":
+            # Secrets only in .gitignore'd files - expected for local dev
+            console.print(
+                Panel(
+                    "[bold cyan]INFO: Secrets found in local development files[/bold cyan]\n\n"
+                    "Location: .env (in .gitignore ✓)\n"
+                    "Git History: No secrets found ✓\n\n"
+                    "[bold]Status: Expected for local development[/bold]\n"
+                    "  ✓ .env is in .gitignore (won't be committed)\n"
+                    "  ✓ No secrets found in version control\n"
+                    "  ℹ These secrets are safe for local development\n\n"
+                    "[bold]Best Practices:[/bold]\n"
+                    "  1. Keep .env in .gitignore\n"
+                    "  2. Use .env.example for team templates (with placeholder values)\n"
+                    "  3. Consider secret manager for production (AWS Secrets Manager, Vault)\n"
+                    "  4. Enable pre-commit hooks to prevent accidental commits",
+                    border_style="cyan",
+                    title="[i] Local Development",
+                )
+            )
 
-        if strict:
+        if strict and risk_level in ("CRITICAL", "MEDIUM"):
             sys.exit(1)
     else:
         status = get_status_icon("valid")
@@ -233,8 +308,6 @@ def _display_single_audit_result(
         console.print("[bold yellow]Timeline:[/bold yellow]\n")
 
         # Group occurrences by date
-        from typing import Any
-
         from tripwire.git_audit import FileOccurrence
 
         by_date: dict[str, list[FileOccurrence]] = defaultdict(list)
