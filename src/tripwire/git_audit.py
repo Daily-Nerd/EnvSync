@@ -506,7 +506,7 @@ def audit_secret_stream(
                 continue
 
             # Stream occurrences from this commit
-            for occurrence in find_secret_in_commit(commit_hash, secret_pattern, repo_path):
+            for occurrence in find_secret_in_commit(commit_hash, sanitized_pattern, repo_path):
                 yield occurrence
 
             count += 1
@@ -605,7 +605,7 @@ def analyze_secret_history(
     memory_limit_reached: bool = False
 
     for commit_hash in commit_hashes:
-        occurrences = find_secret_in_commit(commit_hash, secret_pattern, repo_path)
+        occurrences = find_secret_in_commit(commit_hash, sanitized_pattern, repo_path)
 
         for occ in occurrences:
             key = (occ.commit_hash, occ.file_path, occ.line_number)
