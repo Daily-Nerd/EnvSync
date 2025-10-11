@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Memory Usage Tracking**: Added memory monitoring to prevent OOM errors in git audit
   - Tracks memory consumption during git history analysis
-  - Issues warnings when memory usage exceeds 80% threshold (800MB default limit)
+  - Issues warnings when memory usage exceeds 100MB default limit
   - Prevents system crashes when auditing large repositories
 
 ### Added
