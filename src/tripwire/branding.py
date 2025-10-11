@@ -31,7 +31,7 @@ def get_status_icon(state: str = "neutral", colored: bool = True, rich_markup: b
     """Get status icon for terminal output.
 
     Args:
-        state: One of "valid", "invalid", "warning", "neutral"
+        state: One of "valid", "invalid", "warning", "neutral", "info"
         colored: If True, use colors; if False, monochrome
         rich_markup: If True, use Rich markup format; if False, use ANSI codes
 
@@ -49,6 +49,7 @@ def get_status_icon(state: str = "neutral", colored: bool = True, rich_markup: b
         "invalid": "✗",
         "warning": "!",
         "neutral": "○",
+        "info": "ℹ",
     }
 
     # Rich color names
@@ -57,6 +58,7 @@ def get_status_icon(state: str = "neutral", colored: bool = True, rich_markup: b
         "invalid": "red",
         "warning": "yellow",
         "neutral": "bright_black",
+        "info": "cyan",
     }
 
     symbol = symbols.get(state, symbols["neutral"])

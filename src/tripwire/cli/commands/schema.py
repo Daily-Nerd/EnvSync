@@ -29,6 +29,7 @@ from tripwire.cli.formatters.docs import (
     generate_markdown_docs,
 )
 from tripwire.cli.utils.console import console
+from tripwire.cli.utils.helpers import should_skip_file_in_hook
 
 
 @click.group()
@@ -180,6 +181,14 @@ def schema_validate(env_file: str, schema_file: str, environment: str, strict: b
         console.print(f"[red]Error:[/red] Schema file not found: {schema_file}")
         console.print("Run [cyan]tripwire schema new[/cyan] to create one")
         sys.exit(1)
+
+    env_path = Path(env_file)
+
+    # In strict mode (pre-commit hooks), skip files in .gitignore
+    if strict and env_path.exists() and should_skip_file_in_hook(env_path):
+        console.print(f"[dim]Skipping {env_file} (in .gitignore - won't be committed)[/dim]")
+        console.print("[green][OK][/green] Validation skipped for ignored file")
+        return
 
     console.print(f"[yellow]Validating {env_file} against {schema_file}...[/yellow]\n")
     console.print(f"Environment: [cyan]{environment}[/cyan]\n")

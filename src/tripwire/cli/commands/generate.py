@@ -15,12 +15,34 @@ from tripwire.cli.utils.console import console
 
 
 def _infer_type_and_default(value: str) -> tuple[str, Any]:
-    """Infer type and default value from string."""
-    # Try boolean
-    if value.lower() in ("true", "false"):
-        return "bool", value.lower() == "true"
+    """Infer type and default value from string with intelligent boolean detection.
 
-    # Try integer
+    Boolean patterns recognized (v0.7.1+):
+    - true/false
+    - yes/no
+    - on/off
+    - enabled/disabled
+    - 1/0 (when clearly used as boolean)
+
+    Args:
+        value: String value from .env.example
+
+    Returns:
+        Tuple of (type_name, default_value)
+    """
+    value_lower = value.lower().strip()
+
+    # Comprehensive boolean detection (v0.7.1 fix)
+    # Check BEFORE numeric parsing to catch "0" and "1" as booleans
+    boolean_true_values = {"true", "yes", "on", "enabled", "1"}
+    boolean_false_values = {"false", "no", "off", "disabled", "0"}
+
+    if value_lower in boolean_true_values:
+        return "bool", True
+    elif value_lower in boolean_false_values:
+        return "bool", False
+
+    # Try integer (after boolean check)
     try:
         int_val = int(value)
         return "int", int_val
