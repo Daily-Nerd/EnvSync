@@ -26,6 +26,7 @@ _REDOS_PATTERNS: List[str] = [
     r"\(\w+\*\)+",  # Nested quantifiers: (a*)*
     r"\(\w+\?\)+",  # Nested quantifiers: (a?)+
     r"\{\d+,\d+\}",  # Bounded repetition: .{10,100}
+    r"\{\d+,\}",    # Unbounded repetition: .{1000,}
     r"\(\.\+\)+",  # Nested any-quantifiers: (.+)+
     r"\(\.\*\)+",  # Nested any-quantifiers: (.*)*
 ]
