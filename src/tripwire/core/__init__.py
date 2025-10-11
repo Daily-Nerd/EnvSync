@@ -5,11 +5,11 @@ This package contains the refactored core components following SOLID principles:
 - loader: Environment file loading with source abstraction
 - inference: Type inference from annotations using strategy pattern
 - validation_orchestrator: Validation rule chain with Chain of Responsibility pattern
-"""
 
-# Import legacy TripWire class from _core_legacy module
-# This maintains backward compatibility while we refactor
-from tripwire._core_legacy import TripWire, env
+Version 0.9.0+:
+- TripWire and env now use the modern TripWireV2 implementation
+- TripWireLegacy is available for backward compatibility (deprecated)
+"""
 
 # Import components from refactored modules
 from tripwire.core.inference import (
@@ -19,6 +19,9 @@ from tripwire.core.inference import (
 )
 from tripwire.core.loader import DotenvFileSource, EnvFileLoader, EnvSource
 from tripwire.core.registry import VariableMetadata, VariableRegistry
+
+# Import modern TripWire implementation (v0.9.0+)
+from tripwire.core.tripwire_v2 import TripWire, TripWireV2, env
 from tripwire.core.validation_orchestrator import (
     ChoicesValidationRule,
     CustomValidationRule,
@@ -32,6 +35,10 @@ from tripwire.core.validation_orchestrator import (
 )
 
 __all__ = [
+    # Modern TripWire implementation (v0.9.0+)
+    "TripWire",  # Modern implementation (alias for TripWireV2)
+    "TripWireV2",  # Modern implementation (explicit name)
+    "env",  # Module-level singleton (uses modern implementation)
     # Refactored components
     "VariableMetadata",
     "VariableRegistry",
@@ -50,7 +57,4 @@ __all__ = [
     "RangeValidationRule",
     "LengthValidationRule",
     "CustomValidationRule",
-    # Legacy exports for backward compatibility
-    "TripWire",
-    "env",
 ]

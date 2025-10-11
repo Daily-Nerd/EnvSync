@@ -123,7 +123,7 @@ class PatternValidationRule(ValidationRule):
         from tripwire.validation import validate_pattern
 
         if not validate_pattern(context.raw_value, self.pattern):
-            reason = self.error_message if self.error_message else f"Value does not match pattern: {self.pattern}"
+            reason = self.error_message if self.error_message else f"Does not match pattern: {self.pattern}"
             raise ValidationError(variable_name=context.name, value=context.raw_value, reason=reason)
 
 
@@ -146,7 +146,7 @@ class ChoicesValidationRule(ValidationRule):
         from tripwire.validation import validate_choices
 
         if not validate_choices(context.raw_value, self.choices):
-            reason = self.error_message if self.error_message else f"Value must be one of: {', '.join(self.choices)}"
+            reason = self.error_message if self.error_message else f"Not in allowed choices: {self.choices}"
             raise ValidationError(variable_name=context.name, value=context.raw_value, reason=reason)
 
 
@@ -182,11 +182,11 @@ class RangeValidationRule(ValidationRule):
         if not validate_range(context.coerced_value, self.min_val, self.max_val):
             range_desc = []
             if self.min_val is not None:
-                range_desc.append(f"min={self.min_val}")
+                range_desc.append(f">= {self.min_val}")
             if self.max_val is not None:
-                range_desc.append(f"max={self.max_val}")
+                range_desc.append(f"<= {self.max_val}")
 
-            reason = self.error_message if self.error_message else f"Value out of range ({', '.join(range_desc)})"
+            reason = self.error_message if self.error_message else f"Out of range: must be {' and '.join(range_desc)}"
             raise ValidationError(variable_name=context.name, value=context.coerced_value, reason=reason)
 
 
@@ -219,15 +219,20 @@ class LengthValidationRule(ValidationRule):
         if not isinstance(context.coerced_value, str):
             return
 
-        if not validate_length(context.coerced_value, self.min_length, self.max_length):
-            length_desc = []
-            if self.min_length is not None:
-                length_desc.append(f"min_length={self.min_length}")
-            if self.max_length is not None:
-                length_desc.append(f"max_length={self.max_length}")
-
+        length = len(context.coerced_value)
+        if self.min_length is not None and length < self.min_length:
             reason = (
-                self.error_message if self.error_message else f"String length out of bounds ({', '.join(length_desc)})"
+                self.error_message
+                if self.error_message
+                else f"String too short: must be at least {self.min_length} characters"
+            )
+            raise ValidationError(variable_name=context.name, value=context.coerced_value, reason=reason)
+
+        if self.max_length is not None and length > self.max_length:
+            reason = (
+                self.error_message
+                if self.error_message
+                else f"String too long: must be at most {self.max_length} characters"
             )
             raise ValidationError(variable_name=context.name, value=context.coerced_value, reason=reason)
 

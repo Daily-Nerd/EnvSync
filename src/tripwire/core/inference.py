@@ -10,7 +10,17 @@ import inspect
 import linecache
 import threading
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, Tuple, Union, get_args, get_origin, get_type_hints
+from typing import (
+    Callable,
+    Dict,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 # Thread-safe lock for frame inspection to prevent race conditions
 # in multi-threaded environments (web servers, async workers, etc.)
@@ -32,7 +42,7 @@ _CACHE_MAX_SIZE: int = 1000
 
 def _cache_get_or_compute(
     cache_key: Tuple[str, int],
-    compute_fn: callable,
+    compute_fn: Callable[[], Optional[type]],
 ) -> Optional[type]:
     """Thread-safe cache lookup with LRU eviction.
 
@@ -61,7 +71,7 @@ def _cache_get_or_compute(
             return value
 
         # COMPUTE: Cache miss, compute the value
-        computed_value = compute_fn()
+        computed_value: Optional[type] = compute_fn()
 
         # SET: Store in cache with LRU eviction
         if len(_TYPE_INFERENCE_CACHE) >= _CACHE_MAX_SIZE:
@@ -283,7 +293,11 @@ class FrameInspectionStrategy(TypeInferenceStrategy):
             # Filter out NoneType
             non_none_args = [arg for arg in args if arg is not type(None)]
             if non_none_args:
-                return non_none_args[0] if isinstance(non_none_args[0], type) else None
+                first_arg = non_none_args[0]
+                # Type narrowing: ensure we return a type, not Any
+                if isinstance(first_arg, type):
+                    return first_arg
+                return None
 
         # Return the hint if it's a basic type
         if hint in (int, float, bool, str, list, dict):
@@ -291,7 +305,9 @@ class FrameInspectionStrategy(TypeInferenceStrategy):
 
         # Handle generic types (List[T], Dict[K,V]) -> return base type
         if origin in (list, dict):
-            return origin
+            # Type narrowing: origin must be a type if it matches list or dict
+            if isinstance(origin, type):
+                return origin
 
         # Unknown/unsupported type
         return None

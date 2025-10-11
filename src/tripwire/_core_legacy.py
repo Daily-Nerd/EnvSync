@@ -1,13 +1,29 @@
-"""Core TripWire functionality.
+"""Core TripWire functionality (LEGACY IMPLEMENTATION).
 
-This module contains the main TripWire class and the module-level singleton
-instance used for environment variable management.
+This module contains the legacy TripWire class and is deprecated in favor
+of the modern implementation in tripwire.core.
+
+.. deprecated:: 0.9.0
+   The legacy TripWire implementation in _core_legacy is deprecated.
+   Use tripwire.TripWire (which now uses the modern TripWireV2 implementation).
+   This legacy module will be removed in v1.0.0.
+
+For new code, use::
+
+    from tripwire import TripWire  # Modern implementation (TripWireV2)
+    env = TripWire()
+
+If you need the legacy implementation explicitly::
+
+    from tripwire import TripWireLegacy
+    env = TripWireLegacy()
 """
 
 import inspect
 import linecache
 import os
 import threading
+import warnings
 from pathlib import Path
 from typing import (
     Any,
@@ -103,10 +119,21 @@ def _cache_get_or_compute(
 
 
 class TripWire:
-    """Main class for environment variable management with validation.
+    """Main class for environment variable management with validation (DEPRECATED).
 
-    This class provides methods to load, validate, and retrieve environment
-    variables with type safety and format validation.
+    .. deprecated:: 0.9.0
+       TripWire from _core_legacy is deprecated. Import from tripwire instead:
+
+           from tripwire import TripWire  # Uses modern TripWireV2 implementation
+
+       If you specifically need the legacy implementation:
+
+           from tripwire import TripWireLegacy
+
+       This legacy implementation will be removed in v1.0.0.
+
+    This is the legacy monolithic implementation. The modern implementation
+    (TripWireV2) offers better architecture, performance, and testability.
     """
 
     def __init__(
@@ -116,7 +143,7 @@ class TripWire:
         strict: bool = False,
         detect_secrets: bool = False,
     ) -> None:
-        """Initialize TripWire.
+        """Initialize TripWire (DEPRECATED).
 
         Args:
             env_file: Path to .env file to load (default: .env)
@@ -124,6 +151,15 @@ class TripWire:
             strict: Whether to enable strict mode (warnings become errors)
             detect_secrets: Whether to detect potential secrets
         """
+        # Emit deprecation warning
+        warnings.warn(
+            "TripWire from tripwire._core_legacy is deprecated. "
+            "Use 'from tripwire import TripWire' which now uses the modern TripWireV2 implementation. "
+            "This legacy implementation will be removed in v1.0.0.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         self.env_file = Path(env_file) if env_file else Path(".env")
         self.strict = strict
         self.detect_secrets = detect_secrets
@@ -901,5 +937,9 @@ class TripWire:
         return legacy_format
 
 
-# Module-level singleton instance for convenient usage
+# Module-level singleton instance for convenient usage (DEPRECATED)
+# Use: from tripwire import env (which now uses TripWireV2)
 env = TripWire()
+
+# Alias for backward compatibility
+TripWireLegacy = TripWire

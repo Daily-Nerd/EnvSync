@@ -128,7 +128,7 @@ class TestPatternValidationRule:
             coerced_value="invalid",
             expected_type=str,
         )
-        with pytest.raises(ValidationError, match="does not match pattern"):
+        with pytest.raises(ValidationError, match="Does not match pattern"):
             rule.validate(context)
 
     def test_alphanumeric_pattern(self):
@@ -146,7 +146,7 @@ class TestPatternValidationRule:
             coerced_value="ABC-123",
             expected_type=str,
         )
-        with pytest.raises(ValidationError, match="does not match pattern"):
+        with pytest.raises(ValidationError, match="Does not match pattern"):
             rule.validate(context)
 
     def test_custom_error_message(self):
@@ -175,7 +175,7 @@ class TestChoicesValidationRule:
             coerced_value="invalid",
             expected_type=str,
         )
-        with pytest.raises(ValidationError, match="must be one of"):
+        with pytest.raises(ValidationError, match="Not in allowed choices"):
             rule.validate(context)
 
     def test_single_choice(self):
@@ -215,14 +215,14 @@ class TestRangeValidationRule:
         """Test validation fails for value below minimum."""
         rule = RangeValidationRule(min_val=10)
         context = ValidationContext(name="PORT", raw_value="5", coerced_value=5, expected_type=int)
-        with pytest.raises(ValidationError, match="out of range"):
+        with pytest.raises(ValidationError, match="Out of range"):
             rule.validate(context)
 
     def test_value_above_max(self):
         """Test validation fails for value above maximum."""
         rule = RangeValidationRule(max_val=100)
         context = ValidationContext(name="PORT", raw_value="150", coerced_value=150, expected_type=int)
-        with pytest.raises(ValidationError, match="out of range"):
+        with pytest.raises(ValidationError, match="Out of range"):
             rule.validate(context)
 
     def test_value_at_min_boundary(self):
@@ -270,7 +270,7 @@ class TestLengthValidationRule:
         """Test validation fails for length below minimum."""
         rule = LengthValidationRule(min_length=5)
         context = ValidationContext(name="NAME", raw_value="ab", coerced_value="ab", expected_type=str)
-        with pytest.raises(ValidationError, match="out of bounds"):
+        with pytest.raises(ValidationError, match="String too"):
             rule.validate(context)
 
     def test_length_too_long(self):
@@ -282,7 +282,7 @@ class TestLengthValidationRule:
             coerced_value="toolong",
             expected_type=str,
         )
-        with pytest.raises(ValidationError, match="out of bounds"):
+        with pytest.raises(ValidationError, match="String too"):
             rule.validate(context)
 
     def test_length_at_min_boundary(self):
@@ -306,7 +306,7 @@ class TestLengthValidationRule:
         """Test empty string fails minimum length."""
         rule = LengthValidationRule(min_length=1)
         context = ValidationContext(name="VAR", raw_value="", coerced_value="", expected_type=str)
-        with pytest.raises(ValidationError, match="out of bounds"):
+        with pytest.raises(ValidationError, match="String too"):
             rule.validate(context)
 
     def test_non_string_skipped(self):
@@ -440,7 +440,7 @@ class TestValidationOrchestrator:
 
         context = ValidationContext(name="VAR", raw_value="short", coerced_value="short", expected_type=str)
 
-        with pytest.raises(ValidationError, match="out of bounds"):
+        with pytest.raises(ValidationError, match="String too"):
             orchestrator.validate(context)
 
     def test_builder_pattern(self):
