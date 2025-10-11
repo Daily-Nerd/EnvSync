@@ -31,7 +31,6 @@ default = "username"
 [variables.DB_PASSWORD]
 type = "string"
 required = true
-default = "password"
 secret = true
 
 [variables.API_TOKEN]
