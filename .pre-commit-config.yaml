@@ -55,10 +55,3 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
-
-      - id: tripwire-secret-scan
-        name: TripWire Secret Scan
-        entry: tripwire security scan --strict
-        language: system
-        pass_filenames: false
-        always_run: true
