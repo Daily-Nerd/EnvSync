@@ -207,7 +207,7 @@ Detect secrets in .env and audit git history for leaks.
 
 ```bash
 # Auto-detect and audit all secrets
-$ tripwire audit --all
+$ tripwire security audit --all
 
 🔍 Auto-detecting secrets in .env file...
 ⚠️  Found 3 potential secret(s)
@@ -248,14 +248,18 @@ tripwire sync
 # Compare configurations (v0.4.0+)
 tripwire diff .env .env.prod
 
-# Scan for secrets
-tripwire scan --strict
+# Scan for secrets (v0.8.0+)
+tripwire security scan --strict
 
-# Audit git history for secret leaks
-tripwire audit --all
+# Audit git history for secret leaks (v0.8.0+)
+tripwire security audit --all
 
 # Validate .env without running app
 tripwire validate
+
+# Plugin management (v0.10.0+)
+tripwire plugin install vault
+tripwire plugin list
 ```
 
 [Complete CLI Reference →](docs/guides/cli-reference.md)
@@ -367,6 +371,91 @@ tripwire schema from-example
 
 ---
 
+## Plugin System
+
+Extend TripWire with cloud secret managers and custom environment sources (v0.10.0+).
+
+### Official Plugins
+
+TripWire includes 4 production-ready plugins for major cloud providers:
+
+```bash
+# Install plugins from official registry
+tripwire plugin install vault           # HashiCorp Vault
+tripwire plugin install aws-secrets     # AWS Secrets Manager
+tripwire plugin install azure-keyvault  # Azure Key Vault
+tripwire plugin install remote-config   # Generic HTTP endpoint
+```
+
+### Using Plugins
+
+```python
+from tripwire import TripWire
+from tripwire.plugins.sources import VaultEnvSource, AWSSecretsSource
+
+# HashiCorp Vault
+vault = VaultEnvSource(
+    url="https://vault.company.com",
+    token="hvs.xxx",
+    mount_point="secret",
+    path="myapp/config"
+)
+
+# AWS Secrets Manager
+aws = AWSSecretsSource(
+    secret_name="myapp/production",
+    region_name="us-east-1"
+    # Uses AWS credentials from environment or IAM role
+)
+
+# Use with TripWire
+env = TripWire(sources=[vault, aws])
+DATABASE_URL = env.require("DATABASE_URL")
+API_KEY = env.require("API_KEY")
+```
+
+### Plugin Commands
+
+```bash
+# Search for plugins
+tripwire plugin search vault
+
+# List installed plugins
+tripwire plugin list
+
+# Update a plugin
+tripwire plugin update vault --version 0.2.0
+
+# Remove a plugin
+tripwire plugin remove vault
+```
+
+### Authentication
+
+**HashiCorp Vault:**
+- Token authentication: `VAULT_TOKEN` env var
+- AppRole authentication: `VAULT_ROLE_ID` + `VAULT_SECRET_ID`
+- Kubernetes auth: Automatic when running in K8s
+
+**AWS Secrets Manager:**
+- IAM credentials: `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY`
+- IAM role: Automatic when running on EC2/ECS/Lambda
+- AWS CLI profile: Respects `AWS_PROFILE` env var
+
+**Azure Key Vault:**
+- Service Principal: `AZURE_CLIENT_ID` + `AZURE_TENANT_ID` + `AZURE_CLIENT_SECRET`
+- Managed Identity: Automatic when running on Azure VMs/App Service
+- Azure CLI: Uses `az login` credentials
+
+**Remote HTTP Endpoint:**
+- Bearer token: `Authorization: Bearer <token>` header
+- API key: Custom header authentication
+- mTLS: Client certificate authentication
+
+[Learn more about Plugin Development →](docs/guides/plugin-development.md)
+
+---
+
 ## CI/CD Integration
 
 ### GitHub Actions
@@ -385,7 +474,7 @@ jobs:
           python-version: '3.11'
       - run: pip install tripwire-py
       - run: tripwire generate --check
-      - run: tripwire scan --strict
+      - run: tripwire security scan --strict
       - run: tripwire schema validate --strict
 ```
 
@@ -404,6 +493,7 @@ jobs:
 | Team sync (drift detection) | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Secret detection (45+ patterns) | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Git history auditing | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Plugin system (cloud secrets) | ✅ | ❌ | ❌ | ❌ | ❌ |
 | CLI tools | ✅ | ❌ | ❌ | ❌ | ⚠️ |
 | Multi-environment | ✅ | ✅ | ✅ | ✅ | ✅ |
 
@@ -473,16 +563,18 @@ TripWire builds on the excellent work of the Python community, particularly:
 - [x] **Configuration as Code** (TOML schemas - v0.3.0)
 - [x] **Tool configuration** (`[tool.tripwire]` - v0.4.1)
 - [x] **Schema migration** (schema from-example - v0.4.1)
+- [x] **Plugin system** (v0.10.0) - Vault, AWS, Azure, Remote HTTP
+- [x] **Modern architecture** (TripWireV2 - v0.9.0) - 22% faster
 
 ### Planned Features 📋
 
 - [ ] VS Code extension (env var autocomplete)
 - [ ] PyCharm plugin
-- [ ] Cloud secrets support (AWS Secrets Manager, Vault)
 - [ ] Encrypted .env files
 - [ ] Web UI for team env management
 - [ ] Environment variable versioning
 - [ ] Compliance reports (SOC2, HIPAA)
+- [ ] Additional plugins (GCP Secret Manager, 1Password, Bitwarden)
 
 ---
 

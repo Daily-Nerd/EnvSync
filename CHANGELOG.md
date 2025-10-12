@@ -40,8 +40,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Security: Azure Plugin URL Validation** (TW-2025-004, HIGH severity)
+  - Enhanced HTTPS scheme enforcement to prevent HTTP downgrade attacks
+  - Added domain validation requiring `.vault.azure.net` suffix to prevent domain spoofing
+  - Validates URL format with proper error messages for invalid Azure Key Vault URLs
+  - Commit: 4151a3a (2025-10-12)
+
+- **Security: Plugin Registry SSRF Protection** (TW-2025-005, MEDIUM severity)
+  - URL scheme validation prevents SSRF attacks via file://, gopher://, etc.
+  - Blocks fetching from internal network resources through plugin URLs
+  - Whitelist-based scheme validation (https:// only for plugin registry)
+  - Commit: 4151a3a (2025-10-12)
+
+- **Security: Plugin Path Traversal Protection** (TW-2025-006, HIGH severity)
+  - Path sanitization prevents `../` traversal attacks in plugin installation
+  - Blocks writing plugin files outside designated plugin directory
+  - Prevents arbitrary file write vulnerabilities
+  - Commit: 4151a3a (2025-10-12)
+
 - PyYAML Imports: Removed type ignore comments for better type checking
-- Azure Plugin Validation: Enhanced HTTPS scheme validation and domain format checks
 - AWS Plugin: Clarified secret name sanitization for environment variable compatibility
 
 ### Technical Details

@@ -12,4 +12,6 @@ __pycache__/
 htmlcov/*
 .DS_Store
 dist/*
+
+# Internal documentation
 docs/internal/*
