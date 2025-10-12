@@ -16,16 +16,117 @@ The registry is hosted on GitHub as a JSON file, similar to npm/PyPI indexes.
 
 import hashlib
 import json
+import os
 import shutil
 import tarfile
 import tempfile
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+
+def _validate_url_scheme(url: str) -> None:
+    """
+    Validate that URL uses HTTPS scheme only.
+
+    Prevents SSRF attacks via file://, ftp://, or other dangerous schemes.
+
+    Args:
+        url: URL to validate
+
+    Raises:
+        ValueError: If URL scheme is not HTTPS
+    """
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "https":
+        raise ValueError(f"Security: Only HTTPS URLs are allowed, got scheme '{parsed.scheme}'. " f"URL: {url}")
+
+
+def _is_safe_path(base_path: Path, target_path: Path) -> bool:
+    """
+    Check if target path is safely contained within base path.
+
+    Prevents path traversal attacks (Zip Slip) by ensuring extracted
+    files cannot escape the intended directory using paths like ../../etc/passwd
+
+    Args:
+        base_path: Base directory that should contain target
+        target_path: Target path to validate
+
+    Returns:
+        True if target_path is safely within base_path
+    """
+    # Resolve both paths to absolute canonical forms
+    base_resolved = base_path.resolve()
+    target_resolved = target_path.resolve()
+
+    # Check if target is a child of base
+    try:
+        target_resolved.relative_to(base_resolved)
+        return True
+    except ValueError:
+        return False
+
+
+def _safe_extract_tarfile(tar: tarfile.TarFile, target_dir: Path) -> None:
+    """
+    Safely extract tarfile with path traversal protection.
+
+    Validates each member path before extraction to prevent Zip Slip attacks.
+
+    Args:
+        tar: Open tarfile object
+        target_dir: Directory to extract to
+
+    Raises:
+        RuntimeError: If any member path attempts to escape target_dir
+    """
+    for member in tar.getmembers():
+        # Construct full target path
+        member_path = target_dir / member.name
+
+        # Validate path is safe
+        if not _is_safe_path(target_dir, member_path):
+            raise RuntimeError(
+                f"Security: Archive member '{member.name}' attempts to escape "
+                f"extraction directory. Possible path traversal attack."
+            )
+
+    # All paths validated, safe to extract
+    tar.extractall(target_dir)  # nosec B202  # Path traversal validated above via _is_safe_path()
+
+
+def _safe_extract_zipfile(zip_file: zipfile.ZipFile, target_dir: Path) -> None:
+    """
+    Safely extract zipfile with path traversal protection.
+
+    Validates each member path before extraction to prevent Zip Slip attacks.
+
+    Args:
+        zip_file: Open zipfile object
+        target_dir: Directory to extract to
+
+    Raises:
+        RuntimeError: If any member path attempts to escape target_dir
+    """
+    for member_name in zip_file.namelist():
+        # Construct full target path
+        member_path = target_dir / member_name
+
+        # Validate path is safe
+        if not _is_safe_path(target_dir, member_path):
+            raise RuntimeError(
+                f"Security: Archive member '{member_name}' attempts to escape "
+                f"extraction directory. Possible path traversal attack."
+            )
+
+    # All paths validated, safe to extract
+    zip_file.extractall(target_dir)  # nosec B202  # Path traversal validated above via _is_safe_path()
 
 
 @dataclass(frozen=True)
@@ -253,7 +354,12 @@ class PluginRegistryClient:
     def _fetch_from_remote(self) -> PluginRegistryIndex:
         """Fetch registry from remote URL and cache it."""
         try:
-            with urllib.request.urlopen(self.registry_url, timeout=10) as response:
+            # Validate URL scheme for security (prevent SSRF)
+            _validate_url_scheme(self.registry_url)
+
+            with urllib.request.urlopen(
+                self.registry_url, timeout=10
+            ) as response:  # nosec B310  # URL scheme validated above
                 data = response.read()
 
             # Parse JSON
@@ -458,12 +564,17 @@ class PluginInstaller:
         if not version_info.download_url:
             raise RuntimeError("No download URL available for plugin")
 
+        # Validate URL scheme for security (prevent SSRF)
+        _validate_url_scheme(version_info.download_url)
+
         # Download to temporary file
         temp_dir = Path(tempfile.gettempdir())
         archive_path = temp_dir / f"tripwire-plugin-{version_info.version}.tar.gz"
 
         try:
-            with urllib.request.urlopen(version_info.download_url, timeout=30) as response:
+            with urllib.request.urlopen(
+                version_info.download_url, timeout=30
+            ) as response:  # nosec B310  # URL scheme validated above
                 with open(archive_path, "wb") as f:
                     f.write(response.read())
         except urllib.error.URLError as e:
@@ -489,16 +600,18 @@ class PluginInstaller:
             raise RuntimeError(f"Checksum mismatch! Expected {expected_checksum}, " f"got {actual_checksum}")
 
     def _extract_archive(self, archive_path: Path) -> Path:
-        """Extract plugin archive to temporary directory."""
+        """Extract plugin archive to temporary directory with path traversal protection."""
         temp_dir = Path(tempfile.mkdtemp(prefix="tripwire-plugin-"))
 
         try:
             if archive_path.suffix == ".gz" or archive_path.suffixes[-2:] == [".tar", ".gz"]:
                 with tarfile.open(archive_path, "r:gz") as tar:
-                    tar.extractall(temp_dir)
+                    # Use safe extraction to prevent Zip Slip attacks
+                    _safe_extract_tarfile(tar, temp_dir)  # noqa: S202
             elif archive_path.suffix == ".zip":
                 with zipfile.ZipFile(archive_path, "r") as zip_file:
-                    zip_file.extractall(temp_dir)
+                    # Use safe extraction to prevent Zip Slip attacks
+                    _safe_extract_zipfile(zip_file, temp_dir)  # noqa: S202
             else:
                 raise RuntimeError(f"Unsupported archive format: {archive_path.suffix}")
         except Exception as e:
