@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import os
 from typing import Any
+from urllib.parse import urlparse
 
 from tripwire.plugins.base import PluginInterface, PluginMetadata
 from tripwire.plugins.errors import PluginAPIError, PluginValidationError
@@ -100,11 +101,19 @@ class AzureKeyVaultSource(PluginInterface):
         if not self.vault_url:
             errors.append("Vault URL is required (vault_url parameter or AZURE_KEYVAULT_URL env var)")
 
-        # Validate URL format
-        if self.vault_url and not self.vault_url.startswith("https://"):
-            errors.append(f"Vault URL must start with 'https://': {self.vault_url}")
-        if self.vault_url and not ".vault.azure.net" in self.vault_url:
-            errors.append(f"Invalid Azure Key Vault URL format: {self.vault_url}")
+        # Validate URL format with proper domain verification
+        if self.vault_url:
+            try:
+                parsed = urlparse(self.vault_url)
+                if parsed.scheme != "https":
+                    errors.append(f"Vault URL must use HTTPS: {self.vault_url}")
+                if not parsed.hostname or not parsed.hostname.endswith(".vault.azure.net"):
+                    errors.append(
+                        f"Invalid Azure Key Vault URL format. "
+                        f"Hostname must end with '.vault.azure.net': {self.vault_url}"
+                    )
+            except Exception as e:
+                errors.append(f"Invalid URL format: {self.vault_url} - {e}")
 
         if errors:
             raise PluginValidationError(self.metadata.name, errors)
@@ -275,11 +284,18 @@ class AzureKeyVaultSource(PluginInterface):
             errors.append("Missing required field: vault_url")
         else:
             vault_url = config["vault_url"]
-            # Validate URL format
-            if not vault_url.startswith("https://"):
-                errors.append(f"Vault URL must start with 'https://': {vault_url}")
-            if ".vault.azure.net" not in vault_url:
-                errors.append(f"Invalid Azure Key Vault URL format: {vault_url}")
+            # Validate URL format with proper domain verification
+            try:
+                parsed = urlparse(vault_url)
+                if parsed.scheme != "https":
+                    errors.append(f"Vault URL must use HTTPS: {vault_url}")
+                if not parsed.hostname or not parsed.hostname.endswith(".vault.azure.net"):
+                    errors.append(
+                        f"Invalid Azure Key Vault URL format. "
+                        f"Hostname must end with '.vault.azure.net': {vault_url}"
+                    )
+            except Exception as e:
+                errors.append(f"Invalid URL format: {vault_url} - {e}")
 
         if errors:
             raise PluginValidationError(self.metadata.name, errors)

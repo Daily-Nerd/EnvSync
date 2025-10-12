@@ -262,7 +262,7 @@ class AWSSecretsSource(PluginInterface):
                 # Remove version suffix if present
                 secret_name = secret_name.rsplit("-", 1)[0]
 
-        # Replace non-alphanumeric characters with underscores
+        # Replace non-alphanumeric characters with underscores for env var compatibility
         sanitized = "".join(c if c.isalnum() else "_" for c in secret_name)
         return sanitized.upper()
 

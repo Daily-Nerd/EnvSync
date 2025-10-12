@@ -287,7 +287,8 @@ class TestAzureKeyVaultSource:
         with pytest.raises(PluginValidationError) as exc:
             azure.validate_config(config)
 
-        assert "must start with 'https://'" in str(exc.value)
+        # Test updated error message after security fix
+        assert "must use HTTPS" in str(exc.value) or "Invalid Azure Key Vault URL" in str(exc.value)
 
 
 class TestRemoteConfigSource:
