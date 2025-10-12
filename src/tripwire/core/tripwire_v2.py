@@ -147,6 +147,9 @@ class TripWireV2:
             self._inference_engine = inference_engine
 
         # File loader with pluggable sources (Strategy Pattern)
+        # Track whether sources were explicitly provided (for auto_load logic)
+        _sources_provided = sources is not None
+
         if loader is None:
             # Use provided sources or default to DotenvFileSource
             if sources is None:
@@ -158,17 +161,18 @@ class TripWireV2:
             self._loader = loader
 
         # Auto-load if enabled
-        # Note: When using custom loader, we always call load_all() regardless of self.env_file
-        # The custom loader knows which files to load
+        # Logic:
+        # 1. Custom loader injected OR custom sources provided → always load (they know what to load)
+        # 2. Default .env source → only load if file exists (backward compatibility)
         if auto_load:
-            if loader is not None:
-                # Custom loader injected - always load (loader knows what files to load)
+            if loader is not None or _sources_provided:
+                # Custom loader/sources injected - always load (they know what to provide)
                 self._loader.load_all()
-                # Track loaded files from the custom loader
+                # Track loaded files from the loader
                 loaded_files = self._loader.get_loaded_files()
                 self._loaded_files.extend(loaded_files)
             elif self.env_file.exists():
-                # Default loader - only load if env_file exists
+                # Default .env source - only load if file exists
                 self._loader.load_all()
                 # Track loaded file for backward compatibility
                 if self.env_file not in self._loaded_files:
