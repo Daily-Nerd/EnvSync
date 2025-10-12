@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2025-10-12
+
+### Added
+
+- **Plugin Management System**: Complete plugin architecture for extensible environment variable sources
+  - PluginMetadata dataclass for plugin identification and validation
+  - EnvSourcePlugin protocol defining plugin interface contract
+  - PluginInterface abstract base class with template methods
+  - PluginRegistry for thread-safe plugin registration and discovery
+  - Plugin validation with semantic versioning checks
+- **Plugin CLI Commands**: New tripwire plugin command group for plugin management
+  - plugin install - Install plugins from official registry
+  - plugin search - Search for plugins by name/tag
+  - plugin list - List installed plugins with metadata
+  - plugin update - Update plugins to specific versions
+  - plugin remove - Remove installed plugins
+- **Official Plugin Sources**: Four production-ready environment sources
+  - VaultEnvSource - HashiCorp Vault integration
+  - AWSSecretsSource - AWS Secrets Manager integration
+  - AzureKeyVaultSource - Azure Key Vault integration
+  - RemoteConfigSource - Generic HTTP endpoint support
+- **Enhanced TripWireV2**: Plugin system integration
+  - Auto-loading support for plugin-based sources
+  - Backward compatible with existing .env file loading
+  - Custom loader flag tracking for intelligent auto-load behavior
+
+### Changed
+
+- Core Loader: Added plugin source support to EnvFileLoader
+- Import System: Exported plugin components from tripwire.core for public API
+
+### Fixed
+
+- PyYAML Imports: Removed type ignore comments for better type checking
+- Azure Plugin Validation: Enhanced HTTPS scheme validation and domain format checks
+- AWS Plugin: Clarified secret name sanitization for environment variable compatibility
+
+### Technical Details
+
+- Added 7,315+ lines of plugin system code
+- 847 new tests for plugin CLI commands
+- 1,176 tests for official plugin sources
+- Thread-safe plugin registry with proper locking
+- Comprehensive error handling with custom exception hierarchy
+
 ## [0.9.0] - 2025-10-11
 
 ### Added
