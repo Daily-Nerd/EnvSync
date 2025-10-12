@@ -143,9 +143,18 @@ class EnvFileLoader:
         Raises:
             EnvFileNotFoundError: If strict=True and a file source doesn't exist
         """
+        import os
+
         for source in self.sources:
             # Load the source
             loaded_vars = source.load()
+
+            # For non-DotenvFileSource sources (like plugins), we need to
+            # inject the variables into os.environ manually
+            if not isinstance(source, DotenvFileSource):
+                # Inject variables from plugin into environment
+                for key, value in loaded_vars.items():
+                    os.environ[key] = value
 
             # Track successful file loads for reporting
             if isinstance(source, DotenvFileSource):

@@ -35,6 +35,9 @@ from tripwire.validation import ValidatorFunc, coerce_type
 
 T = TypeVar("T")
 
+# Import plugin system (lazy import to avoid circular dependencies)
+_plugin_system_imported = False
+
 
 class TripWireV2:
     """Modern environment variable management with composable architecture.
@@ -87,6 +90,7 @@ class TripWireV2:
         registry: Optional[VariableRegistry] = None,
         loader: Optional[EnvFileLoader] = None,
         inference_engine: Optional[TypeInferenceEngine] = None,
+        sources: Optional[List[EnvSource]] = None,
     ) -> None:
         """Initialize TripWireV2 with optional component injection.
 
@@ -98,6 +102,8 @@ class TripWireV2:
             registry: Custom variable registry (default: create new VariableRegistry)
             loader: Custom file loader (default: DotenvFileSource)
             inference_engine: Custom type inference engine (default: FrameInspection)
+            sources: Custom environment sources (default: DotenvFileSource)
+                     When provided, overrides env_file parameter
 
         Design Pattern:
             Factory Pattern: Creates default instances if not provided
@@ -106,6 +112,21 @@ class TripWireV2:
         Thread Safety:
             All injected components are expected to be thread-safe.
             Default components (VariableRegistry, etc.) are thread-safe by design.
+
+        Example with plugin sources:
+            >>> from tripwire import TripWire
+            >>> from tripwire.plugins import PluginRegistry
+            >>>
+            >>> # Discover plugins
+            >>> TripWire.discover_plugins()
+            >>>
+            >>> # Get plugin class
+            >>> VaultPlugin = PluginRegistry.get_plugin("vault")
+            >>> vault = VaultPlugin(url="https://vault.example.com", token="...")
+            >>>
+            >>> # Use with TripWire
+            >>> env = TripWire(sources=[vault])
+            >>> DATABASE_URL = env.require("DATABASE_URL")
         """
         # Core configuration
         self.env_file = Path(env_file) if env_file else Path(".env")
@@ -127,8 +148,12 @@ class TripWireV2:
 
         # File loader with pluggable sources (Strategy Pattern)
         if loader is None:
-            sources: List[EnvSource] = [DotenvFileSource(self.env_file)]
-            self._loader = EnvFileLoader(sources, strict=self.strict)
+            # Use provided sources or default to DotenvFileSource
+            if sources is None:
+                source_list: List[EnvSource] = [DotenvFileSource(self.env_file)]
+            else:
+                source_list = sources
+            self._loader = EnvFileLoader(source_list, strict=self.strict)
         else:
             self._loader = loader
 
@@ -884,6 +909,44 @@ class TripWireV2:
             orchestrator.add_rule(CustomValidationRule(validator, error_message))
 
         return orchestrator
+
+    @classmethod
+    def discover_plugins(cls) -> None:
+        """Discover and register plugins from entry points.
+
+        This method scans for plugins registered via setuptools entry points
+        in the 'tripwire.plugins' group and registers them with the PluginRegistry.
+
+        Plugins can then be retrieved using PluginRegistry.get_plugin() and used
+        as sources when creating TripWire instances.
+
+        Example:
+            >>> from tripwire import TripWire
+            >>> from tripwire.plugins import PluginRegistry
+            >>>
+            >>> # Discover all installed plugins
+            >>> TripWire.discover_plugins()
+            >>>
+            >>> # Get and use a plugin
+            >>> VaultPlugin = PluginRegistry.get_plugin("vault")
+            >>> vault = VaultPlugin(url="...", token="...")
+            >>> env = TripWire(sources=[vault])
+
+        Note:
+            This method is typically called once at application startup.
+            Plugins registered in pyproject.toml entry points will be
+            automatically discovered and validated.
+        """
+        global _plugin_system_imported
+        if not _plugin_system_imported:
+            # Lazy import to avoid circular dependencies
+            from tripwire.core.plugin_system import PluginRegistry
+
+            _plugin_system_imported = True
+        else:
+            from tripwire.core.plugin_system import PluginRegistry
+
+        PluginRegistry.discover_plugins()
 
 
 # Module-level singleton instance for convenient usage

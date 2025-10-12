@@ -18,6 +18,14 @@ from tripwire.core.inference import (
     TypeInferenceStrategy,
 )
 from tripwire.core.loader import DotenvFileSource, EnvFileLoader, EnvSource
+
+# Plugin system (v0.10.0+)
+from tripwire.core.plugin_system import (
+    PluginLoader,
+    PluginRegistry,
+    PluginSandbox,
+    PluginValidator,
+)
 from tripwire.core.registry import VariableMetadata, VariableRegistry
 
 # Import modern TripWire implementation (v0.9.0+)
@@ -57,4 +65,9 @@ __all__ = [
     "RangeValidationRule",
     "LengthValidationRule",
     "CustomValidationRule",
+    # Plugin system (v0.10.0+)
+    "PluginRegistry",
+    "PluginLoader",
+    "PluginValidator",
+    "PluginSandbox",
 ]

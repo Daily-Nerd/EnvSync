@@ -1128,7 +1128,7 @@ def schema_to_env(
 
     elif format_output == "yaml":
         try:
-            import yaml
+            import yaml  # type: ignore[import-untyped]
         except ImportError:
             console.print("[red]Error:[/red] PyYAML not installed")
             console.print("Install it with: [cyan]pip install pyyaml[/cyan]")
