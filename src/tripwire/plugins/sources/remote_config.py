@@ -187,7 +187,7 @@ class RemoteConfigSource(PluginInterface):
                     data = response.json()
                 elif self.format == "yaml":
                     try:
-                        import yaml  # type: ignore[import-untyped]
+                        import yaml
                     except ImportError as e:
                         raise PluginAPIError(
                             self.metadata.name,
