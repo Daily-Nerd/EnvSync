@@ -124,8 +124,8 @@ class AzureKeyVaultSource(PluginInterface):
         """
         if self._client is None:
             try:
-                from azure.keyvault.secrets import (
-                    SecretClient,  # type: ignore[import-not-found]
+                from azure.keyvault.secrets import (  # type: ignore[import-not-found]
+                    SecretClient,
                 )
             except ImportError as e:
                 raise PluginAPIError(
@@ -138,8 +138,8 @@ class AzureKeyVaultSource(PluginInterface):
             # Create or get credential
             if self._credential is None:
                 try:
-                    from azure.identity import (
-                        DefaultAzureCredential,  # type: ignore[import-not-found]
+                    from azure.identity import (  # type: ignore[import-not-found]
+                        DefaultAzureCredential,
                     )
 
                     self._credential = DefaultAzureCredential()

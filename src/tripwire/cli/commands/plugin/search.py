@@ -64,8 +64,10 @@ def search(
             return
 
         # Display results in table
+        query_suffix = f' for "{query}"' if query else ""
+        title = f"Plugin Search Results{query_suffix}"
         table = Table(
-            title=f"Plugin Search Results{f' for \"{query}\"' if query else ''}",
+            title=title,
             show_header=True,
             header_style="bold cyan",
         )
