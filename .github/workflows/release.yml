@@ -277,8 +277,6 @@ jobs:
     name: Test PyPI Upload
     runs-on: ubuntu-latest
     needs: [validate-release, build-package]
-    # Keep your original logic: tag push OR explicit prerelease flag uploads to TestPyPI
-    if: github.event_name == 'push' || github.event.inputs.prerelease == 'true'
     env:
       # Force UTF-8 encoding on Windows for proper Unicode handling
       PYTHONIOENCODING: utf-8
@@ -450,7 +448,7 @@ jobs:
     name: PyPI Upload (Trusted Publishing)
     runs-on: ubuntu-latest
     needs: [validate-release, build-package, test-pypi]
-    if: github.event_name == 'push' && needs.validate-release.outputs.is_prerelease == 'false'
+    if: needs.validate-release.outputs.is_prerelease == 'false'
     # OIDC for Trusted Publishing
     permissions:
       contents: read
