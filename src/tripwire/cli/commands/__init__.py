@@ -2,6 +2,7 @@
 
 import click
 
+from tripwire.cli.commands import plugin as plugin_module
 from tripwire.cli.commands import security as security_module
 
 # Import the actual security commands for deprecated aliases
@@ -31,8 +32,6 @@ def create_deprecated_scan() -> click.Command:
     @click.pass_context
     def scan(ctx: click.Context, strict: bool, depth: int) -> None:
         """[DEPRECATED] Use 'tripwire security scan' instead."""
-        import sys
-
         # Print warning to stderr so it doesn't interfere with JSON output
         click.echo("⚠️  Warning: 'tripwire scan' is deprecated.", err=True)
         click.echo("   Use 'tripwire security scan' instead.", err=True)
@@ -91,8 +90,6 @@ def create_deprecated_audit() -> click.Command:
         output_json: bool,
     ) -> None:
         """[DEPRECATED] Use 'tripwire security audit' instead."""
-        import sys
-
         # Only print warning if not using JSON output (to avoid breaking JSON parsing)
         if not output_json:
             # Print warning to stderr so it doesn't interfere with JSON output
@@ -118,7 +115,8 @@ def create_deprecated_audit() -> click.Command:
 deprecated_scan = create_deprecated_scan()
 deprecated_audit = create_deprecated_audit()
 
-# Export security module
+# Export command groups
 security = security_module.security
+plugin = plugin_module.plugin
 
-__all__ = ["security", "deprecated_scan", "deprecated_audit"]
+__all__ = ["security", "plugin", "deprecated_scan", "deprecated_audit"]
