@@ -649,7 +649,7 @@ def validate_datetime(
         >>> valid
         True
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     # Default to ISO8601 format if not specified
     if formats is None:
@@ -697,8 +697,6 @@ def validate_datetime(
                 min_dt = min_dt.replace(tzinfo=None)
             elif parsed_dt.tzinfo is not None and min_dt.tzinfo is None:
                 # Make min_dt aware for comparison (assume UTC)
-                from datetime import timezone
-
                 min_dt = min_dt.replace(tzinfo=timezone.utc)
 
             if parsed_dt < min_dt:
@@ -718,8 +716,6 @@ def validate_datetime(
                 max_dt = max_dt.replace(tzinfo=None)
             elif parsed_dt.tzinfo is not None and max_dt.tzinfo is None:
                 # Make max_dt aware for comparison (assume UTC)
-                from datetime import timezone
-
                 max_dt = max_dt.replace(tzinfo=timezone.utc)
 
             if parsed_dt > max_dt:

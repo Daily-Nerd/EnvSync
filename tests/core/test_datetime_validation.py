@@ -399,8 +399,9 @@ class TestDateTimeValidationRule:
 
     def test_real_world_scheduled_task(self):
         """Real-world example: Scheduled task time validation."""
+        # Time only
         rule = DateTimeValidationRule(
-            formats=["%H:%M:%S"], error_message="Task schedule must be in HH:MM:SS format"  # Time only
+            formats=["%H:%M:%S"], error_message="Task schedule must be in HH:MM:SS format"
         )
 
         # Valid schedule

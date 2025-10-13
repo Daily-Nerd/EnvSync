@@ -81,7 +81,7 @@ class TestValidateURLComponents:
     def test_default_port_implicit(self):
         """URL without explicit port passes validation (default ports)."""
         valid, error = validate_url_components("https://example.com", allowed_ports=[443])
-        # Default port is None from urlparse, so it should pass
+        # No explicit port in URL; should pass regardless of allowed_ports constraint
         assert valid is True
         assert error is None
 
