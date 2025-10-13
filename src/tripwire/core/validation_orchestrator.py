@@ -278,6 +278,155 @@ class CustomValidationRule(ValidationRule):
             )
 
 
+class URLComponentsValidationRule(ValidationRule):
+    """Validates URL components (protocol, port, path, query params).
+
+    This rule provides fine-grained control over URL structure for security
+    and API requirements. Use it to enforce HTTPS-only, specific ports,
+    path patterns, and query parameter policies.
+
+    Example:
+        >>> # Enforce HTTPS-only API URLs with versioning
+        >>> rule = URLComponentsValidationRule(
+        ...     protocols=["https"],
+        ...     allowed_ports=[443, 8443],
+        ...     required_path="^/api/v[0-9]+/",
+        ...     required_params=["api_key"],
+        ...     forbidden_params=["debug"]
+        ... )
+    """
+
+    def __init__(
+        self,
+        protocols: Optional[List[str]] = None,
+        allowed_ports: Optional[List[int]] = None,
+        forbidden_ports: Optional[List[int]] = None,
+        required_path: Optional[str] = None,
+        required_params: Optional[List[str]] = None,
+        forbidden_params: Optional[List[str]] = None,
+        error_message: Optional[str] = None,
+    ):
+        """Initialize URL components validation rule.
+
+        Args:
+            protocols: Whitelist of allowed protocols/schemes (e.g., ["https", "wss"])
+            allowed_ports: Whitelist of allowed ports (e.g., [443, 8443])
+            forbidden_ports: Blacklist of forbidden ports (e.g., [22, 3389])
+            required_path: Regex pattern that path must match (e.g., "^/api/")
+            required_params: Query parameters that must be present (e.g., ["api_key"])
+            forbidden_params: Query parameters that must not be present (e.g., ["debug"])
+            error_message: Custom error message (overrides detailed validation messages)
+        """
+        super().__init__(error_message)
+        self.protocols = protocols
+        self.allowed_ports = allowed_ports
+        self.forbidden_ports = forbidden_ports
+        self.required_path = required_path
+        self.required_params = required_params
+        self.forbidden_params = forbidden_params
+
+    def validate(self, context: ValidationContext) -> None:
+        """Validate URL components."""
+        from tripwire.exceptions import ValidationError
+        from tripwire.validation import validate_url_components
+
+        # Only validate string values (check coerced_value type like other rules)
+        if not isinstance(context.coerced_value, str):
+            return
+
+        is_valid, error_msg = validate_url_components(
+            context.raw_value,
+            protocols=self.protocols,
+            allowed_ports=self.allowed_ports,
+            forbidden_ports=self.forbidden_ports,
+            required_path=self.required_path,
+            required_params=self.required_params,
+            forbidden_params=self.forbidden_params,
+        )
+
+        if not is_valid:
+            # Use custom error message if provided, otherwise use validation error message
+            # Fallback to generic message if error_msg is somehow None (defensive)
+            reason = self.error_message if self.error_message else (error_msg or "URL validation failed")
+            raise ValidationError(
+                variable_name=context.name,
+                value=context.raw_value,
+                reason=reason,
+            )
+
+
+class DateTimeValidationRule(ValidationRule):
+    """Validates datetime strings with format and range requirements.
+
+    This rule provides flexible datetime validation for timestamps,
+    scheduled tasks, expiration dates, and time-sensitive configurations.
+
+    Example:
+        >>> # Enforce ISO 8601 with timezone
+        >>> rule = DateTimeValidationRule(
+        ...     formats=["ISO8601"],
+        ...     require_timezone=True,
+        ...     min_datetime="2020-01-01T00:00:00Z",
+        ...     max_datetime="2030-12-31T23:59:59Z"
+        ... )
+    """
+
+    def __init__(
+        self,
+        formats: Optional[List[str]] = None,
+        require_timezone: Optional[bool] = None,
+        min_datetime: Optional[str] = None,
+        max_datetime: Optional[str] = None,
+        error_message: Optional[str] = None,
+    ):
+        """Initialize datetime validation rule.
+
+        Args:
+            formats: List of accepted datetime formats. Use "ISO8601" for ISO 8601,
+                or provide strptime format strings (e.g., "%Y-%m-%d %H:%M:%S").
+                Default: ["ISO8601"]
+            require_timezone: If True, require timezone-aware datetimes.
+                If False, require timezone-naive datetimes. If None, both allowed.
+            min_datetime: Minimum allowed datetime (ISO 8601 format).
+                Example: "2020-01-01T00:00:00Z"
+            max_datetime: Maximum allowed datetime (ISO 8601 format).
+                Example: "2030-12-31T23:59:59Z"
+            error_message: Custom error message (overrides detailed validation messages)
+        """
+        super().__init__(error_message)
+        self.formats = formats
+        self.require_timezone = require_timezone
+        self.min_datetime = min_datetime
+        self.max_datetime = max_datetime
+
+    def validate(self, context: ValidationContext) -> None:
+        """Validate datetime string."""
+        from tripwire.exceptions import ValidationError
+        from tripwire.validation import validate_datetime
+
+        # Only validate string values (check coerced_value type like other rules)
+        if not isinstance(context.coerced_value, str):
+            return
+
+        is_valid, error_msg = validate_datetime(
+            context.raw_value,
+            formats=self.formats,
+            require_timezone=self.require_timezone,
+            min_datetime=self.min_datetime,
+            max_datetime=self.max_datetime,
+        )
+
+        if not is_valid:
+            # Use custom error message if provided, otherwise use validation error message
+            # Fallback to generic message if error_msg is somehow None (defensive)
+            reason = self.error_message if self.error_message else (error_msg or "DateTime validation failed")
+            raise ValidationError(
+                variable_name=context.name,
+                value=context.raw_value,
+                reason=reason,
+            )
+
+
 class ValidationOrchestrator:
     """Orchestrates validation rule execution (Chain of Responsibility).
 

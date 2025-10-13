@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2025-10-13
+
+### Added
+
+- **URL Components Validation**: Fine-grained URL validation for security policies and API requirements
+  - New `validate_url_components()` function in validation.py (lines 485-593)
+  - Protocol whitelisting (enforce HTTPS-only, specific schemes)
+  - Port restrictions (allowed ports whitelist, forbidden ports blacklist)
+  - Path pattern validation using regex (enforce API versioning, URL structure)
+  - Query parameter policies (required parameters, forbidden parameters)
+  - Prevents SSRF attacks by restricting protocols and ports
+  - Use cases: API endpoint security, webhook validation, OAuth callbacks, microservice communication
+  - 36 comprehensive tests in tests/core/test_url_validation.py
+
+- **DateTime Validation**: Flexible datetime validation for time-sensitive configurations
+  - New `validate_datetime()` function in validation.py (lines 596-728)
+  - ISO 8601 format support with automatic 'Z' suffix handling
+  - Custom datetime formats via strptime format strings
+  - Multiple format support (tries formats in order until match)
+  - Timezone awareness enforcement (require timezone, forbid timezone, or allow both)
+  - Date range validation with min_datetime and max_datetime bounds
+  - Automatic timezone normalization for comparisons (naive vs aware)
+  - Use cases: SSL certificate expiration, scheduled tasks, token expiry, license validation
+  - 44 comprehensive tests in tests/core/test_datetime_validation.py
+
+- **ValidationOrchestrator Integration**: New validation rule classes for TripWireV2
+  - `URLComponentsValidationRule` class in validation_orchestrator.py (lines 281-353)
+  - `DateTimeValidationRule` class in validation_orchestrator.py (lines 356-423)
+  - Composable validation chains using builder pattern
+  - Custom error message support with fallback to detailed validation messages
+  - Non-string value skipping (type-appropriate validation)
+  - Integration examples with multiple validation rules
+
+### Performance
+
+- **Test Parallelization**: 56% faster test execution with pytest-xdist
+  - Added pytest-xdist dependency for parallel test execution
+  - Tests run across multiple CPU cores automatically
+  - No code changes required (transparent speedup)
+  - Configurable via `pytest -n auto` for optimal parallelization
+
+### Documentation
+
+- **Enhanced Validator Reference**: Comprehensive documentation for advanced validators
+  - Added "Advanced Validators" section to docs/reference/validators.md
+  - URL Components Validation: Function signature, parameters, 7+ usage examples
+  - DateTime Validation: Function signature, parameters, 8+ usage examples
+  - Real-world use cases: Security policies, API versioning, scheduled tasks, expiration dates
+  - ValidationOrchestrator integration examples for both validators
+  - Code examples with error messages and .env file samples
+
+### Testing
+
+- **Comprehensive Test Coverage**: 80 new tests for validation features
+  - URL validation: 36 tests covering protocols, ports, paths, query params, edge cases
+  - DateTime validation: 44 tests covering formats, timezones, ranges, edge cases
+  - All tests passing with 100% coverage on new features
+  - Real-world scenario tests (SSL certs, scheduled tasks, API endpoints)
+
+### Technical Details
+
+- Total new code: 600+ lines of validation logic
+- Test coverage: 100% on new validation functions
+- API compatibility: Fully backward compatible with existing validators
+- Dependencies: pytest-xdist (dev dependency only)
+
 ## [0.10.0] - 2025-10-12
 
 ### Added

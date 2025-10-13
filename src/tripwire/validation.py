@@ -482,6 +482,250 @@ def validate_length(
     return True
 
 
+def validate_url_components(
+    value: str,
+    protocols: Optional[List[str]] = None,
+    allowed_ports: Optional[List[int]] = None,
+    forbidden_ports: Optional[List[int]] = None,
+    required_path: Optional[str] = None,
+    required_params: Optional[List[str]] = None,
+    forbidden_params: Optional[List[str]] = None,
+) -> tuple[bool, Optional[str]]:
+    """Validate URL components against specific requirements.
+
+    This validator provides fine-grained control over URL structure beyond
+    basic format validation. Use it to enforce security policies and API
+    requirements.
+
+    Args:
+        value: URL string to validate
+        protocols: Whitelist of allowed protocols (schemes).
+            Example: ["https", "wss"] to only allow secure protocols
+        allowed_ports: Whitelist of allowed port numbers.
+            Example: [443, 8443] to only allow specific HTTPS ports
+        forbidden_ports: Blacklist of forbidden port numbers.
+            Example: [22, 3389] to prevent SSH/RDP in API URLs
+        required_path: Regex pattern that path must match.
+            Example: "^/api/v[0-9]+" to require versioned API paths
+        required_params: List of query parameters that must be present.
+            Example: ["api_key", "version"] to require authentication
+        forbidden_params: List of query parameters that must not be present.
+            Example: ["debug", "test"] to prevent debug flags in production
+
+    Returns:
+        Tuple of (is_valid, error_message). If valid, error_message is None.
+        If invalid, error_message explains which component failed.
+
+    Example:
+        >>> # Enforce HTTPS-only with specific ports
+        >>> valid, error = validate_url_components(
+        ...     "https://api.example.com:443/v1/users?api_key=xxx",
+        ...     protocols=["https"],
+        ...     allowed_ports=[443, 8443],
+        ...     required_path="^/v[0-9]+/",
+        ...     required_params=["api_key"],
+        ...     forbidden_params=["debug"]
+        ... )
+        >>> valid
+        True
+
+        >>> # Detect invalid protocol
+        >>> valid, error = validate_url_components(
+        ...     "http://api.example.com",
+        ...     protocols=["https"]
+        ... )
+        >>> valid
+        False
+        >>> error
+        "Protocol 'http' not allowed. Allowed protocols: https"
+    """
+    from urllib.parse import parse_qs, urlparse
+
+    try:
+        parsed = urlparse(value)
+    except Exception as e:
+        return False, f"Invalid URL format: {e}"
+
+    # Validate protocol (scheme)
+    if protocols is not None:
+        if not parsed.scheme:
+            return False, "URL missing protocol/scheme"
+        if parsed.scheme not in protocols:
+            allowed = ", ".join(protocols)
+            return False, f"Protocol '{parsed.scheme}' not allowed. Allowed protocols: {allowed}"
+
+    # Validate port
+    port = parsed.port
+    if port is not None:
+        # Check forbidden ports (blacklist)
+        if forbidden_ports is not None and port in forbidden_ports:
+            return False, f"Port {port} is forbidden"
+
+        # Check allowed ports (whitelist)
+        if allowed_ports is not None and port not in allowed_ports:
+            allowed = ", ".join(str(p) for p in sorted(allowed_ports))
+            return False, f"Port {port} not allowed. Allowed ports: {allowed}"
+
+    # Validate path
+    if required_path is not None:
+        if not parsed.path:
+            return False, f"URL path missing. Required pattern: {required_path}"
+        if not re.match(required_path, parsed.path):
+            return False, f"URL path '{parsed.path}' does not match required pattern: {required_path}"
+
+    # Validate query parameters
+    if required_params is not None or forbidden_params is not None:
+        query_params = parse_qs(parsed.query)
+        param_names = set(query_params.keys())
+
+        # Check required parameters
+        if required_params is not None:
+            missing = [p for p in required_params if p not in param_names]
+            if missing:
+                return False, f"Missing required query parameters: {', '.join(missing)}"
+
+        # Check forbidden parameters
+        if forbidden_params is not None:
+            present = [p for p in forbidden_params if p in param_names]
+            if present:
+                return False, f"Forbidden query parameters present: {', '.join(present)}"
+
+    return True, None
+
+
+def validate_datetime(
+    value: str,
+    formats: Optional[List[str]] = None,
+    require_timezone: Optional[bool] = None,
+    min_datetime: Optional[str] = None,
+    max_datetime: Optional[str] = None,
+) -> tuple[bool, Optional[str]]:
+    """Validate datetime string against format and range requirements.
+
+    This validator provides flexible datetime validation for timestamps,
+    scheduled tasks, and time-sensitive configurations.
+
+    Args:
+        value: Datetime string to validate
+        formats: List of accepted formats. Use "ISO8601" for ISO 8601 format,
+            or provide strptime format strings (e.g., "%Y-%m-%d %H:%M:%S").
+            Default: ["ISO8601"]
+        require_timezone: If True, datetime must be timezone-aware.
+            If False, datetime must be timezone-naive. If None, both allowed.
+        min_datetime: Minimum allowed datetime (ISO 8601 format).
+            Example: "2020-01-01T00:00:00Z"
+        max_datetime: Maximum allowed datetime (ISO 8601 format).
+            Example: "2030-12-31T23:59:59Z"
+
+    Returns:
+        Tuple of (is_valid, error_message). If valid, error_message is None.
+        If invalid, error_message explains which check failed.
+
+    Example:
+        >>> # Validate ISO 8601 with timezone
+        >>> valid, error = validate_datetime(
+        ...     "2025-10-13T14:30:00Z",
+        ...     formats=["ISO8601"],
+        ...     require_timezone=True
+        ... )
+        >>> valid
+        True
+
+        >>> # Validate custom format without timezone
+        >>> valid, error = validate_datetime(
+        ...     "2025-10-13 14:30:00",
+        ...     formats=["%Y-%m-%d %H:%M:%S"],
+        ...     require_timezone=False
+        ... )
+        >>> valid
+        True
+
+        >>> # Validate date range
+        >>> valid, error = validate_datetime(
+        ...     "2025-10-13T14:30:00Z",
+        ...     min_datetime="2020-01-01T00:00:00Z",
+        ...     max_datetime="2030-12-31T23:59:59Z"
+        ... )
+        >>> valid
+        True
+    """
+    from datetime import datetime, timezone
+
+    # Default to ISO8601 format if not specified
+    if formats is None:
+        formats = ["ISO8601"]
+
+    # Try to parse datetime using provided formats
+    parsed_dt = None
+    for fmt in formats:
+        try:
+            if fmt == "ISO8601":
+                # Use fromisoformat for ISO 8601 parsing (Python 3.7+)
+                # Handle 'Z' suffix (UTC timezone indicator)
+                value_normalized = value.replace("Z", "+00:00") if value.endswith("Z") else value
+                parsed_dt = datetime.fromisoformat(value_normalized)
+            else:
+                # Use strptime for custom formats
+                parsed_dt = datetime.strptime(value, fmt)
+            break  # Successfully parsed
+        except (ValueError, AttributeError):
+            continue  # Try next format
+
+    if parsed_dt is None:
+        formats_str = ", ".join(formats)
+        return False, f"Datetime '{value}' does not match any accepted format: {formats_str}"
+
+    # Validate timezone requirement
+    if require_timezone is not None:
+        is_aware = parsed_dt.tzinfo is not None and parsed_dt.tzinfo.utcoffset(None) is not None
+
+        if require_timezone and not is_aware:
+            return False, f"Datetime '{value}' must include timezone information"
+
+        if not require_timezone and is_aware:
+            return False, f"Datetime '{value}' must not include timezone information"
+
+    # Validate min_datetime
+    if min_datetime is not None:
+        try:
+            min_dt_normalized = min_datetime.replace("Z", "+00:00") if min_datetime.endswith("Z") else min_datetime
+            min_dt = datetime.fromisoformat(min_dt_normalized)
+
+            # Compare dates (handle timezone-aware vs naive)
+            if parsed_dt.tzinfo is None and min_dt.tzinfo is not None:
+                # Make min_dt naive for comparison
+                min_dt = min_dt.replace(tzinfo=None)
+            elif parsed_dt.tzinfo is not None and min_dt.tzinfo is None:
+                # Make min_dt aware for comparison (assume UTC)
+                min_dt = min_dt.replace(tzinfo=timezone.utc)
+
+            if parsed_dt < min_dt:
+                return False, f"Datetime '{value}' is before minimum allowed: {min_datetime}"
+        except (ValueError, AttributeError) as e:
+            return False, f"Invalid min_datetime format '{min_datetime}': {e}"
+
+    # Validate max_datetime
+    if max_datetime is not None:
+        try:
+            max_dt_normalized = max_datetime.replace("Z", "+00:00") if max_datetime.endswith("Z") else max_datetime
+            max_dt = datetime.fromisoformat(max_dt_normalized)
+
+            # Compare dates (handle timezone-aware vs naive)
+            if parsed_dt.tzinfo is None and max_dt.tzinfo is not None:
+                # Make max_dt naive for comparison
+                max_dt = max_dt.replace(tzinfo=None)
+            elif parsed_dt.tzinfo is not None and max_dt.tzinfo is None:
+                # Make max_dt aware for comparison (assume UTC)
+                max_dt = max_dt.replace(tzinfo=timezone.utc)
+
+            if parsed_dt > max_dt:
+                return False, f"Datetime '{value}' is after maximum allowed: {max_datetime}"
+        except (ValueError, AttributeError) as e:
+            return False, f"Invalid max_datetime format '{max_datetime}': {e}"
+
+    return True, None
+
+
 def validator(func: ValidatorFunc) -> ValidatorFunc:
     """Decorator for creating custom validator functions.
 

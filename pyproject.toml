@@ -38,6 +38,7 @@ dev = [
     "mypy>=1.18.2",
     "pytest>=8.4.2",
     "pytest-cov>=7.0.0",
+    "pytest-xdist>=3.8.0",
     "ruff>=0.13.3",
     "bandit>=1.7.5",
     "safety>=2.3.5",
@@ -75,6 +76,8 @@ addopts = [
     "--cov=tripwire",
     "--cov-report=term-missing",
     "--cov-report=html",
+    "-n",
+    "auto",
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",

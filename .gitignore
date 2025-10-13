@@ -12,6 +12,6 @@ __pycache__/
 htmlcov/*
 .DS_Store
 dist/*
-
+.coverage*
 # Internal documentation
 docs/internal/*
