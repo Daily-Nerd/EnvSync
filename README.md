@@ -186,10 +186,10 @@ ENVIRONMENT: str = env.require("ENVIRONMENT", choices=["dev", "staging", "prod"]
 
 ### 3. Format Validators
 
-Built-in validators for common formats.
+Built-in validators for common formats, plus advanced validators for security-critical configurations (v0.10.1+).
 
 ```python
-# Email, URL, database, IP, UUID validation
+# Basic format validation
 ADMIN_EMAIL: str = env.require("ADMIN_EMAIL", format="email")
 API_URL: str = env.require("API_URL", format="url")
 DATABASE_URL: str = env.require("DATABASE_URL", format="postgresql")
@@ -197,6 +197,30 @@ SERVER_IP: str = env.require("SERVER_IP", format="ipv4")
 
 # Custom regex patterns
 API_KEY: str = env.require("API_KEY", pattern=r"^sk-[a-zA-Z0-9]{32}$")
+
+# Advanced URL validation (v0.10.1+)
+from tripwire.validation import validate_url_components
+API_ENDPOINT: str = env.require(
+    "API_ENDPOINT",
+    validator=lambda url: validate_url_components(
+        url,
+        protocols=["https"],  # HTTPS-only for security
+        forbidden_ports=[22, 23, 3389],  # Block SSH/Telnet/RDP
+        required_params=["api_key"]  # Enforce authentication
+    )[0]
+)
+
+# DateTime validation for expiration dates (v0.10.1+)
+from tripwire.validation import validate_datetime
+CERT_EXPIRY: str = env.require(
+    "CERT_EXPIRY",
+    validator=lambda dt: validate_datetime(
+        dt,
+        formats=["ISO8601"],
+        require_timezone=True,
+        min_datetime="2025-01-01T00:00:00Z"
+    )[0]
+)
 ```
 
 [See all validators →](docs/reference/validators.md)
@@ -565,6 +589,7 @@ TripWire builds on the excellent work of the Python community, particularly:
 - [x] **Schema migration** (schema from-example - v0.4.1)
 - [x] **Plugin system** (v0.10.0) - Vault, AWS, Azure, Remote HTTP
 - [x] **Modern architecture** (TripWireV2 - v0.9.0) - 22% faster
+- [x] **Advanced validators** (v0.10.1) - URL components, DateTime validation
 
 ### Planned Features 📋
 
