@@ -142,8 +142,8 @@ Deep dives for power users:
 
 - [Secret Management Guide](guides/secret-management.md)
 - [Git Audit Deep Dive](advanced/git-audit.md)
-- [CLI Reference - scan command](guides/cli-reference.md#tripwire-scan)
-- [CLI Reference - audit command](guides/cli-reference.md#tripwire-audit)
+- [CLI Reference - security scan command](guides/cli-reference.md#tripwire-scan)
+- [CLI Reference - security audit command](guides/cli-reference.md#tripwire-audit)
 
 ### Schema-Based Configuration
 
@@ -183,6 +183,10 @@ Deep dives for power users:
 
 ### What's New
 
+- **[v0.10.1](../CHANGELOG.md#0101)** - Advanced URL and DateTime validation features
+- **[v0.10.0](../CHANGELOG.md#0100)** - Plugin system for cloud secret managers (Vault, AWS, Azure, Remote)
+- **[v0.9.0](../CHANGELOG.md#090)** - TripWireV2 modern architecture (22% faster)
+- **[v0.8.0](../CHANGELOG.md#080)** - Security command group reorganization
 - **[v0.4.1](../CHANGELOG.md#041)** - Tool configuration, schema from-example command
 - **[v0.4.0](../CHANGELOG.md#040)** - Type inference, diff command, unified config abstraction
 - **[v0.3.0](../CHANGELOG.md#030)** - Configuration as Code (TOML schemas)
@@ -213,7 +217,7 @@ Deep dives for power users:
 
 ## Documentation Metrics
 
-**Last Updated:** 2025-10-09
+**Last Updated:** 2025-10-14
 
 | Section | Files | Status |
 |---------|-------|--------|

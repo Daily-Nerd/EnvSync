@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from tripwire import TripWire, env
+from tripwire.core.tripwire_v2 import TripWireV2
 from tripwire.exceptions import MissingVariableError, TypeCoercionError, ValidationError
 
 
@@ -41,16 +42,20 @@ class TestRequireMethod:
 
     def test_require_missing_variable(self, isolated_env: None) -> None:
         """Test requiring a missing variable raises error."""
+        # Use fail-fast mode for backward compatibility testing
+        env_test = TripWireV2(collect_errors=False, auto_load=False)
         with pytest.raises(MissingVariableError, match="MISSING_VAR"):
-            env.require("MISSING_VAR")
+            env_test.require("MISSING_VAR")
 
     def test_require_with_description(self, isolated_env: None) -> None:
         """Test error message includes description."""
+        # Use fail-fast mode for backward compatibility testing
+        env_test = TripWireV2(collect_errors=False, auto_load=False)
         with pytest.raises(
             MissingVariableError,
             match="Test description",
         ):
-            env.require("MISSING_VAR", description="Test description")
+            env_test.require("MISSING_VAR", description="Test description")
 
     def test_require_with_default(self, isolated_env: None) -> None:
         """Test requiring variable with default value."""
@@ -86,9 +91,11 @@ class TestTypeCoercion:
 
     def test_invalid_coercion(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test invalid type coercion raises error."""
+        # Use fail-fast mode for backward compatibility testing
+        env_test = TripWireV2(collect_errors=False, auto_load=False)
         monkeypatch.setenv("PORT", "not-a-number")
         with pytest.raises(TypeCoercionError):
-            env.require("PORT", type=int)
+            env_test.require("PORT", type=int)
 
 
 class TestFormatValidation:
@@ -101,9 +108,11 @@ class TestFormatValidation:
 
     def test_email_format_invalid(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test invalid email format raises error."""
+        # Use fail-fast mode for backward compatibility testing
+        env_test = TripWireV2(collect_errors=False, auto_load=False)
         monkeypatch.setenv("ADMIN_EMAIL", "not-an-email")
         with pytest.raises(ValidationError, match="Invalid format"):
-            env.require("ADMIN_EMAIL", format="email")
+            env_test.require("ADMIN_EMAIL", format="email")
 
     def test_url_format_valid(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test valid URL format."""
@@ -128,9 +137,11 @@ class TestPatternValidation:
 
     def test_pattern_mismatch(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test non-matching pattern raises error."""
+        # Use fail-fast mode for backward compatibility testing
+        env_test = TripWireV2(collect_errors=False, auto_load=False)
         monkeypatch.setenv("API_KEY", "invalid-format")
         with pytest.raises(ValidationError, match="Does not match pattern"):
-            env.require("API_KEY", pattern=r"^sk-[a-z0-9]+$")
+            env_test.require("API_KEY", pattern=r"^sk-[a-z0-9]+$")
 
 
 class TestChoicesValidation:
@@ -147,9 +158,11 @@ class TestChoicesValidation:
 
     def test_invalid_choice(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test invalid choice raises error."""
+        # Use fail-fast mode for backward compatibility testing
+        env_test = TripWireV2(collect_errors=False, auto_load=False)
         monkeypatch.setenv("ENV", "invalid")
         with pytest.raises(ValidationError, match="Not in allowed choices"):
-            env.require(
+            env_test.require(
                 "ENV",
                 choices=["development", "staging", "production"],
             )

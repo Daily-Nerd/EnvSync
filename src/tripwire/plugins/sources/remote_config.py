@@ -32,10 +32,16 @@ Environment Variables:
 from __future__ import annotations
 
 import os
+import warnings
 from typing import Any
+from urllib.parse import urlparse
 
 from tripwire.plugins.base import PluginInterface, PluginMetadata
-from tripwire.plugins.errors import PluginAPIError, PluginValidationError
+from tripwire.plugins.errors import (
+    PluginAPIError,
+    PluginValidationError,
+    SecurityWarning,
+)
 
 
 class RemoteConfigSource(PluginInterface):
@@ -79,6 +85,7 @@ class RemoteConfigSource(PluginInterface):
         verify_ssl: bool = True,
         api_key: str | None = None,
         api_key_header: str = "X-API-Key",
+        allow_http: bool = False,
     ) -> None:
         """Initialize Remote Config plugin.
 
@@ -90,9 +97,15 @@ class RemoteConfigSource(PluginInterface):
             verify_ssl: Verify SSL certificates (default: True)
             api_key: API key value (or set REMOTE_CONFIG_API_KEY env var)
             api_key_header: Header name for API key (default: "X-API-Key")
+            allow_http: Allow HTTP for local/internal deployments (default: False).
+                       When True, shows security warning. Use only for:
+                       - Local development (localhost)
+                       - Same-VM deployments
+                       - Cluster-internal communication
+                       NOT recommended for production or internet-facing deployments.
 
         Raises:
-            PluginValidationError: If required parameters are missing
+            PluginValidationError: If required parameters are missing or URL is invalid
         """
         metadata = PluginMetadata(
             name="remote-config",
@@ -113,6 +126,7 @@ class RemoteConfigSource(PluginInterface):
         self.verify_ssl = verify_ssl
         self.api_key = api_key or os.getenv("REMOTE_CONFIG_API_KEY")
         self.api_key_header = api_key_header
+        self.allow_http = allow_http
 
         # Build headers
         self.headers = headers or {}
@@ -126,9 +140,30 @@ class RemoteConfigSource(PluginInterface):
         if self.format not in ("json", "yaml"):
             errors.append(f"Invalid format: {self.format} (must be 'json' or 'yaml')")
 
-        # Validate URL format
-        if self.url and not (self.url.startswith("http://") or self.url.startswith("https://")):
-            errors.append(f"URL must start with 'http://' or 'https://': {self.url}")
+        # Security: Validate URL scheme - HTTPS by default, HTTP with opt-in
+        if self.url:
+            parsed = urlparse(self.url)
+
+            if parsed.scheme == "http":
+                if not self.allow_http:
+                    errors.append(
+                        "Remote config URL must use HTTPS. If deploying locally/internally, "
+                        "set allow_http=True (not recommended for production)"
+                    )
+                else:
+                    # Show warning but allow HTTP
+                    warnings.warn(
+                        f"Security Warning: Using HTTP for remote config at {self.url}. "
+                        f"This is insecure for production. Use HTTPS or ensure this is "
+                        f"a local/internal deployment only.",
+                        SecurityWarning,
+                        stacklevel=2,
+                    )
+            elif parsed.scheme != "https":
+                errors.append(f"Invalid URL scheme: {parsed.scheme}")
+
+            if not parsed.hostname:
+                errors.append(f"Invalid remote config URL format: {self.url}")
 
         if errors:
             raise PluginValidationError(self.metadata.name, errors)
@@ -271,9 +306,22 @@ class RemoteConfigSource(PluginInterface):
             errors.append("Missing required field: url")
         else:
             url = config["url"]
-            # Validate URL format
-            if not (url.startswith("http://") or url.startswith("https://")):
-                errors.append(f"URL must start with 'http://' or 'https://': {url}")
+            allow_http = config.get("allow_http", False)
+
+            # Security: Validate URL scheme - HTTPS by default, HTTP with opt-in
+            parsed = urlparse(url)
+
+            if parsed.scheme == "http":
+                if not allow_http:
+                    errors.append(
+                        "Remote config URL must use HTTPS. If deploying locally/internally, "
+                        "set allow_http=True (not recommended for production)"
+                    )
+            elif parsed.scheme != "https":
+                errors.append(f"Invalid URL scheme: {parsed.scheme}")
+
+            if not parsed.hostname:
+                errors.append(f"Invalid remote config URL format: {url}")
 
         # Validate format if provided
         if "format" in config:

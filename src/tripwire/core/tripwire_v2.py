@@ -13,7 +13,9 @@ Design Patterns:
 
 from __future__ import annotations
 
+import atexit
 import os
+import threading
 from pathlib import Path
 from typing import Any, List, Optional, Sequence, TypeVar, Union, cast
 
@@ -30,7 +32,11 @@ from tripwire.core.validation_orchestrator import (
     ValidationContext,
     ValidationOrchestrator,
 )
-from tripwire.exceptions import MissingVariableError
+from tripwire.exceptions import (
+    MissingVariableError,
+    TripWireMultiValidationError,
+    ValidationError,
+)
 from tripwire.validation import ValidatorFunc, coerce_type
 
 T = TypeVar("T")
@@ -91,6 +97,7 @@ class TripWireV2:
         loader: Optional[EnvFileLoader] = None,
         inference_engine: Optional[TypeInferenceEngine] = None,
         sources: Optional[List[EnvSource]] = None,
+        collect_errors: bool = True,
     ) -> None:
         """Initialize TripWireV2 with optional component injection.
 
@@ -104,6 +111,8 @@ class TripWireV2:
             inference_engine: Custom type inference engine (default: FrameInspection)
             sources: Custom environment sources (default: DotenvFileSource)
                      When provided, overrides env_file parameter
+            collect_errors: Whether to collect all validation errors and report together
+                           (default: True for better UX, set False for legacy fail-fast behavior)
 
         Design Pattern:
             Factory Pattern: Creates default instances if not provided
@@ -131,10 +140,16 @@ class TripWireV2:
         # Core configuration
         self.env_file = Path(env_file) if env_file else Path(".env")
         self.strict = strict
+        self.collect_errors = collect_errors
 
         # Backward compatibility attributes (deprecated but maintained for legacy tests)
         self.detect_secrets = detect_secrets  # Unused, kept for API compatibility
         self._loaded_files: List[Path] = []  # Track loaded .env files
+
+        # Error collection state (thread-safe)
+        self._validation_errors: List[ValidationError] = []
+        self._error_lock = threading.Lock()  # Thread-safe error collection
+        self._finalized = False  # Track if errors have been finalized
 
         # Dependency injection with sensible defaults (Factory Pattern)
         self._registry = registry if registry is not None else VariableRegistry()
@@ -177,6 +192,11 @@ class TripWireV2:
                 # Track loaded file for backward compatibility
                 if self.env_file not in self._loaded_files:
                     self._loaded_files.append(self.env_file)
+
+        # Register finalization hook for automatic error reporting
+        # This ensures all collected errors are raised when module import completes
+        if self.collect_errors:
+            atexit.register(self._finalize_validation)
 
     def require(
         self,
@@ -260,13 +280,44 @@ class TripWireV2:
         if raw_value is None:
             if default is not None:
                 return default
-            raise MissingVariableError(name, description)
 
-        # Type coercion
-        if inferred_type is not str:
-            coerced_value = coerce_type(raw_value, inferred_type, name)
-        else:
-            coerced_value = raw_value  # type: ignore[assignment]
+            # Handle missing variable based on error collection mode
+            if self.collect_errors:
+                # Collect error and return placeholder (will be caught at finalization)
+                error = ValidationError(
+                    variable_name=name,
+                    value=None,
+                    reason="Required but not set",
+                )
+                with self._error_lock:
+                    self._validation_errors.append(error)
+                # Return type-appropriate placeholder (will fail at finalization anyway)
+                return self._get_placeholder_value(inferred_type)  # type: ignore
+            else:
+                # Fail-fast mode
+                raise MissingVariableError(name, description)
+
+        # Type coercion with error collection
+        try:
+            if inferred_type is not str:
+                coerced_value = coerce_type(raw_value, inferred_type, name)
+            else:
+                coerced_value = raw_value  # type: ignore[assignment]
+        except Exception as e:
+            # Type coercion failed
+            if self.collect_errors:
+                # Convert to ValidationError and collect
+                error = ValidationError(
+                    variable_name=name,
+                    value=raw_value,
+                    reason=f"Cannot coerce to {inferred_type.__name__}: {e}",
+                )
+                with self._error_lock:
+                    self._validation_errors.append(error)
+                return self._get_placeholder_value(inferred_type)  # type: ignore
+            else:
+                # Fail-fast mode
+                raise
 
         # Step 4: Build validation pipeline (Builder Pattern)
         orchestrator = self._build_validation_pipeline(
@@ -288,7 +339,19 @@ class TripWireV2:
             coerced_value=coerced_value,
             expected_type=inferred_type,
         )
-        orchestrator.validate(context)
+
+        if self.collect_errors:
+            # Enable error collection in orchestrator
+            orchestrator.collect_errors = True
+            orchestrator.validate(context)
+
+            # Collect any errors from orchestrator
+            if orchestrator.has_errors():
+                with self._error_lock:
+                    self._validation_errors.extend(orchestrator.get_collected_errors())
+        else:
+            # Fail-fast mode (legacy behavior)
+            orchestrator.validate(context)
 
         return cast(T, coerced_value)
 
@@ -913,6 +976,102 @@ class TripWireV2:
             orchestrator.add_rule(CustomValidationRule(validator, error_message))
 
         return orchestrator
+
+    def _get_placeholder_value(self, type_: type[Any]) -> Any:
+        """Get placeholder value for a given type when collecting errors.
+
+        This is used to return a value when validation fails but we're in error
+        collection mode. The actual value doesn't matter since we'll raise an
+        exception during finalization.
+
+        Args:
+            type_: Type to get placeholder for
+
+        Returns:
+            Placeholder value of the appropriate type
+        """
+        # Return type-appropriate placeholders
+        if type_ is int:
+            return 0
+        elif type_ is float:
+            return 0.0
+        elif type_ is bool:
+            return False
+        elif type_ is str:
+            return ""
+        elif type_ is list:
+            return []
+        elif type_ is dict:
+            return {}
+        else:
+            # For unknown types, return None
+            return None
+
+    def _finalize_validation(self) -> None:
+        """Finalize validation by raising collected errors.
+
+        This method is called automatically via atexit when the module finishes
+        importing. If any validation errors were collected, it raises a
+        TripWireMultiValidationError with all errors.
+
+        Thread Safety:
+            Uses lock to ensure thread-safe access to error list.
+        """
+        # Prevent double finalization
+        if self._finalized:
+            return
+
+        with self._error_lock:
+            self._finalized = True
+
+            # No errors collected - success!
+            if not self._validation_errors:
+                return
+
+            # Single error - raise as regular ValidationError for clarity
+            if len(self._validation_errors) == 1:
+                raise self._validation_errors[0]
+
+            # Multiple errors - raise multi-error exception
+            raise TripWireMultiValidationError(self._validation_errors)
+
+    def finalize(self) -> None:
+        """Manually finalize validation (useful for testing or explicit control).
+
+        Raises any collected validation errors. Normally this is called automatically
+        via atexit, but you can call it manually for explicit control.
+
+        Example:
+            >>> env = TripWireV2()
+            >>> DATABASE_URL: str = env.require("DATABASE_URL", format="postgresql")
+            >>> SECRET_KEY: str = env.require("SECRET_KEY", min_length=32)
+            >>> env.finalize()  # Explicitly check for errors now
+
+        Raises:
+            ValidationError: If single validation error was collected
+            TripWireMultiValidationError: If multiple validation errors were collected
+        """
+        self._finalize_validation()
+
+    def has_validation_errors(self) -> bool:
+        """Check if any validation errors have been collected.
+
+        Returns:
+            True if validation errors exist, False otherwise
+        """
+        with self._error_lock:
+            return len(self._validation_errors) > 0
+
+    def get_validation_errors(self) -> List[ValidationError]:
+        """Get list of collected validation errors without raising.
+
+        Useful for testing or custom error handling.
+
+        Returns:
+            List of ValidationError instances collected so far
+        """
+        with self._error_lock:
+            return self._validation_errors.copy()
 
     @classmethod
     def discover_plugins(cls) -> None:

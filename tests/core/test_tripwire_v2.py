@@ -105,7 +105,8 @@ class TestBasicFunctionality:
 
     def test_missing_variable(self):
         """Test MissingVariableError raised when variable not found."""
-        env = TripWireV2(auto_load=False)
+        # Use collect_errors=False for legacy fail-fast behavior in tests
+        env = TripWireV2(auto_load=False, collect_errors=False)
 
         with pytest.raises(MissingVariableError):
             env.require("NONEXISTENT")
@@ -138,7 +139,8 @@ class TestValidation:
 
     def test_format_validation_email_invalid(self, monkeypatch):
         """Test email format validation with invalid value."""
-        env = TripWireV2(auto_load=False)
+        # Use collect_errors=False for fail-fast behavior in tests
+        env = TripWireV2(auto_load=False, collect_errors=False)
         monkeypatch.setenv("EMAIL", "invalid-email")
 
         with pytest.raises(ValidationError):
@@ -173,7 +175,8 @@ class TestValidation:
 
     def test_pattern_validation_invalid(self, monkeypatch):
         """Test pattern validation with invalid value."""
-        env = TripWireV2(auto_load=False)
+        # Use collect_errors=False for fail-fast behavior in tests
+        env = TripWireV2(auto_load=False, collect_errors=False)
         monkeypatch.setenv("CODE", "invalid")
 
         with pytest.raises(ValidationError):
@@ -190,7 +193,8 @@ class TestValidation:
 
     def test_choices_validation_invalid(self, monkeypatch):
         """Test choices validation with invalid value."""
-        env = TripWireV2(auto_load=False)
+        # Use collect_errors=False for fail-fast behavior in tests
+        env = TripWireV2(auto_load=False, collect_errors=False)
         monkeypatch.setenv("ENV", "invalid")
 
         with pytest.raises(ValidationError):
@@ -207,7 +211,8 @@ class TestValidation:
 
     def test_range_validation_too_low(self, monkeypatch):
         """Test range validation with value too low."""
-        env = TripWireV2(auto_load=False)
+        # Use collect_errors=False for fail-fast behavior in tests
+        env = TripWireV2(auto_load=False, collect_errors=False)
         monkeypatch.setenv("PORT", "0")
 
         with pytest.raises(ValidationError):
@@ -215,7 +220,8 @@ class TestValidation:
 
     def test_range_validation_too_high(self, monkeypatch):
         """Test range validation with value too high."""
-        env = TripWireV2(auto_load=False)
+        # Use collect_errors=False for fail-fast behavior in tests
+        env = TripWireV2(auto_load=False, collect_errors=False)
         monkeypatch.setenv("PORT", "99999")
 
         with pytest.raises(ValidationError):
@@ -232,7 +238,8 @@ class TestValidation:
 
     def test_length_validation_too_short(self, monkeypatch):
         """Test length validation with string too short."""
-        env = TripWireV2(auto_load=False)
+        # Use collect_errors=False for fail-fast behavior in tests
+        env = TripWireV2(auto_load=False, collect_errors=False)
         monkeypatch.setenv("API_KEY", "short")
 
         with pytest.raises(ValidationError):
@@ -240,7 +247,8 @@ class TestValidation:
 
     def test_length_validation_too_long(self, monkeypatch):
         """Test length validation with string too long."""
-        env = TripWireV2(auto_load=False)
+        # Use collect_errors=False for fail-fast behavior in tests
+        env = TripWireV2(auto_load=False, collect_errors=False)
         monkeypatch.setenv("API_KEY", "a" * 100)
 
         with pytest.raises(ValidationError):
@@ -260,7 +268,8 @@ class TestValidation:
 
     def test_custom_validator_fails(self, monkeypatch):
         """Test custom validator failure."""
-        env = TripWireV2(auto_load=False)
+        # Use collect_errors=False for fail-fast behavior in tests
+        env = TripWireV2(auto_load=False, collect_errors=False)
         monkeypatch.setenv("EMAIL", "test@other.com")
 
         def is_company_email(value: str) -> bool:
@@ -388,7 +397,8 @@ class TestComponentInteraction:
 
     def test_validation_orchestrator_validates(self, monkeypatch):
         """Test that validation orchestrator executes rules."""
-        env = TripWireV2(auto_load=False)
+        # Use collect_errors=False for fail-fast behavior in tests
+        env = TripWireV2(auto_load=False, collect_errors=False)
         monkeypatch.setenv("EMAIL", "invalid-email")
 
         # Should fail validation

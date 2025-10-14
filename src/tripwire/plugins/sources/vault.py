@@ -33,10 +33,16 @@ Environment Variables (Alternative to constructor args):
 from __future__ import annotations
 
 import os
+import warnings
 from typing import Any
+from urllib.parse import urlparse
 
 from tripwire.plugins.base import PluginInterface, PluginMetadata
-from tripwire.plugins.errors import PluginAPIError, PluginValidationError
+from tripwire.plugins.errors import (
+    PluginAPIError,
+    PluginValidationError,
+    SecurityWarning,
+)
 
 
 class VaultEnvSource(PluginInterface):
@@ -74,6 +80,7 @@ class VaultEnvSource(PluginInterface):
         kv_version: int = 2,
         namespace: str | None = None,
         verify_ssl: bool = True,
+        allow_http: bool = False,
     ) -> None:
         """Initialize Vault plugin.
 
@@ -85,9 +92,15 @@ class VaultEnvSource(PluginInterface):
             kv_version: KV engine version - 1 or 2 (default: 2)
             namespace: Vault namespace (Enterprise)
             verify_ssl: Verify SSL certificates (default: True)
+            allow_http: Allow HTTP for local/internal deployments (default: False).
+                       When True, shows security warning. Use only for:
+                       - Local development (localhost)
+                       - Same-VM deployments
+                       - Cluster-internal communication
+                       NOT recommended for production or internet-facing deployments.
 
         Raises:
-            PluginValidationError: If required parameters are missing
+            PluginValidationError: If required parameters are missing or URL is invalid
         """
         metadata = PluginMetadata(
             name="vault",
@@ -109,6 +122,7 @@ class VaultEnvSource(PluginInterface):
         self.kv_version = int(os.getenv("VAULT_KV_VERSION", str(kv_version)))
         self.namespace = namespace or os.getenv("VAULT_NAMESPACE")
         self.verify_ssl = verify_ssl
+        self.allow_http = allow_http
 
         # Validate required parameters
         errors: list[str] = []
@@ -120,6 +134,31 @@ class VaultEnvSource(PluginInterface):
             errors.append("Vault path is required (path parameter or VAULT_PATH env var)")
         if self.kv_version not in (1, 2):
             errors.append(f"Invalid KV version: {self.kv_version} (must be 1 or 2)")
+
+        # Security: Validate URL scheme - HTTPS by default, HTTP with opt-in
+        if self.url:
+            parsed = urlparse(self.url)
+
+            if parsed.scheme == "http":
+                if not self.allow_http:
+                    errors.append(
+                        "Vault URL must use HTTPS. If deploying locally/internally, "
+                        "set allow_http=True (not recommended for production)"
+                    )
+                else:
+                    # Show warning but allow HTTP
+                    warnings.warn(
+                        f"Security Warning: Using HTTP for Vault at {self.url}. "
+                        f"This is insecure for production. Use HTTPS or ensure this is "
+                        f"a local/internal deployment only.",
+                        SecurityWarning,
+                        stacklevel=2,
+                    )
+            elif parsed.scheme != "https":
+                errors.append(f"Invalid URL scheme: {parsed.scheme}")
+
+            if not parsed.hostname:
+                errors.append(f"Invalid Vault URL format: {self.url}")
 
         if errors:
             raise PluginValidationError(self.metadata.name, errors)

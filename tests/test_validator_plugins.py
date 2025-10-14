@@ -405,12 +405,15 @@ class TestValidatorIntegration:
         """Test that using unknown format raises appropriate error."""
         import os
 
-        from tripwire import env
+        from tripwire import TripWire
         from tripwire.exceptions import ValidationError
 
         os.environ["TEST_VAR"] = "value"
 
+        # Use fail-fast mode for clear error testing
+        env_test = TripWire(collect_errors=False, auto_load=False)
+
         with pytest.raises(ValidationError, match="Unknown format validator"):
-            env.require("TEST_VAR", format="nonexistent_format")
+            env_test.require("TEST_VAR", format="nonexistent_format")
 
         del os.environ["TEST_VAR"]

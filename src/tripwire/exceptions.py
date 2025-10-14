@@ -218,3 +218,118 @@ class GitCommandError(GitAuditError):
         self.stderr = stderr
         self.returncode = returncode
         super().__init__(f"Git command failed (exit {returncode}): {command}\n{stderr}")
+
+
+class TripWireMultiValidationError(TripWireError):
+    """Raised when multiple environment variables have validation errors.
+
+    This exception provides a comprehensive error report showing all failures at once,
+    dramatically improving developer experience by eliminating the fix-run-fix-run cycle.
+
+    Attributes:
+        errors: List of ValidationError instances collected during validation
+        error_count: Number of validation errors found
+    """
+
+    def __init__(self, errors: List[ValidationError]) -> None:
+        """Initialize TripWireMultiValidationError.
+
+        Args:
+            errors: List of ValidationError instances to report together
+        """
+        self.errors = errors
+        self.error_count = len(errors)
+        super().__init__(self._format_message())
+
+    def _format_message(self) -> str:
+        """Format multi-error message with clear, actionable guidance.
+
+        Returns:
+            Formatted error message with all validation failures and fix suggestions
+        """
+        lines = [
+            "",
+            f"TripWire found {self.error_count} environment variable error(s):",
+            "",
+        ]
+
+        for idx, error in enumerate(self.errors, 1):
+            lines.append(f"  {idx}. {error.variable_name}")
+            lines.append(f"     ├─ Error: {error.reason}")
+
+            if error.value:
+                lines.append(f"     ├─ Received: {repr(error.value)}")
+            else:
+                lines.append(f"     ├─ Received: (not set)")
+
+            # Add helpful fix suggestion
+            fix_suggestion = self._get_fix_suggestion(error)
+            if fix_suggestion:
+                lines.append(f"     └─ Fix: {fix_suggestion}")
+
+            lines.append("")  # Blank line between errors
+
+        lines.append("Fix all variables and restart the application.")
+        lines.append("Need help? Check your .env file or run: tripwire check")
+        lines.append("")
+
+        return "\n".join(lines)
+
+    def _get_fix_suggestion(self, error: ValidationError) -> str:
+        """Generate context-specific fix suggestion based on error reason.
+
+        Args:
+            error: ValidationError to generate suggestion for
+
+        Returns:
+            Actionable fix suggestion string
+        """
+        reason = error.reason.lower()
+
+        # Missing variable
+        if "required but not set" in reason or "missing" in reason:
+            return f"Set {error.variable_name} in your .env file"
+
+        # Format validation errors
+        if "invalid format" in reason:
+            if "postgresql" in reason:
+                return "Use format: postgresql://user:pass@host:port/db"
+            elif "mysql" in reason:
+                return "Use format: mysql://user:pass@host:port/db"
+            elif "email" in reason:
+                return "Use format: user@example.com"
+            elif "url" in reason:
+                return "Add protocol scheme (https://...)"
+            elif "uuid" in reason:
+                return "Use format: 550e8400-e29b-41d4-a716-446655440000"
+            elif "ipv4" in reason:
+                return "Use format: 192.168.1.1"
+
+        # Length validation errors
+        if "min_length" in reason or "too short" in reason or "at least" in reason:
+            return f"Provide a longer value for {error.variable_name}"
+        elif "max_length" in reason or "too long" in reason or "at most" in reason:
+            return f"Shorten {error.variable_name}"
+
+        # Range validation errors
+        if "min_val" in reason or "minimum" in reason or "out of range" in reason:
+            if ">" in reason or ">=" in reason:
+                return f"Increase {error.variable_name} value"
+        if "max_val" in reason or "maximum" in reason or "out of range" in reason:
+            if "<" in reason or "<=" in reason:
+                return f"Decrease {error.variable_name} value"
+
+        # Choices validation
+        if "not in allowed choices" in reason or "allowed values" in reason:
+            return f"Check allowed values for {error.variable_name}"
+
+        # Pattern validation
+        if "does not match pattern" in reason or "pattern" in reason:
+            return f"Ensure {error.variable_name} matches the required pattern"
+
+        # Type coercion errors
+        if "cannot coerce" in reason or "type" in reason:
+            return f"Check that {error.variable_name} has the correct data type"
+
+        # Generic fallback
+        return f"Check {error.variable_name} value in your .env file"

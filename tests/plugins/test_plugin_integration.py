@@ -71,12 +71,16 @@ class TestPluginWithTripWireV2:
 
     def test_tripwire_with_plugin_missing_variable(self):
         """Test that missing variable raises error even with plugin."""
+        from tripwire.exceptions import TripWireMultiValidationError, ValidationError
+
         plugin = MockSimplePlugin()
         env = TripWire(sources=[plugin], auto_load=True)
 
         # Variable not provided by plugin should raise error
-        with pytest.raises(MissingVariableError):
+        # With error collection, we need to finalize to trigger the error
+        with pytest.raises((MissingVariableError, TripWireMultiValidationError, ValidationError)):
             env.require("NONEXISTENT_VAR")
+            env.finalize()
 
     def test_tripwire_with_plugin_type_coercion(self):
         """Test type coercion with plugin-loaded variables."""

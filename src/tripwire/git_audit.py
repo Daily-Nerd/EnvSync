@@ -200,20 +200,26 @@ def run_git_command(
     repo_path: Path,
     check: bool = True,
     capture_output: bool = True,
+    timeout: int = 30,
 ) -> subprocess.CompletedProcess[str]:
-    """Run a git command and return the result.
+    """Run a git command with timeout protection.
 
     Args:
         args: Git command arguments (without 'git' prefix)
         repo_path: Path to git repository
         check: Whether to raise exception on non-zero exit
         capture_output: Whether to capture stdout/stderr
+        timeout: Maximum seconds to wait (default: 30)
 
     Returns:
         Completed process result
 
     Raises:
         GitCommandError: If command fails and check=True
+        RuntimeError: If command exceeds timeout
+
+    Security:
+        Timeout prevents hung processes from malicious or corrupt repositories
     """
     try:
         result = subprocess.run(
@@ -222,6 +228,7 @@ def run_git_command(
             capture_output=capture_output,
             text=True,
             check=False,
+            timeout=timeout,
         )
 
         if check and result.returncode != 0:
@@ -232,6 +239,9 @@ def run_git_command(
             )
 
         return result
+    except subprocess.TimeoutExpired:
+        # Log timeout and re-raise with context
+        raise RuntimeError(f"Git command timed out after {timeout}s: git {' '.join(args)}") from None
     except FileNotFoundError as e:
         raise GitCommandError(command="git", stderr=str(e), returncode=127) from e
 
@@ -639,8 +649,14 @@ def analyze_secret_history(
     # Check if secret is currently in git (HEAD)
     is_currently_in_git = False
     if commit_hashes:
-        head_occurrences = find_secret_in_commit("HEAD", secret_pattern, repo_path)
-        is_currently_in_git = len(head_occurrences) > 0
+        # Security: Validate HEAD is a valid git ref before use
+        result = run_git_command(["rev-parse", "--verify", "HEAD"], repo_path, check=False)
+        if result.returncode == 0:
+            head_occurrences = find_secret_in_commit("HEAD", sanitized_pattern, repo_path)
+            is_currently_in_git = len(head_occurrences) > 0
+        else:
+            # HEAD is invalid or repo is in bad state
+            is_currently_in_git = False
 
     # Collect metadata
     first_seen = all_occurrences[0].commit_date if all_occurrences else None

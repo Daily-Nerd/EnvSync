@@ -7,6 +7,17 @@ providing clear error messages and proper exception chaining.
 from __future__ import annotations
 
 
+class SecurityWarning(UserWarning):
+    """Warning for security-related configuration issues.
+
+    Used to alert users about potentially insecure configurations that are
+    allowed but not recommended, such as using HTTP instead of HTTPS for
+    remote connections.
+    """
+
+    pass
+
+
 class PluginError(Exception):
     """Base exception for all plugin-related errors.
 
