@@ -211,11 +211,11 @@ class PluginRegistry:
 
     @classmethod
     def discover_plugins(cls) -> None:
-        """Discover and register plugins from entry points.
+        """Discover and register plugins from entry points and installed builtin plugins.
 
-        This method scans for plugins registered via setuptools entry points
-        in the 'tripwire.plugins' group. Plugins are automatically loaded
-        and registered.
+        This method scans for plugins in two locations:
+        1. Setuptools entry points in the 'tripwire.plugins' group
+        2. Installed builtin plugins in ~/.tripwire/plugins/
 
         Example:
             >>> # In your package's pyproject.toml:
@@ -231,14 +231,24 @@ class PluginRegistry:
             and typically doesn't need to be called directly.
         """
         loader = PluginLoader()
-        plugins = loader.load_from_entry_points()
 
+        # Discover from entry points
+        plugins = loader.load_from_entry_points()
         for name, plugin_class in plugins.items():
             try:
                 cls.register_plugin(name, plugin_class)
             except PluginValidationError:
                 # Skip invalid plugins (already logged by validator)
                 pass
+
+        # Discover from installed builtin plugins
+        # Skip validation for builtin plugins (they're already part of TripWire)
+        builtin_plugins = loader.load_builtin_plugins()
+        instance = cls()
+        with cls._lock:
+            for name, plugin_class in builtin_plugins.items():
+                # Direct registration without validation
+                instance._plugins[name] = plugin_class
 
     @classmethod
     def clear(cls) -> None:
@@ -329,6 +339,65 @@ class PluginLoader:
             # Entry point discovery failed - this is non-fatal
             # Just return empty dict (no plugins available)
             pass
+
+        return plugins
+
+    def load_builtin_plugins(self) -> dict[str, Type[EnvSourcePlugin]]:
+        """Load builtin plugins from installed plugin directory.
+
+        Scans ~/.tripwire/plugins/ for directories containing .builtin files
+        and loads the plugins specified in those files.
+
+        Returns:
+            Dictionary mapping plugin names to plugin classes
+
+        Example:
+            >>> loader = PluginLoader()
+            >>> plugins = loader.load_builtin_plugins()
+            >>> print(plugins.keys())
+            dict_keys(['vault', 'aws-secrets'])
+        """
+        import json
+
+        plugins: dict[str, Type[EnvSourcePlugin]] = {}
+        plugins_dir = Path.home() / ".tripwire" / "plugins"
+
+        if not plugins_dir.exists():
+            return plugins
+
+        for plugin_dir in plugins_dir.iterdir():
+            if not plugin_dir.is_dir():
+                continue
+
+            builtin_file = plugin_dir / ".builtin"
+            if not builtin_file.exists():
+                continue
+
+            try:
+                # Read builtin metadata
+                with open(builtin_file, "r") as f:
+                    metadata = json.load(f)
+
+                module_path = metadata.get("module_path")
+                class_name = metadata.get("class_name")
+                plugin_id = plugin_dir.name
+
+                if not module_path or not class_name:
+                    continue
+
+                # Import the plugin class
+                module = importlib.import_module(module_path)
+                plugin_class = getattr(module, class_name)
+
+                # Validate it's a class
+                if not inspect.isclass(plugin_class):
+                    continue
+
+                plugins[plugin_id] = plugin_class
+
+            except Exception:
+                # Skip plugins that can't be loaded
+                continue
 
         return plugins
 

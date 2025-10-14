@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.3] - TBD
+
+### Fixed
+
+- **Plugin System Functionality**: Implemented bundled registry for immediate plugin system functionality
+  - Created bundled `registry.json` with 4 official plugins (Vault, AWS Secrets, Azure Key Vault, Remote Config)
+  - Introduced `builtin://` URL scheme for plugins shipped with TripWire
+  - Plugin CLI commands now work out of the box (`search`, `install`, `list`, `remove`)
+  - Falls back to bundled registry when remote registry is unavailable
+  - All plugins marked as "(bundled)" in plugin list output
+  - Forward compatible with future PyPI-based plugin distribution (v0.11.0+)
+  - Zero hosting costs - registry bundled with package
+  - Offline-capable - works without network access
+  - Comprehensive test coverage (60+ new tests)
+
+- **Multi-Error UX Improvement**: Eliminated confusing "Exception ignored in atexit callback" messages
+  - Changed atexit finalization to use `os._exit(1)` instead of raising exceptions
+  - Clean stderr output without Python tracebacks
+  - Proper exit code (1) on validation failures
+  - Professional error presentation for production applications
+  - Manual `finalize()` still raises exceptions for testing compatibility
+
+### Technical Details
+
+- Added bundled registry fallback system (Remote → Cache → Bundled)
+- Implemented builtin plugin installer with dynamic import
+- Enhanced CLI list command with plugin type indicators
+- Package configuration updated to include registry.json in wheel
+- All official plugins installable via `tripwire plugin install <name>`
+
 ## [0.10.2] - 2025-10-14
 
 ### Added

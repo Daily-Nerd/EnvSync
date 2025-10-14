@@ -232,7 +232,7 @@ class TestRegistryClientSecurity:
     """Integration tests for PluginRegistryClient security."""
 
     def test_fetch_registry_rejects_file_url(self, tmp_path):
-        """Registry client should reject file:// URLs."""
+        """Registry client falls back to bundled registry when file:// URL fails."""
         # Ensure cache doesn't exist
         cache_file = tmp_path / "cache" / "registry.json"
         cache_file.parent.mkdir(parents=True, exist_ok=True)
@@ -240,12 +240,16 @@ class TestRegistryClientSecurity:
         client = PluginRegistryClient(registry_url="file:///etc/passwd")
         client.CACHE_FILE = cache_file  # Use temp cache location
 
-        # Should raise ValueError from URL validation wrapped in RuntimeError
-        with pytest.raises(RuntimeError, match="Failed to fetch plugin registry"):
-            client.fetch_registry(use_cache=False)
+        # Should fall back to bundled registry (file:// URL validation will fail)
+        registry = client.fetch_registry(use_cache=False)
+
+        # Should have loaded bundled registry with 4 official plugins
+        assert registry.version == "1.0.0"
+        assert len(registry.plugins) >= 4
+        assert "vault" in registry.plugins
 
     def test_fetch_registry_rejects_http_url(self, tmp_path):
-        """Registry client should reject http:// URLs."""
+        """Registry client falls back to bundled registry when http:// URL fails."""
         # Ensure cache doesn't exist
         cache_file = tmp_path / "cache" / "registry.json"
         cache_file.parent.mkdir(parents=True, exist_ok=True)
@@ -253,9 +257,13 @@ class TestRegistryClientSecurity:
         client = PluginRegistryClient(registry_url="http://evil.com/malicious.json")
         client.CACHE_FILE = cache_file  # Use temp cache location
 
-        # Should raise ValueError from URL validation wrapped in RuntimeError
-        with pytest.raises(RuntimeError, match="Failed to fetch plugin registry"):
-            client.fetch_registry(use_cache=False)
+        # Should fall back to bundled registry (http:// URL validation will fail)
+        registry = client.fetch_registry(use_cache=False)
+
+        # Should have loaded bundled registry with 4 official plugins
+        assert registry.version == "1.0.0"
+        assert len(registry.plugins) >= 4
+        assert "vault" in registry.plugins
 
     @patch("urllib.request.urlopen")
     def test_fetch_registry_accepts_https_url(self, mock_urlopen):
