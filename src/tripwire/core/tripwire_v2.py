@@ -69,12 +69,19 @@ class TripWireV2:
             >>> env = TripWireV2()
             >>> PORT: int = env.require("PORT", min_val=1, max_val=65535)
 
-        Advanced usage with custom components:
+        Advanced usage with multiple sources (RECOMMENDED for plugins):
+            >>> from tripwire.plugins.sources import VaultEnvSource
+            >>> dotenv = DotenvFileSource(Path(".env"))
+            >>> vault = VaultEnvSource(url="https://vault.example.com", token="...")
+            >>> env = TripWireV2(sources=[dotenv, vault])  # Pass sources directly
+            >>> DATABASE_URL: str = env.require("DATABASE_URL", format="postgresql")
+
+        Advanced usage with custom loader (alternative pattern):
             >>> custom_loader = EnvFileLoader([
             ...     DotenvFileSource(Path(".env")),
-            ...     VaultSource(vault_url="https://vault.example.com")
+            ...     DotenvFileSource(Path(".env.local"))
             ... ])
-            >>> env = TripWireV2(loader=custom_loader)
+            >>> env = TripWireV2(loader=custom_loader)  # Pass loader, not sources
             >>> DATABASE_URL: str = env.require("DATABASE_URL", format="postgresql")
 
         Dependency injection for testing:
@@ -107,12 +114,28 @@ class TripWireV2:
             strict: Whether to enable strict mode (errors on missing files)
             detect_secrets: Whether to detect potential secrets (deprecated, unused)
             registry: Custom variable registry (default: create new VariableRegistry)
-            loader: Custom file loader (default: DotenvFileSource)
+            loader: Custom EnvFileLoader instance (mutually exclusive with sources)
+                    Use when you need fine-grained control over loading behavior
             inference_engine: Custom type inference engine (default: FrameInspection)
-            sources: Custom environment sources (default: DotenvFileSource)
-                     When provided, overrides env_file parameter
+            sources: List of EnvSource instances (e.g., DotenvFileSource, VaultEnvSource)
+                     When provided, creates an EnvFileLoader internally
+                     Mutually exclusive with loader parameter
+                     RECOMMENDED for plugin usage - pass plugin instances here
             collect_errors: Whether to collect all validation errors and report together
                            (default: True for better UX, set False for legacy fail-fast behavior)
+
+        Important Usage Patterns:
+            Pattern 1 - Direct sources (RECOMMENDED):
+                >>> vault = VaultEnvSource(url="...", token="...")
+                >>> env = TripWire(sources=[vault])  # [green] Pass EnvSource instances
+
+            Pattern 2 - Custom loader (advanced):
+                >>> loader = EnvFileLoader([source1, source2])
+                >>> env = TripWire(loader=loader)  # [green] Pass EnvFileLoader instance
+
+            ANTI-PATTERN (will raise ValueError):
+                >>> loader = EnvFileLoader([source1, source2])
+                >>> env = TripWire(sources=[loader])  # [red] Wrong! loader is not EnvSource
 
         Design Pattern:
             Factory Pattern: Creates default instances if not provided
@@ -122,19 +145,35 @@ class TripWireV2:
             All injected components are expected to be thread-safe.
             Default components (VariableRegistry, etc.) are thread-safe by design.
 
-        Example with plugin sources:
+        Example with plugin sources (OFFICIAL PLUGINS):
             >>> from tripwire import TripWire
-            >>> from tripwire.plugins import PluginRegistry
+            >>> from tripwire.plugins.sources import VaultEnvSource
             >>>
-            >>> # Discover plugins
-            >>> TripWire.discover_plugins()
+            >>> # Create plugin source (implements EnvSource protocol)
+            >>> vault = VaultEnvSource(
+            ...     url="https://vault.example.com",
+            ...     token="hvs.xxx",
+            ...     mount_point="secret",
+            ...     path="myapp/config"
+            ... )
             >>>
-            >>> # Get plugin class
-            >>> VaultPlugin = PluginRegistry.get_plugin("vault")
-            >>> vault = VaultPlugin(url="https://vault.example.com", token="...")
-            >>>
-            >>> # Use with TripWire
+            >>> # Pass plugin to sources= (NOT loader=)
             >>> env = TripWire(sources=[vault])
+            >>> DATABASE_URL = env.require("DATABASE_URL")
+
+        Example with multiple sources (combining .env + plugins):
+            >>> from tripwire import TripWire
+            >>> from tripwire.core.loader import DotenvFileSource
+            >>> from tripwire.plugins.sources import VaultEnvSource, AWSSecretsSource
+            >>> from pathlib import Path
+            >>>
+            >>> # Create multiple sources
+            >>> dotenv = DotenvFileSource(Path(".env"))
+            >>> vault = VaultEnvSource(url="...", token="...", path="...")
+            >>> aws = AWSSecretsSource(secret_name="myapp/prod", region="us-east-1")
+            >>>
+            >>> # TripWire loads in order (later sources override earlier)
+            >>> env = TripWire(sources=[dotenv, vault, aws])
             >>> DATABASE_URL = env.require("DATABASE_URL")
         """
         # Core configuration
@@ -164,6 +203,25 @@ class TripWireV2:
         # File loader with pluggable sources (Strategy Pattern)
         # Track whether sources were explicitly provided (for auto_load logic)
         _sources_provided = sources is not None
+
+        # VALIDATION: Prevent common API misuse - passing EnvFileLoader to sources=
+        if sources is not None:
+            for idx, source in enumerate(sources):
+                if isinstance(source, EnvFileLoader):
+                    raise ValueError(
+                        f"Invalid sources parameter: item at index {idx} is an EnvFileLoader, "
+                        f"but sources= expects a list of EnvSource instances.\n\n"
+                        f"COMMON MISTAKE:\n"
+                        f"  [red] loader = EnvFileLoader([source1, source2])\n"
+                        f"  [red] env = TripWire(sources=[loader])  # Wrong!\n\n"
+                        f"CORRECT USAGE (choose one pattern):\n"
+                        f"  [green] Pattern 1: Pass sources directly\n"
+                        f"     env = TripWire(sources=[source1, source2])\n\n"
+                        f"  [green] Pattern 2: Pass loader to loader= parameter\n"
+                        f"     loader = EnvFileLoader([source1, source2])\n"
+                        f"     env = TripWire(loader=loader)\n\n"
+                        f"See documentation for more details."
+                    )
 
         if loader is None:
             # Use provided sources or default to DotenvFileSource
