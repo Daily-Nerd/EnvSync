@@ -17,7 +17,6 @@ The registry is hosted on GitHub as a JSON file, similar to npm/PyPI indexes.
 import hashlib
 import importlib
 import json
-import os
 import shutil
 import tarfile
 import tempfile
@@ -384,7 +383,17 @@ class PluginRegistryClient:
             registry_data = json.loads(data)
             registry = self._parse_registry(registry_data)
 
-            # Cache for future use
+            # Validate registry has plugins before caching
+            # This prevents caching empty/placeholder registries that would
+            # break the fallback chain to bundled registry
+            if not registry.plugins:
+                raise RuntimeError(
+                    "Remote registry is empty (no plugins). "
+                    "This likely indicates the registry is not yet initialized. "
+                    "Falling back to bundled registry."
+                )
+
+            # Cache for future use (only if registry is valid)
             self._save_to_cache(data)
 
             return registry
@@ -397,7 +406,14 @@ class PluginRegistryClient:
         """Load registry from local cache."""
         with open(self.CACHE_FILE, "r") as f:
             registry_data = json.load(f)
-        return self._parse_registry(registry_data)
+        registry = self._parse_registry(registry_data)
+
+        # Validate cached registry has plugins
+        # This prevents using corrupt/empty caches and ensures fallback to bundled registry
+        if not registry.plugins:
+            raise RuntimeError("Cached registry is empty (no plugins). Cache may be corrupt.")
+
+        return registry
 
     def _load_bundled_registry(self) -> PluginRegistryIndex:
         """

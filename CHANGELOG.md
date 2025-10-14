@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.4] - 2025-10-14
+
+### Fixed
+
+- **Plugin Registry Loading Bug**: Fixed bundled registry not being used when remote registry is unavailable or returns empty results
+  - Added validation to prevent caching empty/corrupt registry responses
+  - Registry now validates plugin count before caching remote responses
+  - Cache validation ensures corrupt caches are rejected and fallback to bundled registry occurs
+  - Fixes issue where `plugin list --details` showed plugins as "unknown" metadata with "(custom)" type
+  - Fixes issue where `plugin install` failed with "Plugin not found in registry" errors
+  - Bundled registry now properly serves as ultimate fallback for offline and fresh installs
+  - All 4 official plugins (Vault, AWS Secrets, Azure Key Vault, Remote Config) now display correct metadata
+
 ## [0.10.3] - 2025-10-14
 
 ### Fixed
@@ -847,7 +860,8 @@ utils/ subdirectories
 - CLI implementation with rich output
 - Project initialization (`init` command)
 
-[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.10.3...HEAD
+[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.10.4...HEAD
+[0.10.4]: https://github.com/Daily-Nerd/TripWire/compare/v0.10.3...v0.10.4
 [0.10.3]: https://github.com/Daily-Nerd/TripWire/compare/v0.10.2...v0.10.3
 [0.10.2]: https://github.com/Daily-Nerd/TripWire/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/Daily-Nerd/TripWire/compare/v0.10.0...v0.10.1
