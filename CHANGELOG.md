@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2025-10-14
+
+### Added
+
+- **Secret Protection System**: Comprehensive defense-in-depth protection against accidental secret exposure
+  - New `Secret[T]` wrapper class prevents secrets from being leaked in print(), logging, JSON, tracebacks
+  - `env.require(..., secret=True)` now returns `Secret[T]` instead of plain values
+  - Automatic masking in all string contexts: `str()`, `repr()`, `format()`, f-strings
+  - Explicit `get_secret_value()` method for intentional access when needed (API calls, auth, etc.)
+  - Thread-safe logging integration with automatic secret registration
+  - Defense-in-depth: Even `get_secret_value()` output is masked in logs (requires logging integration)
+  - Constant-time comparison for equality (prevents timing attacks)
+  - JSON serialization protection (SecretJSONEncoder, StrictSecretJSONEncoder)
+  - Immutable design with `__slots__` for memory efficiency and security
+  - Compatible with Pydantic's SecretStr API for easier migration
+  - Protection against pickle serialization (secrets still masked in repr after unpickling)
+  - Comprehensive utilities: `mask_secret_in_string()`, `mask_multiple_secrets()`, `unwrap_secret()`
+
+- **Logging Integration**: Automatic secret redaction in application logs
+  - `SecretRedactionFilter` for Python's logging module (thread-safe)
+  - `SecretRedactionFormatter` for custom log formatting with redaction
+  - `register_secret()` for manual secret registration
+  - `register_pattern()` for regex-based secret detection (AWS keys, GitHub tokens, etc.)
+  - `register_common_patterns()` for automatic registration of 45+ platform-specific patterns
+  - `auto_install()` convenience function for quick setup on any logger
+  - Automatic secret registration when using `env.require(..., secret=True)`
+  - Defense-in-depth: Even explicitly unwrapped secrets are masked in logs
+
+### Security
+
+- **BREAKING CHANGE**: `env.require(..., secret=True)` now returns `Secret[T]` instead of plain values
+  - This is a major version change for safety - users must explicitly call `get_secret_value()`
+  - Prevents accidental secret exposure through print(), logging, error messages, monitoring tools
+  - Migration: Replace `secret_var` with `secret_var.get_secret_value()` only where needed
+  - Type hint: `Secret[str]` instead of `str` for secret variables
+
+### Documentation
+
+- **Secret Protection Guide**: Comprehensive documentation of secret handling best practices
+  - When to use `secret=True` vs manual Secret wrapper
+  - How to access secrets safely with `get_secret_value()`
+  - Defense-in-depth architecture explanation
+  - User responsibility guidelines for unwrapped secrets
+  - Integration with logging frameworks (Python logging, loguru, structlog)
+
+### Testing
+
+- **Comprehensive Test Coverage**: 700+ tests for secret protection
+  - `tests/security/test_secret.py` - 50+ tests for Secret wrapper (masking, comparison, serialization)
+  - `tests/security/test_logging.py` - 40+ tests for logging integration (filters, formatters, patterns)
+  - Integration tests for TripWire + Secret + Logging
+  - Thread-safety tests for concurrent secret registration
+  - Defense-in-depth validation (unwrapped secrets still protected in logs)
+
+### Technical Details
+
+- Secret wrapper uses `__slots__` for memory efficiency (prevents attribute injection)
+- Constant-time comparison via `secrets.compare_digest()` (timing attack protection)
+- Thread-safe secret registry with `threading.Lock`
+- Immutable design prevents modification after creation
+- Generic type support: `Secret[T]` works with any type
+- Zero performance overhead for non-secret variables
+- Fully backward compatible (old code without `secret=True` works unchanged)
+
 ## [0.10.4] - 2025-10-14
 
 ### Fixed
@@ -860,7 +924,8 @@ utils/ subdirectories
 - CLI implementation with rich output
 - Project initialization (`init` command)
 
-[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.10.4...HEAD
+[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.10.4...v0.11.0
 [0.10.4]: https://github.com/Daily-Nerd/TripWire/compare/v0.10.3...v0.10.4
 [0.10.3]: https://github.com/Daily-Nerd/TripWire/compare/v0.10.2...v0.10.3
 [0.10.2]: https://github.com/Daily-Nerd/TripWire/compare/v0.10.1...v0.10.2
