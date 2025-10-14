@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.2] - 2025-10-14
+
+### Added
+
+- **Multi-Error Validation**: Collect and display all validation errors together instead of failing on first error
+  - New `TripWireMultiValidationError` exception for comprehensive error reporting
+  - Enhanced `ValidationOrchestrator` with error collection mode (`collect_errors=True` by default)
+  - Context-specific fix suggestions for each error type (format, range, length, missing variables)
+  - Clear, numbered error list with tree-style formatting for better readability
+  - Automatic finalization via `atexit` hooks
+  - Backward compatible fail-fast mode available with `collect_errors=False`
+
+- **CONTRIBUTING.md**: Community contribution guidelines and development workflow
+  - Development setup instructions (venv, dependencies, pre-commit hooks)
+  - Code style guide (Black, Ruff, Mypy requirements)
+  - Testing requirements and coverage expectations
+  - Pull request process with conventional commit guidelines
+  - Areas for contribution and getting help resources
+
+- **Enhanced Documentation**: Complete plugin CLI commands reference
+  - Added plugin management commands to CLI reference guide
+  - Documentation for `plugin install`, `search`, `list`, `update`, `remove`
+  - Usage examples and output samples for each command
+  - Updated version history in docs/README.md
+
+### Security
+
+- **Plugin HTTPS Enforcement with Local Flexibility** (TW-2025-007, TW-2025-008)
+  - Vault plugin: HTTPS required by default with `allow_http=True` opt-in for local deployments
+  - Remote-config plugin: HTTPS required by default with `allow_http=True` opt-in for cluster-internal communication
+  - Security warnings displayed when HTTP is used
+  - Valid use cases: localhost development, same-VM deployments, Kubernetes cluster-internal
+  - Enhanced URL validation with scheme and hostname checks
+
+### Fixed
+
+- **Git Audit HEAD Validation**: Added validation to prevent command injection via malformed HEAD references
+- **Git Command Timeouts**: Added 30-second default timeout to prevent hung processes on corrupted repositories
+- **Test Suite**: Fixed 13 tests broken by multi-error validation changes
+  - Updated tests to use explicit fail-fast mode where appropriate
+  - Added `finalize()` calls in plugin integration tests
+  - Fixed type inference test bug (PORT validation)
+
+### Changed
+
+- **Default Validation Behavior**: Error collection now enabled by default for better developer experience
+  - Shows all validation errors at once instead of one at a time
+  - Reduces fix → run → fix → run cycle frustration
+  - Maintains backward compatibility with `collect_errors=False` option
+
+### Documentation
+
+- Updated README.md with Discord and VS Code extension links
+- Added plugin CLI commands section to docs/guides/cli-reference.md
+- Updated deprecated command references throughout documentation
+- Fixed broken internal links in docs/README.md
+
+### Technical Details
+
+- Added 25 new tests for multi-error validation
+- Updated 13 tests for compatibility with new validation behavior
+- All 1429 tests passing with 76.45% code coverage
+- Zero breaking changes - fully backward compatible
+
 ## [0.10.1] - 2025-10-13
 
 ### Added
@@ -754,6 +818,9 @@ utils/ subdirectories
 - Project initialization (`init` command)
 
 [Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.9.0...HEAD
+[0.10.2]: https://github.com/Daily-Nerd/TripWire/compare/v0.10.1...v0.10.2
+[0.10.1]: https://github.com/Daily-Nerd/TripWire/compare/v0.10.0...v0.10.1
+[0.10.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/Daily-Nerd/TripWire/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.7.1...v0.8.0
