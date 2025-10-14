@@ -238,6 +238,132 @@ When we receive a security bug report, we will:
    pip-audit
    ```
 
+## Pickle Serialization Security
+
+### Overview
+
+TripWire's `Secret` objects support pickle serialization to enable distributed systems and caching. This is an intentional design decision to support production use cases like:
+
+- Distributed task queues (Celery, RQ, Dask)
+- Caching systems (Redis, Memcached with pickle serialization)
+- Multiprocessing (Python's multiprocessing.Pool)
+- RPC systems (gRPC, Pyro)
+
+### Security Model
+
+**Pickle is not the vulnerability** - the vulnerability is where pickled data is stored or transmitted.
+
+Think of pickle like `get_secret_value()`:
+- `get_secret_value()` exposes the secret, but it's needed for legitimate use
+- Pickle exposes the secret in serialized form, but it's needed for distributed systems
+- Both require secure infrastructure to be safe
+
+### Safe Usage Patterns
+
+✓ **SAFE**: Encrypted message broker
+```python
+# Celery with RabbitMQ over TLS
+@celery.task
+def process_payment(api_key: Secret[str]):
+    stripe.api_key = api_key.get_secret_value()
+
+# Safe because: RabbitMQ uses TLS, message broker is trusted
+process_payment.delay(api_key=Secret("sk_live_123"))
+```
+
+✓ **SAFE**: Encrypted cache backend
+```python
+# Redis with encryption at rest
+cache_data = {"api_key": Secret("sk_live_123")}
+redis.set("config", pickle.dumps(cache_data))
+
+# Safe because: Redis has encryption at rest enabled
+```
+
+✓ **SAFE**: Local multiprocessing
+```python
+# Local multiprocessing pool
+def worker(secret: Secret[str]):
+    # Process data with secret
+    pass
+
+with multiprocessing.Pool(4) as pool:
+    pool.map(worker, [Secret("token1"), Secret("token2")])
+
+# Safe because: Processes are local, shared memory is secure
+```
+
+### Unsafe Usage Patterns
+
+✗ **UNSAFE**: File storage without encryption
+```python
+# DON'T DO THIS
+secret = Secret("my_password")
+with open("secrets.pkl", "wb") as f:
+    pickle.dump(secret, f)  # ✗ Unencrypted file on disk
+```
+
+✗ **UNSAFE**: Network transmission without TLS
+```python
+# DON'T DO THIS
+import socket
+secret = Secret("api_key")
+sock.send(pickle.dumps(secret))  # ✗ Plaintext over network
+```
+
+✗ **UNSAFE**: Shared cache without encryption
+```python
+# DON'T DO THIS
+memcached.set("secret", pickle.dumps(Secret("key")))  # ✗ Plaintext cache
+```
+
+### Alternative Pattern: Avoid Pickle
+
+If your infrastructure doesn't support encrypted pickle transport, pass unwrapped values instead:
+
+```python
+# Instead of pickling Secret objects
+@celery.task
+def process(secret: Secret[str]):
+    api_key = secret.get_secret_value()
+
+process.delay(secret=Secret("sk_live_123"))  # Pickles Secret object
+
+# Pass plain values instead
+@celery.task
+def process(secret_value: str):
+    secret = Secret(secret_value)  # Wrap in worker
+    api_key = secret.get_secret_value()
+
+process.delay(secret_value="sk_live_123")  # Pickles plain string
+```
+
+### Infrastructure Checklist
+
+When using pickle with Secret objects, ensure:
+
+- [ ] Message broker uses TLS/encryption (RabbitMQ, Kafka, AWS SQS)
+- [ ] Cache backend has encryption at rest (Redis, ElastiCache)
+- [ ] Network channels are secured (VPN, TLS, private network)
+- [ ] Temporary files are encrypted (if using file-based queues)
+- [ ] Crash dumps exclude pickled secrets (configure debugger)
+
+### Why We Support Pickle
+
+**Precedent**: Pydantic's `SecretStr` supports pickle for the same reasons.
+
+**Use Cases**:
+- Celery/RQ tasks that accept Secret arguments
+- Redis caching of configuration objects with secrets
+- Multiprocessing pools that need Secret objects
+- Distributed computing frameworks (Dask, Ray)
+
+**Philosophy**: Blocking pickle would force users to work around the restriction, often in less secure ways (e.g., passing secrets as environment variables, storing in global state, etc.). Instead, we support pickle with clear security guidance.
+
+### Reporting Issues
+
+If you discover a security issue related to pickle serialization, please report it via our vulnerability disclosure process (see above).
+
 ## Hall of Fame
 
 We deeply appreciate security researchers who responsibly disclose vulnerabilities:

@@ -37,6 +37,7 @@ from tripwire.exceptions import (
     TripWireMultiValidationError,
     ValidationError,
 )
+from tripwire.security.secret import Secret
 from tripwire.validation import ValidatorFunc, coerce_type
 
 T = TypeVar("T")
@@ -299,11 +300,13 @@ class TripWireV2:
             min_length: Minimum length (for str)
             max_length: Maximum length (for str)
             validator: Custom validator function
-            secret: Mark as secret (for documentation and secret detection)
+            secret: Mark as secret - wraps value in Secret[T] to prevent accidental exposure
+                   through print(), logging, JSON serialization, etc.
             error_message: Custom error message for validation failures
 
         Returns:
-            Validated and type-coerced value
+            Validated and type-coerced value. If secret=True, returns Secret[T] wrapper.
+            Use .get_secret_value() to access the unwrapped value when needed.
 
         Raises:
             MissingVariableError: If variable missing and no default provided
@@ -316,6 +319,12 @@ class TripWireV2:
 
             >>> # Explicit type with validation
             >>> EMAIL: str = env.require("EMAIL", type=str, format="email")
+
+            >>> # Secret values (wrapped in Secret[T])
+            >>> from tripwire.security import Secret
+            >>> API_KEY: Secret[str] = env.require("API_KEY", secret=True)
+            >>> print(API_KEY)  # Output: **********
+            >>> actual = API_KEY.get_secret_value()  # Unwrap when needed
 
             >>> # Optional with default
             >>> DEBUG: bool = env.require("DEBUG", default=False)
@@ -410,6 +419,21 @@ class TripWireV2:
         else:
             # Fail-fast mode (legacy behavior)
             orchestrator.validate(context)
+
+        # Step 6: Wrap in Secret if marked as secret
+        if secret and raw_value is not None:
+            # Only wrap non-None values in Secret
+            # Import logging integration to auto-register secret
+            try:
+                from tripwire.security.logging import register_secret
+
+                register_secret(str(coerced_value))  # Register for logging redaction
+            except ImportError:
+                pass  # Logging integration not available (shouldn't happen)
+
+            # Wrap the coerced value in Secret wrapper
+            # This prevents accidental exposure through print(), logging, JSON, etc.
+            return cast(T, Secret(coerced_value))
 
         return cast(T, coerced_value)
 
