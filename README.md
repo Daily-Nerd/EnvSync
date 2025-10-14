@@ -22,7 +22,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[Quick Start](docs/getting-started/quick-start.md) • [Documentation](docs/README.md) • [CLI Reference](docs/guides/cli-reference.md) • [API Docs](docs/reference/api.md)
+[Quick Start](docs/getting-started/quick-start.md) • [Documentation](docs/README.md) • [CLI Reference](docs/guides/cli-reference.md) • [API Docs](docs/reference/api.md) • [VS Code Extension](https://marketplace.visualstudio.com/items?itemName=Daily-Nerd.tripwire) • [Discord](https://discord.gg/eDwuVY68)
 
 </div>
 
@@ -590,10 +590,9 @@ TripWire builds on the excellent work of the Python community, particularly:
 - [x] **Plugin system** (v0.10.0) - Vault, AWS, Azure, Remote HTTP
 - [x] **Modern architecture** (TripWireV2 - v0.9.0) - 22% faster
 - [x] **Advanced validators** (v0.10.1) - URL components, DateTime validation
+- [x] **VS Code extension** - Diagnostics, autocomplete, git audit integration ([Marketplace](https://marketplace.visualstudio.com/items?itemName=Daily-Nerd.tripwire))
 
 ### Planned Features 📋
-
-- [ ] VS Code extension (env var autocomplete)
 - [ ] PyCharm plugin
 - [ ] Encrypted .env files
 - [ ] Web UI for team env management
@@ -668,9 +667,11 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Support
 
-- **GitHub**: [github.com/Daily-Nerd/TripWire](https://github.com/Daily-Nerd/TripWire)
-- **Issues**: [github.com/Daily-Nerd/TripWire/issues](https://github.com/Daily-Nerd/TripWire/issues)
-- **PyPI**: [pypi.org/project/tripwire-py](https://pypi.org/project/tripwire-py/)
+- 💬 **Discord**: [discord.gg/eDwuVY68](https://discord.gg/eDwuVY68) - Get help, share ideas, connect with the community
+- 📦 **PyPI**: [pypi.org/project/tripwire-py](https://pypi.org/project/tripwire-py/)
+- 💻 **GitHub**: [github.com/Daily-Nerd/TripWire](https://github.com/Daily-Nerd/TripWire)
+- 🐛 **Issues**: [github.com/Daily-Nerd/TripWire/issues](https://github.com/Daily-Nerd/TripWire/issues)
+- 🔌 **VS Code Extension**: [marketplace.visualstudio.com/items?itemName=Daily-Nerd.tripwire](https://marketplace.visualstudio.com/items?itemName=Daily-Nerd.tripwire)
 
 ---
 
