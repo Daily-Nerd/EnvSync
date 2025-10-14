@@ -15,14 +15,20 @@ Complete reference for all TripWire CLI commands with examples and best practice
   - [sync](#tripwire-sync)
   - [diff](#tripwire-diff)
 - [Secret Management](#secret-management)
-  - [scan](#tripwire-scan)
-  - [audit](#tripwire-audit)
+  - [security scan](#tripwire-scan)
+  - [security audit](#tripwire-audit)
 - [Schema Commands](#schema-commands)
   - [schema init](#tripwire-schema-init)
   - [schema validate](#tripwire-schema-validate)
   - [schema check](#tripwire-schema-check)
   - [schema from-code](#tripwire-schema-import)
   - [schema to-example](#tripwire-schema-generate-example)
+- [Plugin Management](#plugin-management)
+  - [plugin install](#tripwire-plugin-install)
+  - [plugin search](#tripwire-plugin-search)
+  - [plugin list](#tripwire-plugin-list)
+  - [plugin update](#tripwire-plugin-update)
+  - [plugin remove](#tripwire-plugin-remove)
 - [Validation](#validation)
   - [validate](#tripwire-validate)
   - [docs](#tripwire-docs)
@@ -335,13 +341,13 @@ Comparing configurations: .env vs .env.prod
 
 ## Secret Management
 
-### `tripwire scan`
+### `tripwire security scan`
 
 Scan for potential secrets in `.env` file and git history.
 
 **Syntax:**
 ```bash
-tripwire scan [OPTIONS]
+tripwire security scan [OPTIONS]
 ```
 
 **Options:**
@@ -352,13 +358,13 @@ tripwire scan [OPTIONS]
 
 ```bash
 # Scan for secrets
-tripwire scan
+tripwire security scan
 
 # Fail on secrets (CI)
-tripwire scan --strict
+tripwire security scan --strict
 
 # Scan more git history
-tripwire scan --depth 500
+tripwire security scan --depth 500
 ```
 
 **Output:**
@@ -389,13 +395,13 @@ Your environment files appear secure
 
 ---
 
-### `tripwire audit`
+### `tripwire security audit`
 
 Audit git history for secret leaks with timeline and remediation.
 
 **Syntax:**
 ```bash
-tripwire audit [SECRET_NAME] [OPTIONS]
+tripwire security audit [SECRET_NAME] [OPTIONS]
 ```
 
 **Options:**
@@ -403,25 +409,29 @@ tripwire audit [SECRET_NAME] [OPTIONS]
 - `--all` - Auto-detect and audit all secrets in `.env`
 - `--value TEXT` - Actual secret value for exact matching
 - `--max-commits INT` - Maximum commits to analyze (default: 1000)
+- `--strict` - Exit 1 if secrets found (v0.8.0+)
 - `--json` - Output as JSON
 
 **Examples:**
 
 ```bash
 # Audit specific secret
-tripwire audit AWS_SECRET_ACCESS_KEY
+tripwire security audit AWS_SECRET_ACCESS_KEY
 
 # Auto-detect and audit all
-tripwire audit --all
+tripwire security audit --all
 
 # Audit with exact value
-tripwire audit API_KEY --value "sk-abc123..."
+tripwire security audit API_KEY --value "sk-abc123..."
 
 # Deep history scan
-tripwire audit DATABASE_URL --max-commits 5000
+tripwire security audit DATABASE_URL --max-commits 5000
+
+# Strict mode (fail on secrets)
+tripwire security audit --all --strict
 
 # JSON output
-tripwire audit --all --json
+tripwire security audit --all --json
 ```
 
 **Output:**
@@ -700,6 +710,336 @@ Generating .env.example from .tripwire.toml...
 
 ---
 
+## Plugin Management
+
+TripWire supports an extensible plugin system for cloud secret managers and custom environment sources (v0.10.0+).
+
+### `tripwire plugin install`
+
+Install a plugin from the official registry or PyPI.
+
+**Syntax:**
+```bash
+tripwire plugin install <plugin-name> [OPTIONS]
+```
+
+**Arguments:**
+- `plugin-name` - Name of plugin to install (vault, aws-secrets, azure-keyvault, remote-config)
+
+**Options:**
+- `--version VERSION` - Install specific version (default: latest)
+- `--force` - Force reinstall if already installed
+- `--no-cache` - Don't use cached registry (fetch from remote)
+
+**Examples:**
+
+```bash
+# Install latest Vault plugin
+tripwire plugin install vault
+
+# Install specific version
+tripwire plugin install aws-secrets --version 0.2.0
+
+# Force reinstall
+tripwire plugin install azure-keyvault --force
+
+# Install without cache
+tripwire plugin install remote-config --no-cache
+```
+
+**Output:**
+```
+Installing HashiCorp Vault Plugin
+  Version: 0.1.0
+  Author: TripWire Team
+  License: MIT
+  Description: HashiCorp Vault integration for TripWire
+
+✓ Plugin 'vault' installed successfully!
+  Location: ~/.tripwire/plugins/vault
+
+Next steps:
+  1. Import the plugin: TripWireV2.discover_plugins()
+  2. Use in code: See https://github.com/Daily-Nerd/tripwire-plugin-vault for usage examples
+```
+
+**Use Cases:**
+- Install official cloud secret manager plugins
+- Add support for HashiCorp Vault, AWS Secrets Manager, Azure Key Vault
+- Extend TripWire with custom environment sources
+
+**Best Practices:**
+- Install plugins in your virtual environment or Docker container
+- Pin specific versions in production
+- Review plugin documentation before installation
+
+---
+
+### `tripwire plugin search`
+
+Search for available plugins by name, description, or tag.
+
+**Syntax:**
+```bash
+tripwire plugin search [QUERY] [OPTIONS]
+```
+
+**Arguments:**
+- `QUERY` - Search query (optional, searches name, description, and tags)
+
+**Options:**
+- `--no-cache` - Don't use cached registry (fetch from remote)
+- `--limit INT` - Maximum number of results to show (default: 20)
+
+**Examples:**
+
+```bash
+# Search all plugins
+tripwire plugin search
+
+# Search by name
+tripwire plugin search vault
+
+# Search by keyword
+tripwire plugin search aws
+
+# Search with custom limit
+tripwire plugin search --limit 50
+```
+
+**Output:**
+```
+                      Plugin Search Results for "vault"
+┏━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃ Name               ┃ Display Name            ┃ Version  ┃ Description   ┃ Downloads  ┃
+┡━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ vault              │ HashiCorp Vault Plugin  │ 0.1.0    │ HashiCorp ... │ 1,234      │
+│ azure-keyvault     │ Azure Key Vault Plugin  │ 0.1.0    │ Azure Key ... │ 856        │
+└────────────────────┴─────────────────────────┴──────────┴───────────────┴────────────┘
+
+To install: tripwire plugin install <name>
+For details: Visit the plugin homepage
+```
+
+**What It Searches:**
+- Plugin name (highest priority)
+- Display name
+- Description
+- Tags (secrets, cloud, vault, aws, azure)
+
+**Use Cases:**
+- Discover available plugins
+- Find plugins for specific cloud providers
+- Check plugin popularity and versions
+
+---
+
+### `tripwire plugin list`
+
+List all installed plugins with metadata.
+
+**Syntax:**
+```bash
+tripwire plugin list [OPTIONS]
+```
+
+**Options:**
+- `--details` - Show detailed information for each plugin
+
+**Examples:**
+
+```bash
+# List installed plugins
+tripwire plugin list
+
+# Show detailed info
+tripwire plugin list --details
+```
+
+**Output (simple):**
+```
+Installed Plugins:
+
+  ✓ aws-secrets
+  ✓ vault
+
+Total: 2 plugins installed
+Details: Use --details for more information
+```
+
+**Output (detailed):**
+```
+                           Installed Plugins
+┏━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ Name               ┃ Display Name            ┃ Version  ┃ Author       ┃ License  ┃
+┡━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ aws-secrets        │ AWS Secrets Manager     │ 0.1.0    │ TripWire ... │ MIT      │
+│ vault              │ HashiCorp Vault Plugin  │ 0.1.0    │ TripWire ... │ MIT      │
+└────────────────────┴─────────────────────────┴──────────┴──────────────┴──────────┘
+```
+
+**Use Cases:**
+- Check which plugins are installed
+- Verify plugin versions
+- Audit plugin dependencies
+
+---
+
+### `tripwire plugin update`
+
+Update an installed plugin to a newer version.
+
+**Syntax:**
+```bash
+tripwire plugin update <plugin-name> [OPTIONS]
+```
+
+**Arguments:**
+- `plugin-name` - Name of plugin to update
+
+**Options:**
+- `--version VERSION` - Update to specific version (default: latest)
+- `--no-cache` - Don't use cached registry (fetch from remote)
+
+**Examples:**
+
+```bash
+# Update to latest version
+tripwire plugin update vault
+
+# Update to specific version
+tripwire plugin update aws-secrets --version 0.2.0
+
+# Update without using cache
+tripwire plugin update azure-keyvault --no-cache
+```
+
+**Output:**
+```
+Updating HashiCorp Vault Plugin
+  Target version: 0.2.0
+  Author: TripWire Team
+  Description: HashiCorp Vault integration for TripWire
+
+✓ Plugin 'vault' updated successfully to version 0.2.0!
+  Location: ~/.tripwire/plugins/vault
+
+Note: You may need to restart your application for changes to take effect
+```
+
+**What It Does:**
+1. Checks if plugin is installed
+2. Fetches available versions from registry
+3. Downloads and installs new version
+4. Replaces old version
+
+**Use Cases:**
+- Get latest features and bug fixes
+- Apply security patches
+- Test new plugin versions
+
+**Best Practices:**
+- Review changelog before updating
+- Test updates in staging environment first
+- Restart application after updating
+
+---
+
+### `tripwire plugin remove`
+
+Remove an installed plugin.
+
+**Syntax:**
+```bash
+tripwire plugin remove <plugin-name> [OPTIONS]
+```
+
+**Arguments:**
+- `plugin-name` - Name of plugin to remove
+
+**Options:**
+- `--yes` - Skip confirmation prompt
+
+**Examples:**
+
+```bash
+# Remove plugin (with confirmation)
+tripwire plugin remove vault
+
+# Remove without confirmation
+tripwire plugin remove aws-secrets --yes
+```
+
+**Output:**
+```
+⚠  You are about to remove plugin 'vault'
+    Location: ~/.tripwire/plugins/vault
+
+    This action cannot be undone.
+
+Do you want to continue? [y/N]: y
+
+✓ Plugin 'vault' removed successfully
+
+Reinstall: Use tripwire plugin install vault to reinstall
+```
+
+**What It Does:**
+1. Checks if plugin is installed
+2. Prompts for confirmation (unless `--yes` is used)
+3. Removes plugin directory from `~/.tripwire/plugins/`
+
+**Use Cases:**
+- Clean up unused plugins
+- Remove outdated plugins
+- Free up disk space
+
+**Best Practices:**
+- Ensure no code depends on the plugin before removing
+- Back up plugin configuration if needed
+- Use `--yes` flag only in scripts
+
+---
+
+### Plugin Usage Example
+
+After installing a plugin, use it with TripWire:
+
+```python
+from tripwire import TripWireV2
+
+# Auto-discover installed plugins
+TripWireV2.discover_plugins()
+
+# Import plugin source classes
+from tripwire.plugins.sources import VaultEnvSource, AWSSecretsSource
+
+# Initialize plugin sources
+vault = VaultEnvSource(
+    url="https://vault.company.com",
+    token="hvs.xxx",
+    mount_point="secret",
+    path="myapp/config"
+)
+
+aws = AWSSecretsSource(
+    secret_name="myapp/production",
+    region_name="us-east-1"
+)
+
+# Use with TripWire (supports multiple sources)
+env = TripWireV2(sources=[vault, aws])
+DATABASE_URL = env.require("DATABASE_URL")
+API_KEY = env.require("API_KEY")
+```
+
+**See Also:**
+- [Plugin Development Guide](plugin-development.md)
+- [Plugin Security Best Practices](../advanced/security-patterns.md)
+- [Official Plugins Repository](https://github.com/Daily-Nerd/tripwire-plugins)
+
+---
+
 ## Validation
 
 ### `tripwire validate`
@@ -870,7 +1210,7 @@ jobs:
       - run: tripwire generate --check
 
       # Scan for secrets
-      - run: tripwire scan --strict
+      - run: tripwire security scan --strict
 
       # Validate schema
       - run: tripwire schema validate --strict
@@ -889,9 +1229,9 @@ repos:
         language: system
         pass_filenames: false
 
-      - id: tripwire-scan
+      - id: tripwire-secret-scan
         name: Scan for secrets
-        entry: tripwire scan --strict
+        entry: tripwire security scan --strict
         language: system
         pass_filenames: false
 ```

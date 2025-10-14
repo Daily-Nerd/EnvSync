@@ -214,7 +214,8 @@ class TestTypedConvenienceMethods:
         env_file.write_text("LOW_PORT=100\n")
 
         monkeypatch.chdir(tmp_path)
-        env = TripWire(env_file=str(env_file))
+        # Use fail-fast mode for clear validation testing
+        env = TripWire(env_file=str(env_file), collect_errors=False)
 
         # Should fail validation
         with pytest.raises(Exception) as exc_info:
@@ -434,7 +435,8 @@ class TestEdgeCases:
         env_file.write_text("SHORT=abc\nLONG=verylongstring\n")
 
         monkeypatch.chdir(tmp_path)
-        env = TripWire(env_file=str(env_file))
+        # Use fail-fast mode for clear validation testing
+        env = TripWire(env_file=str(env_file), collect_errors=False)
 
         # Min length validation
         with pytest.raises(Exception) as exc_info:
@@ -456,7 +458,8 @@ class TestEdgeCases:
         env_file.write_text("")
 
         monkeypatch.chdir(tmp_path)
-        env = TripWire(env_file=str(env_file))
+        # Use fail-fast mode for clear error testing
+        env = TripWire(env_file=str(env_file), collect_errors=False)
 
         # Should raise MissingVariableError
         with pytest.raises(Exception) as exc_info:
@@ -485,7 +488,8 @@ class TestEdgeCases:
         monkeypatch.chdir(tmp_path)
         # Clear environment to avoid pollution
         monkeypatch.delenv("PORT", raising=False)
-        env = TripWire(env_file=str(env_file))
+        # Use fail-fast mode for clear error testing
+        env = TripWire(env_file=str(env_file), collect_errors=False)
 
         # Should raise TypeCoercionError
         from tripwire.exceptions import TypeCoercionError
@@ -498,19 +502,24 @@ class TestEdgeCases:
     def test_custom_validator_with_typed_methods(self, tmp_path, monkeypatch):
         """Test custom validators work with typed methods."""
         env_file = tmp_path / ".env"
-        env_file.write_text("PORT=1000\n")
+        # Use port 2000 which is NOT privileged (>= 1024)
+        env_file.write_text("PORT=2000\n")
 
         monkeypatch.chdir(tmp_path)
-        env = TripWire(env_file=str(env_file))
+        # Clear environment to avoid pollution
+        monkeypatch.delenv("PORT", raising=False)
+        # Use fail-fast mode for clear validation testing
+        env = TripWire(env_file=str(env_file), collect_errors=False)
 
-        # Custom validator
+        # Custom validator - requires privileged port (< 1024)
         def is_privileged_port(port: int) -> bool:
             return port < 1024
 
+        # PORT=2000 should fail validation (not privileged)
         with pytest.raises(Exception):
             env.require_int("PORT", validator=is_privileged_port)
 
-        # Should pass with valid port
+        # Should pass with privileged port
         env_file.write_text("PORT=80\n")
         env.load(env_file, override=True)
 

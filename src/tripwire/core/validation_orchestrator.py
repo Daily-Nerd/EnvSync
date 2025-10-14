@@ -431,11 +431,14 @@ class ValidationOrchestrator:
     """Orchestrates validation rule execution (Chain of Responsibility).
 
     This class manages a chain of validation rules and executes them in order.
-    If any rule fails, execution stops and a ValidationError is raised.
+
+    Modes:
+        - collect_errors=False (default): Fail-fast - stops at first error
+        - collect_errors=True: Collects all errors and stores them for batch reporting
 
     Example:
         >>> orchestrator = (
-        ...     ValidationOrchestrator()
+        ...     ValidationOrchestrator(collect_errors=True)
         ...     .add_rule(FormatValidationRule("email"))
         ...     .add_rule(LengthValidationRule(min_length=5))
         ... )
@@ -446,11 +449,19 @@ class ValidationOrchestrator:
         ...     expected_type=str
         ... )
         >>> orchestrator.validate(context)
+        >>> errors = orchestrator.get_collected_errors()
     """
 
-    def __init__(self) -> None:
-        """Initialize empty validation chain."""
+    def __init__(self, collect_errors: bool = False) -> None:
+        """Initialize validation chain with optional error collection.
+
+        Args:
+            collect_errors: If True, collect all errors instead of failing fast.
+                           If False, raise immediately on first error (legacy behavior).
+        """
         self.rules: List[ValidationRule] = []
+        self.collect_errors = collect_errors
+        self.collected_errors: List[Any] = []  # Will be List[ValidationError]
 
     def add_rule(self, rule: ValidationRule) -> ValidationOrchestrator:
         """Add validation rule to chain (builder pattern).
@@ -467,11 +478,52 @@ class ValidationOrchestrator:
     def validate(self, context: ValidationContext) -> None:
         """Execute all validation rules in order.
 
+        Behavior depends on collect_errors mode:
+        - If collect_errors=False: Raises ValidationError on first failure (fail-fast)
+        - If collect_errors=True: Collects all errors, accessible via get_collected_errors()
+
         Args:
             context: Validation context with value and metadata
 
         Raises:
-            ValidationError: If any rule fails
+            ValidationError: If any rule fails (only in fail-fast mode)
         """
-        for rule in self.rules:
-            rule.validate(context)
+        if self.collect_errors:
+            # Error collection mode: try all rules, collect failures
+            for rule in self.rules:
+                try:
+                    rule.validate(context)
+                except Exception as e:
+                    # Import here to avoid circular dependency
+                    from tripwire.exceptions import ValidationError
+
+                    # Only collect ValidationError instances
+                    if isinstance(e, ValidationError):
+                        self.collected_errors.append(e)
+                    else:
+                        # Re-raise non-validation errors (system errors)
+                        raise
+        else:
+            # Fail-fast mode: raise immediately on first error (legacy behavior)
+            for rule in self.rules:
+                rule.validate(context)
+
+    def get_collected_errors(self) -> List[Any]:
+        """Get all validation errors collected during validation.
+
+        Returns:
+            List of ValidationError instances collected (empty if none or not in collection mode)
+        """
+        return self.collected_errors
+
+    def has_errors(self) -> bool:
+        """Check if any validation errors were collected.
+
+        Returns:
+            True if errors were collected, False otherwise
+        """
+        return len(self.collected_errors) > 0
+
+    def clear_errors(self) -> None:
+        """Clear collected errors (useful for reusing orchestrator)."""
+        self.collected_errors.clear()

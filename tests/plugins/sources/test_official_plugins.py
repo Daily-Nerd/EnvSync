@@ -383,7 +383,8 @@ class TestRemoteConfigSource:
         with pytest.raises(PluginValidationError) as exc:
             remote.validate_config(config)
 
-        assert "must start with 'http://'" in str(exc.value)
+        # Updated for new security validation - invalid schemes now show "Invalid URL scheme"
+        assert "Invalid URL scheme" in str(exc.value) or "must start with 'http://'" in str(exc.value)
 
     def test_validate_config_invalid_format(self) -> None:
         """Test config validation with invalid format."""
