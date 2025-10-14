@@ -33,7 +33,7 @@ from tripwire.exceptions import (
 )
 from tripwire.validation import validator
 
-__version__ = "0.10.3"
+__version__ = "0.10.4"
 
 __all__ = [
     # Core (Modern Implementation)
