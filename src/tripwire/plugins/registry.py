@@ -15,6 +15,7 @@ The registry is hosted on GitHub as a JSON file, similar to npm/PyPI indexes.
 """
 
 import hashlib
+import importlib
 import json
 import os
 import shutil
@@ -25,7 +26,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -302,11 +303,17 @@ class PluginRegistryClient:
     The registry is a JSON file hosted on GitHub that contains metadata
     about all available plugins. The client caches the registry locally
     to reduce network requests.
+
+    Fallback Priority:
+    1. Remote registry (if URL configured and accessible)
+    2. Cached registry (if available)
+    3. Bundled registry (always available, ships with package)
     """
 
     DEFAULT_REGISTRY_URL = "https://raw.githubusercontent.com/tripwire-plugins/registry/main/registry.json"
     CACHE_DIR = Path.home() / ".tripwire" / "cache"
     CACHE_FILE = CACHE_DIR / "registry.json"
+    BUNDLED_REGISTRY_PATH = Path(__file__).parent / "data" / "registry.json"
 
     def __init__(self, registry_url: Optional[str] = None) -> None:
         """
@@ -320,7 +327,7 @@ class PluginRegistryClient:
 
     def fetch_registry(self, use_cache: bool = True) -> PluginRegistryIndex:
         """
-        Fetch plugin registry from remote or cache.
+        Fetch plugin registry with fallback priority: Remote → Cache → Bundled.
 
         Args:
             use_cache: Whether to use cached registry if available
@@ -329,7 +336,7 @@ class PluginRegistryClient:
             PluginRegistryIndex
 
         Raises:
-            RuntimeError: If registry cannot be fetched
+            RuntimeError: If all sources fail (should never happen with bundled registry)
         """
         # Try cache first if enabled
         if use_cache and self.CACHE_FILE.exists():
@@ -339,17 +346,28 @@ class PluginRegistryClient:
                 # Cache corrupted, fall through to remote fetch
                 pass
 
-        # Fetch from remote
+        # Try remote fetch
         try:
             return self._fetch_from_remote()
+        except Exception:
+            # Remote failed, fall through to fallbacks
+            pass
+
+        # Try cache as fallback (even if use_cache=False, use it as fallback)
+        if self.CACHE_FILE.exists():
+            try:
+                return self._load_from_cache()
+            except Exception:
+                # Cache failed, fall through to bundled
+                pass
+
+        # Final fallback: bundled registry (always available)
+        try:
+            return self._load_bundled_registry()
         except Exception as e:
-            # If remote fails and cache exists, try cache as fallback
-            if self.CACHE_FILE.exists():
-                try:
-                    return self._load_from_cache()
-                except Exception:
-                    pass
-            raise RuntimeError(f"Failed to fetch plugin registry: {e}") from e
+            raise RuntimeError(
+                f"Failed to fetch plugin registry from all sources " f"(remote, cache, bundled): {e}"
+            ) from e
 
     def _fetch_from_remote(self) -> PluginRegistryIndex:
         """Fetch registry from remote URL and cache it."""
@@ -379,6 +397,30 @@ class PluginRegistryClient:
         """Load registry from local cache."""
         with open(self.CACHE_FILE, "r") as f:
             registry_data = json.load(f)
+        return self._parse_registry(registry_data)
+
+    def _load_bundled_registry(self) -> PluginRegistryIndex:
+        """
+        Load bundled registry from package data.
+
+        This is the final fallback that always works, ensuring plugin
+        commands function even offline or when remote registry is unavailable.
+
+        Returns:
+            PluginRegistryIndex with bundled plugins
+
+        Raises:
+            FileNotFoundError: If bundled registry is missing (package corruption)
+        """
+        if not self.BUNDLED_REGISTRY_PATH.exists():
+            raise FileNotFoundError(
+                f"Bundled registry not found at {self.BUNDLED_REGISTRY_PATH}. "
+                f"This indicates package corruption. Try reinstalling TripWire."
+            )
+
+        with open(self.BUNDLED_REGISTRY_PATH, "r") as f:
+            registry_data = json.load(f)
+
         return self._parse_registry(registry_data)
 
     def _save_to_cache(self, data: bytes) -> None:
@@ -467,6 +509,9 @@ class PluginInstaller:
         """
         Install plugin from registry.
 
+        Supports builtin:// URLs for plugins shipped with TripWire,
+        and standard download URLs for external plugins.
+
         Args:
             plugin_id: Plugin identifier (e.g., "vault")
             version: Specific version to install (None = latest)
@@ -495,6 +540,118 @@ class PluginInstaller:
         plugin_dir = self.PLUGINS_DIR / plugin_id
         if plugin_dir.exists() and not force:
             raise RuntimeError(f"Plugin '{plugin_id}' is already installed. " f"Use --force to reinstall.")
+
+        # Route to appropriate installer based on download URL
+        # For builtin plugins, download_url contains builtin:// scheme
+        download_url = version_info.download_url
+
+        if download_url.startswith("builtin://"):
+            # Builtin plugin - already in package
+            return self._install_builtin_plugin(plugin_id, plugin_entry, download_url)
+        else:
+            # External plugin - download and extract
+            return self._install_external_plugin(plugin_id, version_info)
+
+    def _install_builtin_plugin(
+        self,
+        plugin_id: str,
+        plugin_entry: PluginRegistryEntry,
+        install_url: str,
+    ) -> Path:
+        """
+        Install a builtin plugin by importing its class.
+
+        Builtin plugins are already included in the TripWire package,
+        so we just import the class and create marker files to track installation.
+
+        Args:
+            plugin_id: Plugin identifier (e.g., "vault")
+            plugin_entry: Plugin registry entry with metadata
+            install_url: Builtin URL (e.g., "builtin://tripwire.plugins.sources.vault/VaultEnvSource")
+
+        Returns:
+            Path to installed plugin directory
+
+        Raises:
+            RuntimeError: If plugin class cannot be imported
+        """
+        # Parse builtin:// URL
+        if not install_url.startswith("builtin://"):
+            raise ValueError(f"Invalid builtin URL: {install_url}")
+
+        url_path = install_url.replace("builtin://", "")
+
+        # Split module path and class name
+        if "/" not in url_path:
+            raise ValueError(f"Invalid builtin URL format (expected module/class): {install_url}")
+
+        module_path, class_name = url_path.rsplit("/", 1)
+
+        # Dynamic import of plugin class
+        try:
+            module = importlib.import_module(module_path)
+            plugin_class = getattr(module, class_name)
+        except ImportError as e:
+            raise RuntimeError(
+                f"Failed to import builtin plugin '{plugin_id}' from {module_path}: {e}. "
+                f"This may indicate package corruption. Try reinstalling TripWire."
+            ) from e
+        except AttributeError as e:
+            raise RuntimeError(
+                f"Plugin class '{class_name}' not found in module '{module_path}': {e}. "
+                f"This may indicate package corruption. Try reinstalling TripWire."
+            ) from e
+
+        # Create marker directory
+        plugin_dir = self.PLUGINS_DIR / plugin_id
+        plugin_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create .builtin metadata file
+        metadata_file = plugin_dir / ".builtin"
+        metadata = {
+            "name": plugin_entry.name,
+            "display_name": plugin_entry.display_name,
+            "version": plugin_entry.latest_version,
+            "install_url": install_url,
+            "module_path": module_path,
+            "class_name": class_name,
+            "installed_at": datetime.now(timezone.utc).isoformat(),
+            "bundled": True,
+            "official": True,
+        }
+        with open(metadata_file, "w") as f:
+            json.dump(metadata, f, indent=2)
+
+        # Register plugin with PluginRegistry for immediate use
+        # Skip validation for builtin plugins (they're already part of TripWire)
+        from tripwire.core.plugin_system import PluginRegistry
+
+        instance = PluginRegistry()
+        with PluginRegistry._lock:
+            # Direct registration without validation
+            instance._plugins[plugin_id] = plugin_class
+
+        return plugin_dir
+
+    def _install_external_plugin(
+        self,
+        plugin_id: str,
+        version_info: PluginVersionInfo,
+    ) -> Path:
+        """
+        Install an external plugin by downloading and extracting.
+
+        Args:
+            plugin_id: Plugin identifier
+            version_info: Version info with download URL
+
+        Returns:
+            Path to installed plugin directory
+
+        Raises:
+            RuntimeError: If download or extraction fails
+        """
+        plugin_dir = self.PLUGINS_DIR / plugin_id
 
         # Download plugin
         archive_path = self._download_plugin(version_info)

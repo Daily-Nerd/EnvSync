@@ -64,6 +64,17 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/tripwire"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"src/tripwire/plugins/data/registry.json" = "tripwire/plugins/data/registry.json"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
+    "/docs",
+    "src/tripwire/plugins/data/*.json"
+]
+
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

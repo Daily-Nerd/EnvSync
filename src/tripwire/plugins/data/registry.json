@@ -1,0 +1,153 @@
+{
+  "version": "1.0.0",
+  "schema_version": "1.0",
+  "updated_at": "2025-10-14T00:00:00Z",
+  "description": "Bundled plugin registry for TripWire official plugins",
+  "plugins": {
+    "vault": {
+      "name": "vault",
+      "display_name": "HashiCorp Vault",
+      "description": "Load environment variables from HashiCorp Vault KV secrets engine (v1 and v2). Supports token-based authentication with HTTPS enforcement for production security.",
+      "author": "TripWire Team",
+      "author_email": "noreply@tripwire.dev",
+      "homepage": "https://github.com/Daily-Nerd/TripWire",
+      "repository": "https://github.com/Daily-Nerd/TripWire",
+      "license": "MIT",
+      "tags": [
+        "secrets",
+        "vault",
+        "hashicorp",
+        "cloud",
+        "kv",
+        "authentication",
+        "official"
+      ],
+      "versions": {
+        "1.0.0": {
+          "version": "1.0.0",
+          "release_date": "2025-10-14",
+          "min_tripwire_version": "0.10.0",
+          "max_tripwire_version": null,
+          "download_url": "builtin://tripwire.plugins.sources.vault/VaultEnvSource",
+          "checksum": "",
+          "downloads": 0
+        }
+      },
+      "latest_version": "1.0.0",
+      "total_downloads": 0,
+      "created_at": "2025-10-14T00:00:00Z",
+      "updated_at": "2025-10-14T00:00:00Z",
+      "official": true,
+      "bundled": true
+    },
+    "aws-secrets": {
+      "name": "aws-secrets",
+      "display_name": "AWS Secrets Manager",
+      "description": "Integrate with AWS Secrets Manager to load secrets. Supports IAM roles, credentials, and profiles. Automatically parses JSON secrets into environment variables.",
+      "author": "TripWire Team",
+      "author_email": "noreply@tripwire.dev",
+      "homepage": "https://github.com/Daily-Nerd/TripWire",
+      "repository": "https://github.com/Daily-Nerd/TripWire",
+      "license": "MIT",
+      "tags": [
+        "secrets",
+        "aws",
+        "cloud",
+        "amazon",
+        "iam",
+        "secretsmanager",
+        "official"
+      ],
+      "versions": {
+        "1.0.0": {
+          "version": "1.0.0",
+          "release_date": "2025-10-14",
+          "min_tripwire_version": "0.10.0",
+          "max_tripwire_version": null,
+          "download_url": "builtin://tripwire.plugins.sources.aws_secrets/AWSSecretsSource",
+          "checksum": "",
+          "downloads": 0
+        }
+      },
+      "latest_version": "1.0.0",
+      "total_downloads": 0,
+      "created_at": "2025-10-14T00:00:00Z",
+      "updated_at": "2025-10-14T00:00:00Z",
+      "official": true,
+      "bundled": true
+    },
+    "azure-keyvault": {
+      "name": "azure-keyvault",
+      "display_name": "Azure Key Vault",
+      "description": "Load secrets from Azure Key Vault with DefaultAzureCredential authentication. Supports service principals, managed identity, Azure CLI, and more. Automatically converts Azure naming conventions to environment variables.",
+      "author": "TripWire Team",
+      "author_email": "noreply@tripwire.dev",
+      "homepage": "https://github.com/Daily-Nerd/TripWire",
+      "repository": "https://github.com/Daily-Nerd/TripWire",
+      "license": "MIT",
+      "tags": [
+        "secrets",
+        "azure",
+        "cloud",
+        "microsoft",
+        "keyvault",
+        "managed-identity",
+        "official"
+      ],
+      "versions": {
+        "1.0.0": {
+          "version": "1.0.0",
+          "release_date": "2025-10-14",
+          "min_tripwire_version": "0.10.0",
+          "max_tripwire_version": null,
+          "download_url": "builtin://tripwire.plugins.sources.azure_keyvault/AzureKeyVaultSource",
+          "checksum": "",
+          "downloads": 0
+        }
+      },
+      "latest_version": "1.0.0",
+      "total_downloads": 0,
+      "created_at": "2025-10-14T00:00:00Z",
+      "updated_at": "2025-10-14T00:00:00Z",
+      "official": true,
+      "bundled": true
+    },
+    "remote-config": {
+      "name": "remote-config",
+      "display_name": "Remote HTTP Config",
+      "description": "Fetch configuration from any HTTP/REST API endpoint. Supports JSON and YAML formats with Bearer token, API key, or custom header authentication. HTTPS enforced for production security.",
+      "author": "TripWire Team",
+      "author_email": "noreply@tripwire.dev",
+      "homepage": "https://github.com/Daily-Nerd/TripWire",
+      "repository": "https://github.com/Daily-Nerd/TripWire",
+      "license": "MIT",
+      "tags": [
+        "config",
+        "remote",
+        "http",
+        "api",
+        "rest",
+        "json",
+        "yaml",
+        "official"
+      ],
+      "versions": {
+        "1.0.0": {
+          "version": "1.0.0",
+          "release_date": "2025-10-14",
+          "min_tripwire_version": "0.10.0",
+          "max_tripwire_version": null,
+          "download_url": "builtin://tripwire.plugins.sources.remote_config/RemoteConfigSource",
+          "checksum": "",
+          "downloads": 0
+        }
+      },
+      "latest_version": "1.0.0",
+      "total_downloads": 0,
+      "created_at": "2025-10-14T00:00:00Z",
+      "updated_at": "2025-10-14T00:00:00Z",
+      "official": true,
+      "bundled": true
+    }
+  }
+}

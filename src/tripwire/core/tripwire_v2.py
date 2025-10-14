@@ -1008,11 +1008,17 @@ class TripWireV2:
             return None
 
     def _finalize_validation(self) -> None:
-        """Finalize validation by raising collected errors.
+        """Finalize validation by printing collected errors and setting exit code.
 
         This method is called automatically via atexit when the module finishes
-        importing. If any validation errors were collected, it raises a
-        TripWireMultiValidationError with all errors.
+        importing. If any validation errors were collected, it prints them to
+        stderr and schedules the process to exit with code 1.
+
+        Note:
+            This method does NOT raise exceptions or call sys.exit() (to avoid
+            "Exception ignored in atexit callback" messages). Instead, it prints
+            errors cleanly and uses os._exit(1) which bypasses atexit handlers
+            and exits immediately.
 
         Thread Safety:
             Uses lock to ensure thread-safe access to error list.
@@ -1028,18 +1034,35 @@ class TripWireV2:
             if not self._validation_errors:
                 return
 
-            # Single error - raise as regular ValidationError for clarity
-            if len(self._validation_errors) == 1:
-                raise self._validation_errors[0]
+            # Import sys here to avoid circular imports
+            import sys
 
-            # Multiple errors - raise multi-error exception
-            raise TripWireMultiValidationError(self._validation_errors)
+            # Create the appropriate error object for formatting
+            error: Union[ValidationError, TripWireMultiValidationError]
+            if len(self._validation_errors) == 1:
+                # Single error - use its string representation
+                error = self._validation_errors[0]
+            else:
+                # Multiple errors - use multi-error representation
+                error = TripWireMultiValidationError(self._validation_errors)
+
+            # Print to stderr (not raise) to avoid "Exception ignored" message
+            print(f"\n{error}", file=sys.stderr)
+
+            # Flush stderr to ensure message is displayed
+            sys.stderr.flush()
+
+            # Use os._exit(1) instead of sys.exit(1)
+            # os._exit bypasses cleanup (including remaining atexit handlers) but
+            # ensures clean exit without "Exception ignored" messages
+            os._exit(1)
 
     def finalize(self) -> None:
         """Manually finalize validation (useful for testing or explicit control).
 
-        Raises any collected validation errors. Normally this is called automatically
-        via atexit, but you can call it manually for explicit control.
+        Raises any collected validation errors. This method is for manual/explicit
+        control and DOES raise exceptions (unlike the atexit callback which prints
+        and exits cleanly).
 
         Example:
             >>> env = TripWireV2()
@@ -1051,7 +1074,24 @@ class TripWireV2:
             ValidationError: If single validation error was collected
             TripWireMultiValidationError: If multiple validation errors were collected
         """
-        self._finalize_validation()
+        # Prevent double finalization
+        if self._finalized:
+            return
+
+        with self._error_lock:
+            self._finalized = True
+
+            # No errors collected - success!
+            if not self._validation_errors:
+                return
+
+            # Manual finalization - raise exceptions normally
+            # (This is different from atexit finalization which prints and exits)
+            if len(self._validation_errors) == 1:
+                raise self._validation_errors[0]
+
+            # Multiple errors - raise multi-error exception
+            raise TripWireMultiValidationError(self._validation_errors)
 
     def has_validation_errors(self) -> bool:
         """Check if any validation errors have been collected.

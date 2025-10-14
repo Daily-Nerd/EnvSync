@@ -496,16 +496,23 @@ class TestPluginRegistryClient:
         assert registry.version == "1.0.0"
         assert len(registry.plugins) == 1
 
-    def test_fetch_registry_fails_without_cache(self, tmp_path):
-        """Test fetch fails without cache."""
+    def test_fetch_registry_falls_back_to_bundled(self, tmp_path):
+        """Test fetch falls back to bundled registry when network fails."""
         client = PluginRegistryClient()
         client.CACHE_DIR = tmp_path
         client.CACHE_FILE = tmp_path / "registry.json"
 
         # Mock network error
         with patch("urllib.request.urlopen", side_effect=Exception("Network error")):
-            with pytest.raises(RuntimeError, match="Failed to fetch plugin registry"):
-                client.fetch_registry(use_cache=False)
+            registry = client.fetch_registry(use_cache=False)
+
+        # Should fall back to bundled registry (4 official plugins)
+        assert registry.version == "1.0.0"
+        assert len(registry.plugins) >= 4  # At least the 4 official plugins
+        assert "vault" in registry.plugins
+        assert "aws-secrets" in registry.plugins
+        assert "azure-keyvault" in registry.plugins
+        assert "remote-config" in registry.plugins
 
     def test_clear_cache(self, tmp_path):
         """Test clearing cache."""
