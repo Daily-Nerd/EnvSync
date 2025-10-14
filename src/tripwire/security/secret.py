@@ -29,6 +29,63 @@ Compatibility:
     - Compatible with Pydantic SecretStr (similar API)
     - Works with FastAPI, Django, Flask
     - Type checker support (mypy, pyright)
+
+Pickle Security:
+    Secret objects support pickle serialization for distributed systems (Celery,
+    RQ, Dask, Redis caching, multiprocessing). This is INTENTIONAL to enable
+    legitimate use cases in production systems.
+
+    Security Risks:
+        - Pickled secrets can be written to unencrypted files
+        - Pickled secrets can be transmitted over insecure networks
+        - Pickled secrets can be stored in insecure caches
+
+    Safe Usage:
+        ✓ Encrypted message brokers (RabbitMQ with TLS, Kafka with encryption)
+        ✓ Encrypted cache backends (Redis with encryption at rest)
+        ✓ Secure multiprocessing (local processes with secure IPC)
+        ✓ TLS-protected RPC systems (gRPC with TLS)
+
+    Unsafe Usage:
+        ✗ pickle.dump() to unencrypted files
+        ✗ Transmission over HTTP without TLS
+        ✗ Storage in plaintext Memcached
+        ✗ Debug dumps or crash reports
+
+    Best Practices:
+        1. Always use encrypted channels for distributed systems
+        2. Never pickle secrets to unencrypted files
+        3. Secure your cache backend (Redis with encryption at rest)
+        4. Use TLS for all message brokers (RabbitMQ, Kafka, MQTT)
+        5. Consider passing unwrapped values instead (see __getstate__ docs)
+
+    Alternative Pattern:
+        Instead of pickling Secret objects, you can pass unwrapped values to
+        workers and wrap them on the receiving end. This avoids pickle entirely:
+
+        # Pattern 1: Pickle Secret objects (requires secure infrastructure)
+        @celery.task
+        def process(secret: Secret[str]):
+            api_key = secret.get_secret_value()
+
+        process.delay(secret=Secret("sk_live_123"))  # Pickles Secret
+
+        # Pattern 2: Pass plain values (avoids pickle, but less type-safe)
+        @celery.task
+        def process(secret_value: str):
+            secret = Secret(secret_value)  # Wrap in worker
+            api_key = secret.get_secret_value()
+
+        process.delay(secret_value="sk_live_123")  # Pickles string
+
+    Why We Support Pickle:
+        - Pydantic's SecretStr supports pickle for the same reasons
+        - Distributed systems (Celery, Dask) require pickle for task arguments
+        - Redis caching with pickle serializer is a common pattern
+        - Multiprocessing requires pickleable objects
+
+        Blocking pickle would break legitimate production use cases. The risk is
+        not pickle itself, but WHERE pickled data is stored/transmitted.
 """
 
 from __future__ import annotations
@@ -297,9 +354,47 @@ class Secret(Generic[T]):
         Returns:
             Dictionary containing the secret value for serialization
 
-        Security Note:
-            Pickled secrets can be stored/transmitted. Only pickle secrets
-            in secure contexts (encrypted storage, trusted channels).
+        Security Warning:
+            Pickling creates a serialized copy of the secret that can be:
+            - Written to disk (if you pickle.dump() to a file)
+            - Transmitted over network (if sent to remote workers)
+            - Stored in cache (if cached with pickle serialization)
+
+            Only pickle Secret objects in secure contexts:
+
+            SAFE Use Cases:
+              ✓ Distributed task queues with encrypted message brokers (Celery + RabbitMQ/TLS)
+              ✓ Encrypted Redis cache (Redis with encryption at rest)
+              ✓ Local multiprocessing (secure shared memory)
+              ✓ Secure RPC systems (gRPC with TLS)
+
+            UNSAFE Use Cases:
+              ✗ Unencrypted file storage (pickle.dump to file)
+              ✗ Untrusted network transmission (HTTP without TLS)
+              ✗ Shared cache without encryption (plain Memcached)
+              ✗ Debug dumps or crash reports
+
+            Best Practices:
+              1. Ensure message brokers use TLS/encryption
+              2. Use encrypted cache backends (Redis with encryption)
+              3. Secure network channels (TLS for all transport)
+              4. Never pickle to unencrypted files
+
+            Alternative Pattern:
+              Instead of pickling Secret objects, pass unwrapped values:
+
+              # Instead of this:
+              worker.delay(secret=Secret("token"))  # Pickles Secret object
+
+              # Consider this:
+              worker.delay(secret_value="token")   # Pickles plain string
+              # Then wrap in worker:
+              def worker(secret_value):
+                  secret = Secret(secret_value)
+                  # Use secret...
+
+        Note:
+            This bypasses immutability constraints to allow pickle deserialization.
         """
         return {"_value": self._value}
 
@@ -308,6 +403,20 @@ class Secret(Generic[T]):
 
         Args:
             state: Dictionary containing the secret value
+
+        Security Context:
+            This method is called during pickle.loads() to restore a Secret object.
+            The security considerations from __getstate__ apply here as well.
+
+            Ensure pickled data comes from a trusted source:
+            - Encrypted message broker (RabbitMQ/TLS, Kafka/encryption)
+            - Encrypted cache backend (Redis with encryption at rest)
+            - Secure multiprocessing (local processes)
+
+            NEVER unpickle Secret objects from:
+            - Untrusted files
+            - Network sources without verification
+            - User-controlled input
 
         Note:
             This bypasses immutability constraints to allow pickle deserialization.
@@ -468,7 +577,7 @@ def mask_secret_in_string(text: str, secret_value: str, mask: str = MASK_STRING)
         >>> mask_secret_in_string(text, "abc123")
         'Error: Invalid token ********** provided'
     """
-    if not secret_value:  # Don't mask empty strings
+    if not secret_value:  # Skip masking empty/falsy values to avoid false positives
         return text
 
     return text.replace(secret_value, mask)
