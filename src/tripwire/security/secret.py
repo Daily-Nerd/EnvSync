@@ -90,10 +90,9 @@ Pickle Security:
 
 from __future__ import annotations
 
-import hashlib
 import json
 import secrets
-from typing import Any, Generic, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
 # Generic type variable for Secret wrapper
 T = TypeVar("T")
