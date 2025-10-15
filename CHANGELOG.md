@@ -7,6 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2025-10-15
+
+### Added
+
+- **Phase 1: Deferred Validation for Custom Validators** - Solves the custom validator process boundary problem
+  - New `custom:` prefix convention for custom validators in schema files (e.g., `format = "custom:phone"`)
+  - CLI commands now gracefully defer validation for custom validators that aren't available during schema processing
+  - Schema validation skips `custom:*` format validators instead of failing with "unknown format" errors
+  - Clear warning messages explain that custom validators validate at runtime when registered in application process
+  - `schema from-code` automatically emits `custom:` prefix for non-builtin validators during schema generation
+  - Pattern validation still runs independently (inline regex patterns always validated by CLI)
+  - Comprehensive test suite with 17 tests covering all deferred validation scenarios
+
+### Changed
+
+- **Enhanced Schema Validation Messages** - Better guidance for custom validator workflows
+  - `schema check` shows warnings (not errors) for custom validators with actionable guidance
+  - `schema validate` skips custom validators with warnings explaining runtime validation
+  - `schema to-env` messaging clarified about custom validator import requirements
+  - Error messages now suggest using `custom:` prefix when unknown format validators detected
+
+### Improved
+
+- **Developer Experience** - Clearer separation between CLI-time and runtime validation
+  - No more confusing "Unknown format 'phone'" errors for custom validators
+  - CLI commands complete successfully even when custom validators aren't imported
+  - Explicit messaging about when validation is deferred vs performed
+  - Documentation updated with best practices for custom validator usage
+
+### Technical Details
+
+- Updated `VariableSchema._validate_format()` to detect and skip `custom:` prefixed validators (30 lines, comprehensive docstring)
+- Enhanced `schema check` command to collect and display custom validator warnings separately from errors (40 lines)
+- Updated `schema from-code` command to emit `custom:` prefix for non-builtin validators automatically (15 lines)
+- Messaging improvements in `schema validate` and `schema to-env` commands (10 lines)
+- Added `tests/test_deferred_validation.py` with 17 comprehensive tests covering:
+  - Custom prefix detection and skipping
+  - Builtin validator behavior unchanged
+  - Schema validation with mixed builtin/custom validators
+  - Schema check command warning display
+  - Schema from-code prefix emission
+  - Runtime validation with registered validators
+  - Backward compatibility with existing validators
+  - Edge cases (empty prefix, nested prefix, case sensitivity, whitespace)
+- All 84 schema-related tests passing (including 17 new deferred validation tests)
+- Zero breaking changes - fully backward compatible with existing schemas
+
+### Documentation
+
+- Updated inline documentation in `schema.py` explaining deferred validation behavior
+- Enhanced `schema from-code` command help text with custom validator guidance
+- Added comprehensive docstrings to `_validate_format()` method explaining process boundary problem
+- Schema check command now shows informative notes about custom validator behavior
+
+### Why This Matters
+
+**The Problem**: Custom validators are registered at import-time in your application process via `register_validator("phone", validate_phone)`. However, CLI commands like `tripwire schema check` run in a separate process where these validators don't exist, causing "Unknown format 'phone'" errors.
+
+**The Solution**: Use `format = "custom:phone"` in your schema. CLI commands detect this prefix and defer validation to runtime. Your application code continues using the base name ("phone" without prefix) for registration and validation.
+
+**Best Practice**: Use inline `pattern = "regex"` for simple validations (CLI can validate these). Reserve custom validators for complex logic requiring expensive operations (checksum validation, API calls, database lookups).
+
 ## [0.11.1] - 2025-10-14
 
 ### Added
