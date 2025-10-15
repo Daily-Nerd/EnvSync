@@ -31,6 +31,9 @@ from tripwire.cli.formatters.docs import (
 from tripwire.cli.utils.console import console
 from tripwire.cli.utils.helpers import should_skip_file_in_hook
 
+# Phase 1 (v0.12.0): Custom validator prefix for deferred validation
+CUSTOM_VALIDATOR_PREFIX = "custom:"
+
 
 @click.group()
 def schema() -> None:
@@ -476,7 +479,7 @@ def schema_from_code(output: str, force: bool, dry_run: bool, validate: bool) ->
             # Check if this is a custom validator (not in builtin list)
             if var.format not in builtin_validators:
                 # Emit with custom: prefix to signal deferred validation
-                lines.append(f'format = "custom:{var.format}"')
+                lines.append(f'format = "{CUSTOM_VALIDATOR_PREFIX}{var.format}"')
             else:
                 # Builtin validator - emit without prefix
                 lines.append(f'format = "{var.format}"')
@@ -871,8 +874,8 @@ def schema_check(schema_file: str) -> None:
                 fmt = var_config["format"]
 
                 # Phase 1 (v0.12.0): Handle custom: prefix
-                if fmt.startswith("custom:"):
-                    custom_name = fmt[7:]  # Strip "custom:" prefix
+                if fmt.startswith(CUSTOM_VALIDATOR_PREFIX):
+                    custom_name = fmt[len(CUSTOM_VALIDATOR_PREFIX):]  # Strip prefix
                     format_warnings.append(
                         f"variables.{var_name}: Uses custom validator '{custom_name}' "
                         f"(validation deferred to runtime - ensure validator is registered at import-time)"
@@ -885,7 +888,7 @@ def schema_check(schema_file: str) -> None:
                     format_errors.append(
                         f"variables.{var_name}: Unknown format '{fmt}'. "
                         f"Builtin formats: {', '.join(sorted(builtin_validators))}. "
-                        f"To use custom validators, use format = 'custom:{fmt}' in schema"
+                        f"To use custom validators, use format = '{CUSTOM_VALIDATOR_PREFIX}{fmt}' in schema"
                     )
 
     if not format_errors:

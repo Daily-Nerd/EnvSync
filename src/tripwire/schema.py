@@ -19,6 +19,9 @@ from tripwire.validation import (
     coerce_list,
 )
 
+# Phase 1 (v0.12.0): Custom validator prefix for deferred validation
+CUSTOM_VALIDATOR_PREFIX = "custom:"
+
 
 @dataclass
 class VariableSchema:
@@ -145,7 +148,7 @@ class VariableSchema:
 
         # Phase 1 (v0.12.0): Detect custom validator prefix
         # Skip validation for custom validators (not available in CLI context)
-        if self.format.startswith("custom:"):
+        if self.format.startswith(CUSTOM_VALIDATOR_PREFIX):
             # Defer validation to runtime when validators ARE registered
             return True
 
