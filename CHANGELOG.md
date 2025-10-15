@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.2] - 2025-10-15
+
+### Fixed
+
+- **CRITICAL BUG FIX: `audit --all` now searches for secret VALUES instead of variable NAMES** (Issue #XXX)
+  - Fixed critical bug where `audit --all` searched git history for variable NAMES (e.g., "VAULT_TOKEN") instead of actual secret VALUES (e.g., "hvs.secrettoken123")
+  - **Impact:** Eliminated 100% false positive rate - command was flagging ALL legitimate code that referenced variable names
+  - **Root cause:** Lines 214 & 242 in `audit.py` were passing `secret_value=None` to `analyze_secret_history()`, forcing fallback to name-based pattern search
+  - **The fix:**
+    - Added `load_env_values()` helper function to read actual secret values from .env file
+    - Added `is_placeholder_value()` helper function to skip placeholder values (CHANGE_ME, YOUR_X_HERE, <placeholder>, etc.)
+    - Modified audit command to pass actual secret values instead of None
+    - Added graceful handling for empty/missing .env entries
+    - User-friendly skip messages for placeholder values
+  - **Test coverage:** 9 comprehensive regression tests in `tests/test_cli_audit_bug_fix.py`
+  - **Backward compatible:** No breaking changes, users see immediate improvement
+  - **Documentation:** Complete issue report in `docs/github-issue-audit-bug.md`
+
 ## [0.12.1] - 2025-10-15
 
 ### Fixed
@@ -1186,7 +1204,8 @@ utils/ subdirectories
 - CLI implementation with rich output
 - Project initialization (`init` command)
 
-[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.12.1...HEAD
+[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.12.2...HEAD
+[0.12.2]: https://github.com/Daily-Nerd/TripWire/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/Daily-Nerd/TripWire/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/Daily-Nerd/TripWire/compare/v0.11.0...v0.11.1
