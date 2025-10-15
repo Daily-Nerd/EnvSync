@@ -875,7 +875,7 @@ def schema_check(schema_file: str) -> None:
 
                 # Phase 1 (v0.12.0): Handle custom: prefix
                 if fmt.startswith(CUSTOM_VALIDATOR_PREFIX):
-                    custom_name = fmt[len(CUSTOM_VALIDATOR_PREFIX):]  # Strip prefix
+                    custom_name = fmt[len(CUSTOM_VALIDATOR_PREFIX) :]  # Strip prefix
                     format_warnings.append(
                         f"variables.{var_name}: Uses custom validator '{custom_name}' "
                         f"(validation deferred to runtime - ensure validator is registered at import-time)"
