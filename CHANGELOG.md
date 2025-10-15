@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1] - 2025-10-15
+
 ### Fixed
 
 - **README Documentation Accuracy**: Corrected two technical inaccuracies in code examples (Issue #50, thanks @cleder!)
@@ -28,6 +30,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `# nosec` annotations for intentional demo values in example scripts
   - Bandit security scanner now passes with appropriate suppression comments
   - All security warnings in example code properly explained and justified
+
+- **Schema Validation Quote Handling**: Fixed bug where quoted values in .env files were incorrectly rejected during schema validation
+  - `schema validate` now properly strips quotes from environment variable values using `dotenv_values()`
+  - Quoted emails like `"user@example.com"` now pass email format validation
+  - Quoted URLs, PostgreSQL DSNs, and API tokens validated correctly
+  - Empty values (e.g., `API_URL=`) properly handled as empty strings instead of None
+  - Values with special characters (spaces, equals signs, hashes) work correctly when quoted
+  - 19 comprehensive tests covering quote handling, edge cases, and backward compatibility
+
+- **Type Safety**: Fixed mypy type error in schema validation
+  - Added explicit type annotations to clarify `Dict[str, str]` conversion from `dotenv_values()`
+  - Eliminated argument type incompatibility warning in `validate_env()` call
+  - All 67 source files now pass strict mypy compliance
 
 ### Added
 
@@ -1171,7 +1186,8 @@ utils/ subdirectories
 - CLI implementation with rich output
 - Project initialization (`init` command)
 
-[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/Daily-Nerd/TripWire/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/Daily-Nerd/TripWire/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.10.4...v0.11.0

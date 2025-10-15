@@ -529,23 +529,23 @@ def validate_with_schema(
     Returns:
         (is_valid, list_of_errors)
     """
+    from dotenv import dotenv_values
+
     # Load schema
     schema = load_schema(schema_file)
     if not schema:
         return False, [f"Schema file not found: {schema_file}"]
 
-    # Load .env file
-    env_dict = {}
+    # Load .env file using python-dotenv (properly handles quotes)
     env_path = Path(env_file)
+    env_dict: Dict[str, str] = {}
 
     if env_path.exists():
-        with open(env_path) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#"):
-                    if "=" in line:
-                        key, value = line.split("=", 1)
-                        env_dict[key.strip()] = value.strip()
+        # dotenv_values returns dict with quotes properly stripped
+        raw_env_dict = dotenv_values(env_path)
+        # Handle None values (empty variables like API_URL=)
+        # Convert to Dict[str, str] by replacing None with empty string
+        env_dict = {k: (v if v is not None else "") for k, v in raw_env_dict.items()}
 
     # Validate
     return schema.validate_env(env_dict, environment)
