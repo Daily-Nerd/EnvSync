@@ -499,12 +499,20 @@ See [Plugin Development Guide](docs/guides/plugin-development.md) for details.
 
 ### 5. Documentation Improvements
 
-Documentation is critical:
+Documentation is critical and must be held to the same quality standards as code. See our [Documentation Review Process](docs/DOCUMENTATION_REVIEW_PROCESS.md) for detailed guidelines.
+
+**High-impact areas:**
 - Fix typos and grammar
 - Add examples and tutorials
 - Improve API documentation
 - Create video walkthroughs
 - Translate documentation
+
+**Documentation Quality Standards:**
+- All code examples must be tested (see [Documentation Guidelines](#documentation-guidelines) below)
+- Error types must match actual Python behavior
+- Complex examples should be runnable scripts in `examples/`
+- Technical claims must be empirically verified
 
 ### 6. Test Coverage
 
@@ -522,6 +530,210 @@ Create examples for:
 - Docker deployments
 - Kubernetes configurations
 - Real-world use cases
+
+---
+
+## Documentation Guidelines
+
+TripWire treats documentation with the same rigor as code. All documentation must be accurate, testable, and trustworthy.
+
+### Core Principles
+
+1. **Empirical Validation Over Assumptions** - Don't guess at behavior, verify it
+2. **Every Example Must Be Testable** - If it's in the docs, it must be tested
+3. **Error Types Must Be Accurate** - Match actual Python runtime behavior
+4. **Link to Runnable Code** - Prefer linking to `examples/` scripts over inline code
+
+### Testing Documentation Examples
+
+All code examples in README.md must have corresponding tests:
+
+```bash
+# Run documentation tests
+pytest tests/test_readme_examples.py
+
+# Add your example to this test suite
+```
+
+**Example test pattern:**
+
+```python
+def test_readme_example_type_coercion(monkeypatch):
+    """Test README example: Type coercion with env.require()"""
+    # Setup environment
+    monkeypatch.setenv("PORT", "8080")
+    monkeypatch.setenv("DEBUG", "true")
+
+    # Import and use as shown in README
+    from tripwire import env
+    PORT: int = env.require("PORT")
+    DEBUG: bool = env.require("DEBUG")
+
+    # Verify behavior matches documentation
+    assert PORT == 8080
+    assert DEBUG is True
+```
+
+### Running README Test Suite
+
+Before submitting documentation PRs:
+
+```bash
+# 1. Run the full README test suite
+pytest tests/test_readme_examples.py -v
+
+# 2. Check coverage of documentation examples
+pytest tests/test_readme_examples.py --cov=tripwire --cov-report=term-missing
+
+# 3. Run examples in demo mode (if applicable)
+python examples/basic_usage.py --demo
+```
+
+### Adding Tests for New Examples
+
+When adding code examples to documentation:
+
+**Step 1: Add to appropriate test file**
+
+```bash
+# For README examples
+tests/test_readme_examples.py
+
+# For advanced examples
+tests/examples/test_advanced_examples.py
+
+# For framework integrations
+tests/examples/test_framework_examples.py
+```
+
+**Step 2: Create runnable script (for complex examples)**
+
+```bash
+# Create script in appropriate subdirectory
+examples/basic/01_simple_require.py
+examples/problems/01_os_getenv_none.py
+examples/advanced/01_custom_validators.py
+examples/frameworks/fastapi_example.py
+```
+
+**Step 3: Link from documentation**
+
+```markdown
+```python
+DATABASE_URL: str = env.require("DATABASE_URL")
+```
+
+See full example: [examples/basic/01_simple_require.py](examples/basic/01_simple_require.py)
+```
+
+### Error Type Verification Checklist
+
+When documenting errors or exceptions:
+
+1. **Verify in Python REPL:**
+   ```bash
+   python3
+   >>> import os
+   >>> int(os.getenv("NONEXISTENT"))
+   # Copy EXACT error message
+   ```
+
+2. **Test the error:**
+   ```python
+   def test_readme_error_claim():
+       """Test that documented error actually occurs."""
+       with pytest.raises(TypeError, match="int\\(\\) argument must be"):
+           int(None)  # Simulate os.getenv() returning None
+   ```
+
+3. **Document precisely:**
+   ```markdown
+   Raises `TypeError: int() argument must be a string... not 'NoneType'`
+   ```
+
+### Examples Directory Structure
+
+Organize examples by complexity and purpose:
+
+```
+examples/
+├── basic/              # Simple, single-concept examples
+│   ├── 01_simple_require.py
+│   ├── 02_optional_with_default.py
+│   └── ...
+├── problems/           # Anti-patterns (what NOT to do)
+│   ├── 01_os_getenv_none.py
+│   ├── 02_int_conversion_error.py
+│   └── ...
+├── advanced/           # Advanced features
+│   ├── 01_custom_validators.py
+│   └── ...
+└── frameworks/         # Framework integrations
+    ├── fastapi_example.py
+    └── ...
+```
+
+### Example Script Template
+
+Use this template for new examples:
+
+```python
+"""Example: [Brief title]
+
+This example demonstrates [what it shows].
+
+README Reference: Lines [X-Y]
+
+Expected behavior:
+- [Describe what should happen]
+- [List any important notes]
+
+Run this example:
+    export DATABASE_URL="postgresql://localhost/mydb"
+    python examples/basic/01_simple_require.py
+
+Or use demo mode:
+    python examples/basic/01_simple_require.py --demo
+"""
+
+from tripwire import TripWire
+
+def main():
+    """Demonstrate [feature]."""
+    env = TripWire()
+
+    # Your example code here
+    DATABASE_URL: str = env.require("DATABASE_URL")
+
+    print(f"✅ Success: {DATABASE_URL}")
+    return DATABASE_URL
+
+if __name__ == "__main__":
+    import sys
+    if "--demo" in sys.argv:
+        import os
+        os.environ["DATABASE_URL"] = "postgresql://localhost/demo"
+    main()
+```
+
+### Reference Documentation
+
+For complete documentation review guidelines, see:
+- **[Documentation Review Process](docs/DOCUMENTATION_REVIEW_PROCESS.md)** - Formal review process
+- **[Documentation Test Suite](tests/test_readme_examples.py)** - Example tests
+- **[Examples Directory](examples/README.md)** - Runnable examples
+
+### Documentation PR Checklist
+
+Before submitting documentation PRs:
+
+- [ ] All code examples have tests in `tests/test_readme_examples.py`
+- [ ] Error types verified in Python REPL
+- [ ] Complex examples (3+ lines) are runnable scripts in `examples/`
+- [ ] Links point to existing files/sections
+- [ ] Technical claims verified against source code
+- [ ] Examples support `--demo` mode (if credentials needed)
+- [ ] README test suite passes: `pytest tests/test_readme_examples.py`
 
 ---
 

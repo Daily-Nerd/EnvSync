@@ -1,232 +1,522 @@
 # TripWire Examples
 
-Welcome to TripWire examples! This directory contains practical examples to help you get started with environment variable management.
+Welcome to TripWire examples! This directory contains runnable, verified examples that demonstrate TripWire's features. Every example in this directory is executable and tested.
 
-## Getting Started (Start Here! 👇)
+## Quick Start
 
-### Step 1: Setup Your Environment
+**Fastest way to get started:**
 
 ```bash
-# Copy the example environment file
-cp examples/.env.example examples/.env
-
-# Edit .env and add at minimum your DATABASE_URL
-# DATABASE_URL=postgresql://localhost:5432/mydb
+# Run any example in demo mode (no .env setup needed!)
+python examples/basic/01_simple_require.py --demo
+python examples/problems/01_os_getenv_none.py
+python examples/advanced/01_range_validation.py --demo
 ```
 
-### Step 2: Run Quickstart (Recommended First!)
-
-The quickstart example uses only 3 variables and is perfect for learning the basics:
+**With your own configuration:**
 
 ```bash
-python examples/quickstart.py
-```
+# 1. Create .env file from template
+cp examples/.env.template examples/.env
 
-**Too lazy to set up .env?** Try demo mode:
+# 2. Edit .env with your values
+nano examples/.env  # or your favorite editor
 
-```bash
-python examples/quickstart.py --demo
-```
-
-### Step 3: Explore Full Examples
-
-Once comfortable with quickstart, explore all features:
-
-```bash
-# Make sure you've filled in ALL variables in .env first!
-python examples/basic_usage.py
-```
-
-Or use demo mode:
-
-```bash
-python examples/basic_usage.py --demo
-```
-
-## Available Examples
-
-### 1. **quickstart.py** - START HERE!
-
-**What it demonstrates:**
-- Required variables with `env.require()`
-- Optional variables with `env.optional()`
-- Fail-fast validation at import time
-- Type coercion (bool, int)
-- Minimal setup (only 3 variables)
-
-**Variables needed:**
-- `DATABASE_URL` (required)
-- `DEBUG` (optional, default: false)
-- `PORT` (optional, default: 8000)
-
-**Perfect for:**
-- First-time users
-- Quick prototypes
-- Understanding core concepts
-
----
-
-### 2. **basic_usage.py** - Complete Feature Tour
-
-**What it demonstrates:**
-- All TripWire features in action
-- Format validators (email, postgresql, etc.)
-- Pattern validation with regex
-- Custom validators
-- Choices/enum validation
-- Range validation for numbers
-- Secret marking
-- List type coercion
-
-**Variables needed:**
-- See `.env.example` for the full list (13 variables total)
-
-**Perfect for:**
-- Learning advanced features
-- Reference implementation
-- Production-ready patterns
-
----
-
-## Testing Fail-Fast Behavior
-
-Want to see TripWire's validation in action? Try these experiments:
-
-### Experiment 1: Missing Required Variable
-
-```bash
-# Remove .env temporarily
-mv examples/.env examples/.env.backup
-
-# Run quickstart - you'll see a helpful error!
-python examples/quickstart.py
-
-# You'll see exactly what's missing and how to fix it
-
-# Restore .env
-mv examples/.env.backup examples/.env
-```
-
-### Experiment 2: Invalid Value
-
-```bash
-# Edit .env and set PORT to an invalid value
-echo "PORT=99999" >> examples/.env
-
-# Run quickstart - validation catches it!
-python examples/quickstart.py
-
-# Fix it by setting PORT to a valid value (1-65535)
-```
-
-### Experiment 3: Demo Mode (No Setup Required)
-
-```bash
-# Run without any .env file
-python examples/quickstart.py --demo
-
-# All examples work in demo mode!
-python examples/basic_usage.py --demo
+# 3. Run examples
+python examples/basic/01_simple_require.py
 ```
 
 ---
 
-## Common Issues & Solutions
+## Directory Structure
 
-### ❌ Error: Missing required environment variable
+Examples are organized by complexity and purpose:
 
-**What it means:** TripWire is working correctly! It's enforcing that required variables must be set.
-
-**How to fix:**
-1. Copy `.env.example` to `.env`
-2. Fill in the missing variable value
-3. Run again
-
-### ❌ Import errors or ModuleNotFoundError
-
-**What it means:** TripWire isn't installed in your environment.
-
-**How to fix:**
-```bash
-# Make sure you've installed dependencies
-uv sync
-
-# Or if using pip
-pip install -e .
 ```
-
-### ❌ ValidationError: Format validation failed
-
-**What it means:** The variable value doesn't match the expected format.
-
-**How to fix:**
-- Check the error message for expected format
-- Look at `.env.example` for examples
-- Fix the value in your `.env` file
-
-### ❌ Examples directory vs root directory confusion
-
-**Important:** The `.env` file should be in the `examples/` directory when running these examples:
-
-```bash
-# Correct structure:
 examples/
-  ├── .env          ← Your actual config (git-ignored)
-  ├── .env.example  ← Template with documentation
-  ├── quickstart.py
-  └── basic_usage.py
+├── basic/              # Simple, single-concept examples (START HERE)
+│   ├── 01_simple_require.py
+│   ├── 02_optional_with_default.py
+│   ├── 03_type_coercion.py
+│   └── 04_format_validation.py
+├── problems/           # Anti-patterns (what NOT to do)
+│   ├── 01_os_getenv_none.py
+│   ├── 02_int_conversion_error.py
+│   └── 03_boolean_comparison.py
+├── advanced/           # Advanced validation features
+│   ├── 01_range_validation.py
+│   ├── 02_choices_enum.py
+│   ├── 03_pattern_matching.py
+│   └── 04_custom_validators.py
+└── frameworks/         # Framework integrations
+    ├── fastapi_integration.py
+    ├── flask_integration.py
+    └── django_settings.py
 ```
 
 ---
 
-## Quick Reference
+## Basic Examples (Start Here)
 
-### Running Examples
+### 01_simple_require.py
 
+**What it demonstrates:**
+- Basic `env.require()` usage
+- Import-time validation
+- Fail-fast behavior
+
+**Run it:**
 ```bash
-# From project root
-python examples/quickstart.py
-python examples/basic_usage.py
-
-# With demo mode (no .env needed)
-python examples/quickstart.py --demo
-python examples/basic_usage.py --demo
+python examples/basic/01_simple_require.py --demo
 ```
 
-### Setup Commands
+**README Reference:** [Basic Usage](../README.md#basic-usage)
+
+---
+
+### 02_optional_with_default.py
+
+**What it demonstrates:**
+- `env.optional()` with default values
+- Type inference from defaults
+- Never-fail pattern for non-critical config
+
+**Run it:**
+```bash
+python examples/basic/02_optional_with_default.py --demo
+```
+
+**README Reference:** [Optional Variables](../README.md#optional-variables)
+
+---
+
+### 03_type_coercion.py
+
+**What it demonstrates:**
+- Automatic type coercion (int, bool, float)
+- Type annotation-driven conversion
+- No manual parsing needed
+
+**Run it:**
+```bash
+python examples/basic/03_type_coercion.py --demo
+```
+
+**README Reference:** [Type Inference](../README.md#type-inference)
+
+---
+
+### 04_format_validation.py
+
+**What it demonstrates:**
+- Built-in format validators (postgresql, url, email)
+- Pattern-based validation
+- Helpful error messages
+
+**Run it:**
+```bash
+python examples/basic/04_format_validation.py --demo
+```
+
+**README Reference:** [Format Validators](../README.md#format-validators)
+
+---
+
+## Problems Examples (Anti-Patterns)
+
+These examples show common pitfalls and why TripWire exists.
+
+### 01_os_getenv_none.py
+
+**Demonstrates the problem:**
+- `os.getenv()` returns None silently
+- Errors happen at runtime, not startup
+- Hard to debug in production
+
+**Run it:**
+```bash
+python examples/problems/01_os_getenv_none.py
+```
+
+**README Reference:** [The Problem](../README.md#the-problem)
+
+---
+
+### 02_int_conversion_error.py
+
+**Demonstrates the problem:**
+- `int(os.getenv())` raises TypeError
+- Shows exact error type from README
+- Why type coercion matters
+
+**Run it:**
+```bash
+python examples/problems/02_int_conversion_error.py
+```
+
+**README Reference:** [The Problem](../README.md#the-problem)
+
+---
+
+### 03_boolean_comparison.py
+
+**Demonstrates the problem:**
+- String "false" is truthy in Python
+- Boolean parsing pitfalls
+- TripWire's correct solution
+
+**Run it:**
+```bash
+python examples/problems/03_boolean_comparison.py
+```
+
+**README Reference:** [Type Coercion](../README.md#type-inference)
+
+---
+
+## Advanced Examples
+
+### 01_range_validation.py
+
+**What it demonstrates:**
+- min_val and max_val validation
+- Numeric constraints
+- Port number validation
+
+**Run it:**
+```bash
+python examples/advanced/01_range_validation.py --demo
+```
+
+**README Reference:** [Advanced Validation](../README.md#advanced-usage)
+
+---
+
+### 02_choices_enum.py
+
+**What it demonstrates:**
+- choices parameter for enums
+- Restricted value sets
+- Environment selection patterns
+
+**Run it:**
+```bash
+python examples/advanced/02_choices_enum.py --demo
+```
+
+**README Reference:** [Choices Validation](../README.md#advanced-usage)
+
+---
+
+### 03_pattern_matching.py
+
+**What it demonstrates:**
+- Regex pattern validation
+- API key format validation
+- Semantic versioning checks
+
+**Run it:**
+```bash
+python examples/advanced/03_pattern_matching.py --demo
+```
+
+**README Reference:** [Pattern Validation](../README.md#advanced-usage)
+
+---
+
+### 04_custom_validators.py
+
+**What it demonstrates:**
+- Creating custom validators
+- Registering validators globally
+- Reusable validation logic
+
+**Run it:**
+```bash
+python examples/advanced/04_custom_validators.py --demo
+```
+
+**README Reference:** [Custom Validators](../README.md#custom-validators)
+
+---
+
+## Framework Integration Examples
+
+### fastapi_integration.py
+
+**What it demonstrates:**
+- TripWire + FastAPI integration
+- Configuration validation before server starts
+- Type-safe FastAPI settings
+
+**Run it:**
+```bash
+python examples/frameworks/fastapi_integration.py --demo
+```
+
+**Requirements:**
+```bash
+pip install fastapi uvicorn
+```
+
+**README Reference:** [Framework Integration](../README.md#framework-integration)
+
+---
+
+### flask_integration.py
+
+**What it demonstrates:**
+- TripWire + Flask integration
+- Validating Flask configuration
+- Secret key management
+
+**Run it:**
+```bash
+python examples/frameworks/flask_integration.py --demo
+```
+
+**Requirements:**
+```bash
+pip install flask
+```
+
+**README Reference:** [Framework Integration](../README.md#framework-integration)
+
+---
+
+### django_settings.py
+
+**What it demonstrates:**
+- TripWire in Django settings.py
+- Django-specific configuration patterns
+- Security settings validation
+
+**Run it:**
+```bash
+python examples/frameworks/django_settings.py --demo
+```
+
+**README Reference:** [Framework Integration](../README.md#framework-integration)
+
+---
+
+## Testing Examples
+
+All examples in this directory are tested. To run the test suite:
 
 ```bash
-# Copy template
-cp examples/.env.example examples/.env
+# Test basic examples
+pytest tests/examples/test_basic_examples.py
 
-# Initialize new project (from root)
-uv run tripwire init
+# Test advanced examples
+pytest tests/examples/test_advanced_examples.py
 
-# Check for missing variables
-uv run tripwire check
+# Test framework examples
+pytest tests/examples/test_framework_examples.py
 
-# Generate documentation
-uv run tripwire docs
+# Run all example tests
+pytest tests/examples/
+```
+
+---
+
+## Common Patterns
+
+### Demo Mode
+
+Most examples support `--demo` flag for testing without .env setup:
+
+```bash
+python examples/basic/01_simple_require.py --demo
+python examples/advanced/01_range_validation.py --demo
+python examples/frameworks/fastapi_integration.py --demo
+```
+
+### Error Testing
+
+Examples in `problems/` directory are designed to fail (showing anti-patterns):
+
+```bash
+# These demonstrate errors you'd encounter without TripWire
+python examples/problems/01_os_getenv_none.py
+python examples/problems/02_int_conversion_error.py
+```
+
+### Framework Examples
+
+Framework examples can run standalone (demo mode) or as actual servers:
+
+```bash
+# Demo mode - just validates config
+python examples/frameworks/fastapi_integration.py --demo
+
+# Server mode - actually starts the server
+export DATABASE_URL="postgresql://localhost/mydb"
+export API_KEY="your_api_key"
+python examples/frameworks/fastapi_integration.py
+```
+
+---
+
+## Adding New Examples
+
+When adding new examples:
+
+1. **Choose the right directory:**
+   - `basic/` - Simple, single-concept examples
+   - `problems/` - Anti-patterns showing what NOT to do
+   - `advanced/` - Advanced validation features
+   - `frameworks/` - Integration with web frameworks
+
+2. **Follow the template:**
+   ```python
+   """Example: [Brief title]
+
+   This example demonstrates [what it shows].
+
+   README Reference: [Section name]
+
+   Expected behavior:
+   - [What should happen]
+
+   Run this example:
+       export VAR="value"
+       python examples/[category]/[number]_[name].py
+
+   Or use demo mode:
+       python examples/[category]/[number]_[name].py --demo
+   """
+   ```
+
+3. **Add to this README:**
+   - Document what it demonstrates
+   - Link to relevant README section
+   - Show how to run it
+
+4. **Add tests:**
+   - Create test in `tests/examples/test_[category]_examples.py`
+   - Verify expected behavior
+   - Test both success and failure cases
+
+5. **Update .env.template:**
+   - Add any new environment variables
+   - Include helpful comments
+
+---
+
+## Legacy Examples
+
+The root `examples/` directory also contains older examples:
+
+- `quickstart.py` - Original quickstart example (still valid)
+- `basic_usage.py` - Original comprehensive example (still valid)
+- `advanced_usage.py` - Advanced features demo
+- `custom_validators.py` - Custom validator examples
+
+These work but the new organized structure (`basic/`, `advanced/`, etc.) is recommended for new users.
+
+---
+
+## Environment Variables
+
+### Required for Basic Examples:
+```bash
+DATABASE_URL=postgresql://localhost:5432/mydb
+```
+
+### Optional (have defaults):
+```bash
+DEBUG=true
+PORT=8080
+LOG_LEVEL=INFO
+```
+
+### For Advanced Examples:
+```bash
+MAX_CONNECTIONS=100
+TIMEOUT=30.0
+ENVIRONMENT=production
+API_KEY=sk_live_abc123xyz789
+VERSION=1.2.3
+USERNAME=john_doe
+WEBHOOK_URL=https://hooks.example.com/webhook
+```
+
+### For Framework Examples:
+```bash
+SECRET_KEY=your-secret-key-minimum-16-chars
+DJANGO_SECRET_KEY=your-django-secret-key-must-be-at-least-32-characters-long
+ALLOWED_HOSTS=localhost,127.0.0.1
+```
+
+**Full template:** See [.env.template](.env.template)
+
+---
+
+## Troubleshooting
+
+### Error: Missing required environment variable
+
+**Solution:**
+```bash
+# Use demo mode
+python examples/basic/01_simple_require.py --demo
+
+# Or set the variable
+export DATABASE_URL="postgresql://localhost/mydb"
+```
+
+### Import errors
+
+**Solution:**
+```bash
+# Install TripWire in development mode
+pip install -e .
+
+# Or with uv
+uv pip install -e .
+```
+
+### Examples can't find tripwire module
+
+**Solution:**
+All examples add project root to sys.path automatically. If still having issues:
+
+```bash
+# Run from project root
+cd /path/to/TripWire
+python examples/basic/01_simple_require.py
 ```
 
 ---
 
 ## Next Steps
 
-1. ✅ Run `quickstart.py` successfully
-2. ✅ Understand required vs optional variables
-3. ✅ Explore `basic_usage.py` for advanced features
-4. ✅ Read the main [README.md](../README.md) for full documentation
-5. ✅ Integrate TripWire into your own project
+1. Run `python examples/basic/01_simple_require.py --demo`
+2. Explore other basic examples
+3. Check out anti-patterns in `problems/`
+4. Try advanced validation in `advanced/`
+5. See framework integrations in `frameworks/`
+6. Read the main [README.md](../README.md)
+7. Integrate TripWire into your project
 
 ---
 
-## Need Help?
+## Contributing
 
-- **Documentation:** See [README.md](../README.md)
-- **Issues:** Check for validation error messages - they're designed to be helpful!
-- **Examples:** All examples include detailed comments explaining each feature
+To add new examples:
+
+1. Create the example file in appropriate directory
+2. Follow the template format
+3. Add tests to `tests/examples/`
+4. Update this README
+5. Add to `.env.template` if needed
+6. Submit PR with `examples` label
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for detailed guidelines.
 
 ---
 
-**Pro Tip:** Start with `quickstart.py --demo` to see everything work immediately, then gradually customize your own `.env` file! 🚀
+**All examples are verified and tested.** See the test suite in `tests/examples/` for validation.
+
+**Questions?** Check the [main README](../README.md) or open an issue.
