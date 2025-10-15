@@ -48,8 +48,8 @@ def validate(env_file: str | Path) -> None:
         console.print("Nothing to validate")
         return
 
-    # Load the env file
-    load_dotenv(env_path)
+    # Load the env file (override=True to ensure test .env files take precedence)
+    load_dotenv(env_path, override=True)
 
     # Check each required variable
     unique_vars = deduplicate_variables(variables)

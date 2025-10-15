@@ -17,11 +17,6 @@ from tripwire.validation import (
     coerce_float,
     coerce_int,
     coerce_list,
-    validate_email,
-    validate_ipv4,
-    validate_postgresql_url,
-    validate_url,
-    validate_uuid,
 )
 
 
@@ -125,19 +120,24 @@ class VariableSchema:
         return True, None
 
     def _validate_format(self, value: str) -> bool:
-        """Validate string against format validator."""
+        """Validate string against format validator (includes custom validators).
+
+        This method checks both built-in validators (email, url, postgresql, uuid, ipv4)
+        and custom validators registered via register_validator().
+
+        For custom validators to work, they must be imported/registered before
+        validation runs (import-time registration).
+
+        Returns:
+            True if value matches format, False otherwise
+        """
+        from tripwire.validation import get_validator
+
         if not self.format:
             return False
 
-        format_validators = {
-            "email": validate_email,
-            "url": validate_url,
-            "postgresql": validate_postgresql_url,
-            "uuid": validate_uuid,
-            "ipv4": validate_ipv4,
-        }
-
-        validator = format_validators.get(self.format)
+        # Use validator registry which includes both built-in and custom validators
+        validator = get_validator(self.format)
         if not validator:
             return False
 

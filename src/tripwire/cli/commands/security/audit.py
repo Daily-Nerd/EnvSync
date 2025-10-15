@@ -1,6 +1,7 @@
 """Security audit command for TripWire CLI."""
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Optional
@@ -12,6 +13,7 @@ from tripwire.cli.formatters.audit import (
     display_combined_timeline,
     display_single_audit_result,
 )
+from tripwire.cli.progress import audit_progress
 from tripwire.cli.utils.console import console
 
 
@@ -99,8 +101,64 @@ def audit(
             console.print("Run 'tripwire init' to create one, or specify a secret name to audit.")
             sys.exit(1)
 
-        # Scan .env file for secrets
+        # Strategy 1: Schema-aware detection (if .tripwire.toml exists)
+        # This finds variables marked with secret=true in the schema
+        schema_path = Path.cwd() / ".tripwire.toml"
+        schema_detected_secrets = []
+
+        if schema_path.exists():
+            try:
+                from tripwire.schema import load_schema
+
+                schema = load_schema(schema_path)
+                if schema:
+                    # Find all variables marked as secret in schema
+                    for var_name, var_schema in schema.variables.items():
+                        if var_schema.secret:
+                            # Create SecretMatch for schema-marked secrets
+                            # Use GENERIC_API_SECRET as default type if not detected by pattern
+                            from tripwire.secrets import (
+                                SecretMatch,
+                                SecretType,
+                                get_recommendation,
+                            )
+
+                            schema_detected_secrets.append(
+                                SecretMatch(
+                                    secret_type=SecretType.GENERIC_API_SECRET,
+                                    variable_name=var_name,
+                                    value="[from schema]",  # Placeholder, actual value not needed
+                                    line_number=0,
+                                    severity="high",  # Schema-marked secrets are high severity by default
+                                    recommendation=get_recommendation(SecretType.GENERIC_API_SECRET),
+                                )
+                            )
+
+                    if not output_json and schema_detected_secrets:
+                        console.print(
+                            f"[dim]Found {len(schema_detected_secrets)} secret(s) marked in .tripwire.toml schema[/dim]\n"
+                        )
+            except Exception as e:
+                # Schema loading failed, fall back to pattern-based detection only
+                if not output_json:
+                    console.print(f"[dim]Warning: Could not load schema file: {e}[/dim]\n")
+
+        # Strategy 2: Pattern-based detection (scan .env file for secret patterns)
         detected_secrets = scan_env_file(env_file)
+
+        # Merge strategies: prioritize schema-detected secrets, add pattern-detected ones
+        # Create a map of variable names to secrets
+        secret_map = {}
+        for secret in schema_detected_secrets:
+            secret_map[secret.variable_name] = secret
+
+        # Add pattern-detected secrets that aren't already in schema
+        for secret in detected_secrets:
+            if secret.variable_name not in secret_map:
+                secret_map[secret.variable_name] = secret
+
+        # Final list combines both strategies
+        detected_secrets = list(secret_map.values())
 
         if not detected_secrets:
             # JSON output mode - return empty results as JSON
@@ -137,27 +195,60 @@ def audit(
             console.print(summary_table)
             console.print()
 
-        # Audit each detected secret
+        # Audit each detected secret with progress tracking
         all_results = []
-        for secret in detected_secrets:
-            if not output_json:
-                console.print(f"\n[bold cyan]{'=' * 70}[/bold cyan]")
-                console.print(f"[bold cyan]Auditing: {secret.variable_name}[/bold cyan]")
-                console.print(f"[bold cyan]{'=' * 70}[/bold cyan]\n")
 
-            try:
-                timeline = analyze_secret_history(
-                    secret_name=secret.variable_name,
-                    secret_value=None,  # Don't pass value for privacy
-                    repo_path=Path.cwd(),
-                    max_commits=max_commits,
-                )
-                all_results.append((secret, timeline))
+        # Use progress tracking for multi-secret audit (spinner mode - unknown total commits)
+        if not output_json and len(detected_secrets) > 0:
+            with audit_progress(total_commits=None, console=console) as tracker:
+                for idx, secret in enumerate(detected_secrets):
+                    console.print(f"\n[bold cyan]{'=' * 70}[/bold cyan]")
+                    console.print(
+                        f"[bold cyan]Auditing: {secret.variable_name} ({idx+1}/{len(detected_secrets)})[/bold cyan]"
+                    )
+                    console.print(f"[bold cyan]{'=' * 70}[/bold cyan]\n")
 
-            except Exception as e:
+                    try:
+                        timeline = analyze_secret_history(
+                            secret_name=secret.variable_name,
+                            secret_value=None,  # Don't pass value for privacy
+                            repo_path=Path.cwd(),
+                            max_commits=max_commits,
+                        )
+                        all_results.append((secret, timeline))
+
+                        # Update progress
+                        secrets_found = sum(1 for _, t in all_results if t.total_occurrences > 0)
+                        tracker.update(commits_processed=idx + 1, secrets_found=secrets_found)
+
+                    except Exception as e:
+                        console.print(f"[red]Error auditing {secret.variable_name}:[/red] {e}")
+                        continue
+
+                # Finish with final count
+                final_secrets_found = sum(1 for _, t in all_results if t.total_occurrences > 0)
+                tracker.finish(total_secrets=final_secrets_found)
+        else:
+            # JSON mode or no secrets - no progress tracking
+            for secret in detected_secrets:
                 if not output_json:
-                    console.print(f"[red]Error auditing {secret.variable_name}:[/red] {e}")
-                continue
+                    console.print(f"\n[bold cyan]{'=' * 70}[/bold cyan]")
+                    console.print(f"[bold cyan]Auditing: {secret.variable_name}[/bold cyan]")
+                    console.print(f"[bold cyan]{'=' * 70}[/bold cyan]\n")
+
+                try:
+                    timeline = analyze_secret_history(
+                        secret_name=secret.variable_name,
+                        secret_value=None,  # Don't pass value for privacy
+                        repo_path=Path.cwd(),
+                        max_commits=max_commits,
+                    )
+                    all_results.append((secret, timeline))
+
+                except Exception as e:
+                    if not output_json:
+                        console.print(f"[red]Error auditing {secret.variable_name}:[/red] {e}")
+                    continue
 
         # JSON output mode (skip visual output)
         if output_json:
@@ -204,15 +295,51 @@ def audit(
     assert secret_name is not None, "secret_name must be provided in single secret mode"
 
     try:
-        console.print(f"\n[bold cyan]Analyzing git history for: {secret_name}[/bold cyan]\n")
-        console.print("[yellow]This may take a moment...[/yellow]\n")
+        from tripwire.git_audit import count_commits, sanitize_git_pattern
 
-        timeline = analyze_secret_history(
-            secret_name=secret_name,
-            secret_value=value,
+        # Build search pattern (same logic as analyze_secret_history)
+        if value:
+            secret_pattern = re.escape(value)
+        else:
+            secret_pattern = rf"{re.escape(secret_name)}\s*[:=]\s*['\"]?[^\s'\";]+['\"]?"
+
+        # Sanitize pattern
+        sanitized_pattern = sanitize_git_pattern(secret_pattern)
+
+        # Try to estimate commit count for progress bar
+        if not output_json:
+            console.print(f"\n[bold cyan]Analyzing git history for: {secret_name}[/bold cyan]\n")
+
+        total_commits = count_commits(
             repo_path=Path.cwd(),
+            secret_pattern=sanitized_pattern,
             max_commits=max_commits,
         )
+
+        # Use progress tracking (only in non-JSON mode)
+        if not output_json:
+            with audit_progress(total_commits=total_commits, console=console) as tracker:
+                # Start the analysis
+                timeline = analyze_secret_history(
+                    secret_name=secret_name,
+                    secret_value=value,
+                    repo_path=Path.cwd(),
+                    max_commits=max_commits,
+                )
+
+                # Update tracker with final results
+                commits_scanned = len(timeline.commits_affected) if timeline.commits_affected else 0
+                secrets_found = 1 if timeline.total_occurrences > 0 else 0
+                tracker.update(commits_processed=commits_scanned, secrets_found=secrets_found)
+                tracker.finish(total_secrets=secrets_found)
+        else:
+            # JSON mode - no progress display
+            timeline = analyze_secret_history(
+                secret_name=secret_name,
+                secret_value=value,
+                repo_path=Path.cwd(),
+                max_commits=max_commits,
+            )
 
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")

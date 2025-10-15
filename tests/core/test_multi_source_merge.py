@@ -97,8 +97,8 @@ THRESHOLD=100
             "PORT": "8080",  # Overlaps with .env
         }
 
-        # Create sources
-        dotenv = DotenvFileSource(env_file)
+        # Create sources (use override=True to ensure test values override any existing env vars)
+        dotenv = DotenvFileSource(env_file, override=True)
         vault = MockVaultSource(vault_vars)
 
         # Load both sources (order matters - later overrides earlier)
@@ -158,8 +158,8 @@ PORT=3000
 """.strip()
         )
 
-        # Create sources in priority order (note: override=True on local)
-        dotenv_base = DotenvFileSource(base_env)
+        # Create sources in priority order (note: override=True on all for test isolation)
+        dotenv_base = DotenvFileSource(base_env, override=True)  # Override for test isolation
         vault = MockVaultSource(vault_vars)
         dotenv_local = DotenvFileSource(local_env, override=True)  # Must override!
 
@@ -211,7 +211,7 @@ LOCAL_CONFIG=present
         )
 
         # Create TripWire with multiple sources (RECOMMENDED PATTERN)
-        dotenv = DotenvFileSource(env_file)
+        dotenv = DotenvFileSource(env_file, override=True)  # Override for test isolation
         env = TripWire(sources=[dotenv, vault_source, aws_source], auto_load=True)
 
         # VERIFY: All non-overlapping variables are available
@@ -258,7 +258,7 @@ THRESHOLD=100
         )
 
         # User's code pattern
-        dotenv = DotenvFileSource(env_file)
+        dotenv = DotenvFileSource(env_file, override=True)  # Override for test isolation
         env = TripWire(sources=[dotenv, vault], auto_load=True)
 
         # User's expectation 1: Get bootstrap credentials from .env

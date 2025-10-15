@@ -298,6 +298,57 @@ def check_if_public_repo(repo_path: Path) -> bool:
     return any(indicator in remotes for indicator in public_indicators)
 
 
+def count_commits(
+    repo_path: Path,
+    secret_pattern: str,
+    max_commits: int,
+) -> Optional[int]:
+    """Estimate total commits that match a secret pattern.
+
+    This provides an approximate count for progress tracking during audits.
+    Returns None if counting fails or takes too long.
+
+    Args:
+        repo_path: Path to git repository
+        secret_pattern: Sanitized regex pattern to search for
+        max_commits: Maximum commits to count
+
+    Returns:
+        Estimated commit count, or None if unavailable
+
+    Note:
+        This is a best-effort estimate using git log --count.
+        May return None for very large repositories to avoid blocking.
+    """
+    try:
+        # Use git rev-list with --count for fast counting
+        # Limit timeout to 5 seconds to avoid blocking progress display
+        result = run_git_command(
+            [
+                "log",
+                "-G",
+                secret_pattern,
+                "--all",
+                "--format=%H",
+                f"--max-count={max_commits}",
+            ],
+            repo_path,
+            check=False,
+            timeout=5,  # Fast timeout for progress estimation
+        )
+
+        if result.returncode != 0 or not result.stdout.strip():
+            return None
+
+        # Count lines in output
+        commit_count = len(result.stdout.strip().split("\n"))
+        return commit_count
+
+    except (RuntimeError, Exception):
+        # Timeout or error - return None to fall back to spinner mode
+        return None
+
+
 def get_commit_info(commit_hash: str, repo_path: Path) -> Optional[Dict[str, str]]:
     """Get detailed information about a commit.
 

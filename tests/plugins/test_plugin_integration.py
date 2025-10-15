@@ -27,7 +27,7 @@ class TestPluginWithTripWireV2:
         PluginRegistry.clear()
         # Clear environment variables set by previous tests
         for key in list(os.environ.keys()):
-            if key.startswith("MOCK_") or key.startswith("TEST_"):
+            if key.startswith("MOCK_") or key.startswith("TEST_") or key == "NONEXISTENT_VAR":
                 del os.environ[key]
 
     def teardown_method(self):

@@ -351,7 +351,12 @@ def schema_to_example(schema_file: str, output: str, force: bool, check: bool) -
     is_flag=True,
     help="Preview without creating file",
 )
-def schema_from_code(output: str, force: bool, dry_run: bool) -> None:
+@click.option(
+    "--validate",
+    is_flag=True,
+    help="Validate schema after generation (requires custom validators to be imported first)",
+)
+def schema_from_code(output: str, force: bool, dry_run: bool, validate: bool) -> None:
     """Create schema FROM Python code analysis.
 
     Scans Python files for env.require() and env.optional() calls
@@ -507,22 +512,32 @@ def schema_from_code(output: str, force: bool, dry_run: bool) -> None:
     console.print(f"  - {required_count} required")
     console.print(f"  - {optional_count} optional")
 
-    # Auto-validate the generated schema
-    console.print("\n[yellow]Validating generated schema...[/yellow]")
+    # Conditionally validate the generated schema
+    if validate:
+        console.print("\n[yellow]Validating generated schema...[/yellow]")
 
-    try:
-        # Call schema_check to validate the generated file
-        ctx = click.get_current_context()
-        ctx.invoke(schema_check, schema_file=output)
-    except Exception as e:
-        console.print(f"[red]Schema validation failed:[/red] {e}")
-        console.print("\n[cyan]Next:[/cyan]")
-        console.print(f"  1. Review {output} and fix validation errors")
-        console.print("  2. Run: [cyan]tripwire schema check[/cyan]")
-        sys.exit(1)
+        try:
+            # Call schema_check to validate the generated file
+            ctx = click.get_current_context()
+            ctx.invoke(schema_check, schema_file=output)
+        except Exception as e:
+            console.print(f"[red]Schema validation failed:[/red] {e}")
+            console.print("\n[cyan]Next:[/cyan]")
+            console.print(f"  1. Review {output} and fix validation errors")
+            console.print("  2. Run: [cyan]tripwire schema check[/cyan]")
+            sys.exit(1)
+    else:
+        # Schema validation skipped - explain workflow for custom validators
+        console.print("\n[dim]Schema validation skipped (use --validate to check after generation)[/dim]")
+        console.print("[dim]Note: If using custom validators, import them before running validation:[/dim]")
+        console.print("[dim]  1. Ensure custom validators are registered in your code[/dim]")
+        console.print("[dim]  2. Import the module: python -c 'import your_module'[/dim]")
+        console.print("[dim]  3. Then run: tripwire schema check[/dim]")
 
     console.print("\n[cyan]Next:[/cyan]")
     console.print(f"  • Review {output} and customize as needed")
+    if not validate:
+        console.print(f"  • Run [cyan]tripwire schema check[/cyan] to validate schema syntax")
     console.print("  • Run [cyan]tripwire schema validate[/cyan] to check against your .env files")
     console.print("  • Run [cyan]tripwire schema to-example[/cyan] to generate .env.example")
 
@@ -830,8 +845,12 @@ def schema_check(schema_file: str) -> None:
         status = get_status_icon("invalid")
         console.print(f"{status} Schema structure issues found")
 
-    # Check 3: Format validators
-    valid_formats = {"email", "url", "postgresql", "uuid", "ipv4"}
+    # Check 3: Format validators (include custom validators from registry)
+    from tripwire.validation import list_validators
+
+    # Get all registered validators (builtin + custom)
+    all_validators = list_validators()
+    valid_formats = set(all_validators.keys())
     format_errors = []
 
     if "variables" in data:
@@ -839,13 +858,24 @@ def schema_check(schema_file: str) -> None:
             if "format" in var_config:
                 fmt = var_config["format"]
                 if fmt not in valid_formats:
+                    # Provide helpful error message suggesting registration
+                    builtin_validators = {name for name, vtype in all_validators.items() if vtype == "built-in"}
                     format_errors.append(
-                        f"variables.{var_name}: Unknown format '{fmt}' " f"(valid: {', '.join(sorted(valid_formats))})"
+                        f"variables.{var_name}: Unknown format '{fmt}'. "
+                        f"Builtin formats: {', '.join(sorted(builtin_validators))}. "
+                        f"To use custom validators, register them with register_validator()"
                     )
 
     if not format_errors:
         status = get_status_icon("valid")
-        console.print(f"{status} All format validators exist")
+        # Show count of custom validators if any
+        custom_count = sum(1 for vtype in all_validators.values() if vtype == "custom")
+        validator_msg = "All format validators exist"
+        if custom_count > 0:
+            validator_msg += (
+                f" ({len(valid_formats)} total: {len(valid_formats) - custom_count} builtin, {custom_count} custom)"
+            )
+        console.print(f"{status} {validator_msg}")
     else:
         status = get_status_icon("invalid")
         console.print(f"{status} Format validator issues found")
@@ -984,8 +1014,8 @@ def schema_check(schema_file: str) -> None:
 @click.option(
     "--validate",
     is_flag=True,
-    default=True,
-    help="Validate after generation [default: true]",
+    default=False,
+    help="Validate after generation (custom validators must be imported first)",
 )
 @click.option(
     "--format-output",
@@ -1141,9 +1171,10 @@ def schema_to_env(
 
         console.print(f"[green][OK][/green] Generated {output} (YAML format)")
 
-    # Validate after generation
+    # Validate after generation (opt-in)
     if validate and format_output == "env":
         console.print(f"\n[yellow]Validating generated file...[/yellow]")
+        console.print("[dim]Note: Custom validators must be imported before validation[/dim]")
 
         is_valid, errors = validate_with_schema(output_path, schema_path, environment)
 
@@ -1152,15 +1183,25 @@ def schema_to_env(
             console.print(f"{status} [green]Validation passed![/green]")
         else:
             status = get_status_icon("invalid")
-            console.print(f"{status} [yellow]Validation warnings:[/yellow]")
+            console.print(f"{status} [red]Validation failed:[/red]")
+            console.print("[dim]Tip: Import custom validators before running this command[/dim]")
+            console.print("[dim]Example: python -c 'import your_module' && tripwire schema to-env --validate[/dim]")
             for error in errors:
-                console.print(f"  - {error}")
+                console.print(f"  - [red]{error}[/red]")
+    elif format_output == "env":
+        # Validation skipped - provide workflow guidance
+        console.print("\n[dim]Validation skipped (use --validate to check generated file)[/dim]")
+        console.print("[dim]Note: For custom validators, import them before validation[/dim]")
 
     console.print("\n[bold cyan]Next steps:[/bold cyan]")
     console.print(f"  1. Review {output} and fill in any missing values")
-    if format_output == "env":
+    if format_output == "env" and not validate:
         console.print(
             f"  2. Validate: [cyan]tripwire schema validate --env-file {output} --environment {environment}[/cyan]"
+        )
+    elif format_output == "env":
+        console.print(
+            f"  2. Re-validate if needed: [cyan]tripwire schema validate --env-file {output} --environment {environment}[/cyan]"
         )
 
 

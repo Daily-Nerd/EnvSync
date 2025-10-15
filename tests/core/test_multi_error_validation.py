@@ -31,6 +31,20 @@ class TestMultiErrorCollection:
             "TIMEOUT",
             "LOG_LEVEL",
             "API_KEY",
+            "MISSING_VAR",  # For has_validation_errors test
+            "VAR1",  # For get_validation_errors test
+            "VAR2",  # For get_validation_errors test
+            "VAR_T0",
+            "VAR_T1",
+            "VAR_T2",
+            "VAR_T3",
+            "VAR_T4",  # For thread-safe test
+            "VAR_T5",
+            "VAR_T6",
+            "VAR_T7",
+            "VAR_T8",
+            "VAR_T9",
+            "ENV",  # For choices test
         ]
         for var in test_vars:
             if var in os.environ:
@@ -286,7 +300,20 @@ class TestErrorMessageFormatting:
 
     def setup_method(self):
         """Clear environment before each test."""
-        test_vars = ["VAR1", "VAR2", "VAR3"]
+        test_vars = [
+            "VAR1",
+            "VAR2",
+            "VAR3",
+            "MISSING_VAR",  # For test_missing_variable_fix_suggestion
+            "EMAIL",
+            "DB_URL",
+            "UUID_VAR",
+            "IP_VAR",  # For format validation tests
+            "SHORT_VAR",
+            "LONG_VAR",  # For length validation tests
+            "LOW_VAR",
+            "HIGH_VAR",  # For range validation tests
+        ]
         for var in test_vars:
             if var in os.environ:
                 del os.environ[var]
