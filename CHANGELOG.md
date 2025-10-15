@@ -1028,7 +1028,9 @@ utils/ subdirectories
 - CLI implementation with rich output
 - Project initialization (`init` command)
 
-[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/Daily-Nerd/TripWire/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.11.1...v0.12.0
+[0.11.1]: https://github.com/Daily-Nerd/TripWire/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/Daily-Nerd/TripWire/compare/v0.10.4...v0.11.0
 [0.10.4]: https://github.com/Daily-Nerd/TripWire/compare/v0.10.3...v0.10.4
 [0.10.3]: https://github.com/Daily-Nerd/TripWire/compare/v0.10.2...v0.10.3
