@@ -1,10 +1,7 @@
-"""Example: Custom Validators Plugin System.
+"""Custom Validator Definitions for TripWire.
 
-NOTE: See examples/custom_validators_demo/ for a better organized example
-that demonstrates the import workflow for custom validators.
-
-This example demonstrates how to create and register custom format validators
-for your specific validation needs.
+This module defines custom format validators that can be used with TripWire's
+environment variable validation system.
 
 IMPORTANT - Validator Registration Timing:
 ------------------------------------------
@@ -19,17 +16,19 @@ This creates a timing mismatch with the `schema from-code` command:
 Correct Workflow for Custom Validators:
 ----------------------------------------
 
-Method 1: Skip auto-validation (RECOMMENDED)
+Method 1: Skip auto-validation (RECOMMENDED - Default as of v0.11.1)
   $ tripwire schema from-code               # Generates schema WITHOUT validation
   $ tripwire schema check                   # Run validation after validators are registered
 
-  This is the default behavior as of TripWire v0.11.1+
+  This is the default behavior. Auto-validation is skipped unless explicitly
+  requested with --validate flag.
 
 Method 2: Use --validate flag (ADVANCED)
-  $ python -c "import examples.custom_validators"  # Register validators first
-  $ tripwire schema from-code --validate           # Then generate WITH validation
+  $ python -c "import examples.custom_validators_demo.custom_validators"  # Register validators first
+  $ tripwire schema from-code --validate    # Then generate WITH validation
 
-  Only use this if you need immediate validation feedback
+  Only use this if you need immediate validation feedback and have already
+  imported validator registration code.
 
 Method 3: Manual schema editing
   - Create schema with `tripwire schema new`
@@ -42,11 +41,18 @@ Why Two Registration Methods:
 2. @register_validator_decorator: Decorator syntax (cleaner)
 
 Both are equivalent - use whichever you prefer!
+
+Key Insights:
+-------------
+- AST scanning (static analysis) ≠ Code execution (runtime registration)
+- Custom validators register at IMPORT-TIME, not SCAN-TIME
+- `schema from-code` cannot see validators that haven't been imported yet
+- Default behavior (no --validate) prevents false errors
+- Use `schema check` separately after schema generation for validation
 """
 
 import re
 
-from tripwire import env
 from tripwire.validation import register_validator, register_validator_decorator
 
 
@@ -127,35 +133,3 @@ def validate_base64(value: str) -> bool:
         return False
     # Base64 length must be multiple of 4
     return len(value) % 4 == 0
-
-
-# Now you can use these custom validators in your environment variables
-if __name__ == "__main__":
-    # Example usage - these would come from .env file
-    import os
-
-    os.environ["SUPPORT_PHONE"] = "555-123-4567"
-    os.environ["OFFICE_ZIP"] = "94102"
-    os.environ["BRAND_COLOR"] = "#FF5733"
-    os.environ["ADMIN_USERNAME"] = "admin_user"
-    os.environ["APP_VERSION"] = "1.0.0"
-    os.environ["AWS_REGION"] = "us-west-2"
-    os.environ["COMPANY_DOMAIN"] = "example.com"
-
-    # Use custom validators with format parameter
-    phone = env.require("SUPPORT_PHONE", format="phone", description="Support phone number")
-    zip_code = env.require("OFFICE_ZIP", format="zip_code", description="Office ZIP code")
-    color = env.require("BRAND_COLOR", format="hex_color", description="Brand primary color")
-    username = env.require("ADMIN_USERNAME", format="username", description="Admin username")
-    version = env.require("APP_VERSION", format="semantic_version", description="App version")
-    region = env.require("AWS_REGION", format="aws_region", description="AWS deployment region")
-    domain = env.require("COMPANY_DOMAIN", format="domain", description="Company domain")
-
-    print("All custom validators passed!")
-    print(f"Phone: {phone}")
-    print(f"ZIP: {zip_code}")
-    print(f"Color: {color}")
-    print(f"Username: {username}")
-    print(f"Version: {version}")
-    print(f"Region: {region}")
-    print(f"Domain: {domain}")

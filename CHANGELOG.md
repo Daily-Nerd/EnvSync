@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1] - 2025-10-14
+
+### Added
+
+- **Audit Progress Tracking**: Real-time progress indicators for git history scanning
+  - New `cli/progress.py` module with `AuditProgressTracker` class
+  - Progress bar mode when total commits known (shows percentage and counts)
+  - Spinner mode when total commits unknown (shows running counts)
+  - Context manager API: `audit_progress(total_commits=100)` for clean resource management
+  - Live updates showing commits processed and secrets found (highlighted in red)
+  - Transient displays that disappear after completion for clean terminal output
+  - `count_commits()` helper in `git_audit.py` for fast commit counting (5s timeout)
+  - Integrated into both single-secret and multi-secret audit workflows
+  - Zero performance overhead - progress updates <1ms
+  - Automatic cleanup on errors via context manager exception handling
+
+### Changed
+
+- **Enhanced Audit Command**: `tripwire security audit` now shows live progress
+  - Progress bar with percentage when commit count is estimable
+  - Spinner with running counts when commit count is unknown
+  - Multi-secret mode shows "Auditing: SECRET_NAME (X/Y)" with progress
+  - Secrets found highlighted in red for immediate visibility
+  - JSON mode skips progress display (no terminal pollution)
+  - Progress tracking only in interactive terminal mode
+
+### Technical Details
+
+- Added `AuditProgressTracker` class with dual display modes (150 lines)
+- Added `audit_progress()` context manager for clean resource lifecycle
+- Added `count_commits()` with 5s timeout to avoid blocking startup
+- Integrated progress into `audit.py` for both `--all` and single-secret modes
+- 140+ comprehensive tests in `tests/cli/test_progress.py` (>90% coverage)
+  - Basic tracker functionality (start, update, finish, stop)
+  - Context manager behavior and exception handling
+  - Edge cases (zero commits, negative values, large numbers)
+  - Integration tests with simulated audit workflows
+  - Parametrized tests for mode selection and formatting
+- All tests passing with mypy strict compliance
+- Uses Rich library's Progress API for professional terminal UX
+- Transient displays prevent terminal clutter after completion
+
 ## [0.11.0] - 2025-10-14
 
 ### Added
