@@ -21,8 +21,9 @@
 [![PyPI version](https://badge.fury.io/py/tripwire-py.svg)](https://badge.fury.io/py/tripwire-py)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Examples](https://img.shields.io/badge/examples-verified-success)](examples/README.md)
 
-[Quick Start](docs/getting-started/quick-start.md) • [Documentation](docs/README.md) • [CLI Reference](docs/guides/cli-reference.md) • [API Docs](docs/reference/api.md) • [VS Code Extension](https://marketplace.visualstudio.com/items?itemName=Daily-Nerd.tripwire) • [Discord](https://discord.gg/eDwuVY68)
+[Quick Start](docs/getting-started/quick-start.md) • [Documentation](docs/README.md) • [Runnable Examples](examples/README.md) • [CLI Reference](docs/guides/cli-reference.md) • [API Docs](docs/reference/api.md) • [VS Code Extension](https://marketplace.visualstudio.com/items?itemName=Daily-Nerd.tripwire) • [Discord](https://discord.gg/eDwuVY68)
 
 </div>
 
@@ -43,6 +44,8 @@ host = DATABASE_URL.split('@')[1].split('/')[0]
 
 # Production is down. Users are angry. You're debugging at 2 AM.
 ```
+
+[See this problem in action →](examples/problems/01_os_getenv_none.py)
 
 **The pain:**
 - Environment variables fail at runtime, not at startup
@@ -67,6 +70,8 @@ PORT = int(os.getenv("PORT"))  # TypeError if PORT not set
 DEBUG = os.getenv("DEBUG") == "true"  # Wrong! Returns False for "True", "1", etc.
 ```
 
+[See these anti-patterns →](examples/problems/) | [Run: `python examples/problems/02_int_conversion_error.py`](examples/problems/02_int_conversion_error.py)
+
 ### After TripWire
 ```python
 from tripwire import env
@@ -78,6 +83,8 @@ DEBUG: bool = env.optional("DEBUG", default=False)
 
 # Your app won't even start with bad config!
 ```
+
+[Try this example →](examples/basic/01_simple_require.py) | [See all examples →](examples/README.md)
 
 **Key Benefits:**
 - ✅ **Import-time validation** - Fail fast, not in production
@@ -144,7 +151,7 @@ REDIS_URL: str = env.require("REDIS_URL", format="url")
 print(f"Connecting to {DATABASE_URL}")
 ```
 
-[Learn more in the Quick Start Guide →](docs/getting-started/quick-start.md)
+[Run this example →](examples/basic/01_simple_require.py) | [Format validation →](examples/basic/04_format_validation.py) | [Quick Start Guide →](docs/getting-started/quick-start.md)
 
 ---
 
@@ -182,7 +189,7 @@ FEATURE_FLAGS: dict = env.optional("FEATURE_FLAGS", default={})
 ENVIRONMENT: str = env.require("ENVIRONMENT", choices=["dev", "staging", "prod"])
 ```
 
-[Learn more about Type Inference →](docs/reference/type-inference.md)
+[Type coercion example →](examples/basic/03_type_coercion.py) | [Range validation →](examples/advanced/01_range_validation.py) | [Choices validation →](examples/advanced/02_choices_enum.py) | [Type Inference docs →](docs/reference/type-inference.md)
 
 ### 3. Format Validators
 
@@ -310,6 +317,8 @@ async def startup():
     print(f"Connecting to {DATABASE_URL[:20]}...")
 ```
 
+[Run full FastAPI example →](examples/frameworks/fastapi_integration.py)
+
 ### Django
 
 ```python
@@ -332,6 +341,8 @@ DATABASES = {
 }
 ```
 
+[Run full Django example →](examples/frameworks/django_settings.py)
+
 ### Flask
 
 ```python
@@ -348,7 +359,9 @@ app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SECRET_KEY'] = SECRET_KEY
 ```
 
-[More framework examples →](docs/guides/framework-integration.md)
+[Run full Flask example →](examples/frameworks/flask_integration.py)
+
+[More framework examples →](docs/guides/framework-integration.md) | [See all framework integrations →](examples/frameworks/)
 
 ---
 

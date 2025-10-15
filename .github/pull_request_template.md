@@ -46,6 +46,18 @@ Related to #(issue number)
 - [ ] Code comments added for complex logic
 - [ ] Changelog updated (if applicable)
 
+### Documentation Quality Checklist (if docs changed)
+Review the [Documentation Review Process](../docs/DOCUMENTATION_REVIEW_PROCESS.md) for detailed guidelines.
+
+- [ ] All code examples are empirically tested (not just "looks right")
+- [ ] Error types match actual Python behavior (verified in REPL or tests)
+- [ ] Complex examples (3+ lines) added to `examples/` directory as runnable scripts
+- [ ] Examples added to `tests/test_readme_examples.py` (or appropriate test file)
+- [ ] README links to verified example scripts (not just inline code)
+- [ ] Technical claims verified against source code or in Python REPL
+- [ ] All links tested and point to existing files/sections
+- [ ] Examples support `--demo` mode if they require credentials (optional)
+
 ## Performance
 - [ ] No performance regressions
 - [ ] Performance improvements measured
