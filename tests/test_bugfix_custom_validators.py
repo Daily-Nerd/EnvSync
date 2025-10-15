@@ -75,12 +75,16 @@ description = "Brand color"
 
 
 def test_schema_check_rejects_unregistered_validators(tmp_path: Path) -> None:
-    """Test that schema check rejects validators that aren't registered."""
+    """Test that schema check rejects validators that aren't registered.
+
+    Phase 1 (v0.12.0): Schema check now guides users to use custom: prefix
+    instead of asking them to register validators during AST scanning.
+    """
     from click.testing import CliRunner
 
     from tripwire.cli import main as cli
 
-    # Create schema with unregistered validator
+    # Create schema with unregistered validator (no custom: prefix)
     schema_content = """
 [project]
 name = "test-project"
@@ -88,7 +92,7 @@ name = "test-project"
 [variables.PHONE_NUMBER]
 type = "string"
 required = true
-format = "phone_number"  # NOT registered
+format = "phone_number"  # NOT registered and no custom: prefix
 description = "Phone number"
 """
 
@@ -100,11 +104,12 @@ description = "Phone number"
     with runner.isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(cli, ["schema", "check", "--schema-file", str(schema_file)])
 
-    # Should fail validation
+    # Phase 1: Should fail validation and suggest using custom: prefix
     assert result.exit_code == 1
     assert "Unknown format 'phone_number'" in result.output
     assert "Builtin formats:" in result.output
-    assert "register_validator()" in result.output
+    # Phase 1: Guide users to use custom: prefix instead of register_validator()
+    assert "custom:phone_number" in result.output
 
 
 def test_schema_check_shows_custom_validator_count(tmp_path: Path) -> None:
@@ -183,7 +188,11 @@ format = "zipcode"  # custom
 
 
 def test_schema_from_code_with_custom_validators(tmp_path: Path) -> None:
-    """Test that schema from-code works with custom validators in source."""
+    """Test that schema from-code works with custom validators in source.
+
+    Phase 1 (v0.12.0): Schema from-code now emits custom: prefix for
+    non-builtin validators to enable deferred validation.
+    """
     import os
 
     from click.testing import CliRunner
@@ -219,12 +228,12 @@ CARD: str = env.require("CARD", format="credit_card", description="Credit card",
     # Schema should be generated
     assert result.exit_code == 0
 
-    # Verify generated schema has custom formats
+    # Phase 1: Verify generated schema has custom: prefix for custom validators
     schema_file = tmp_path / ".tripwire.toml"
     assert schema_file.exists()
     schema_content = schema_file.read_text()
-    assert 'format = "ssn"' in schema_content
-    assert 'format = "credit_card"' in schema_content
+    assert 'format = "custom:ssn"' in schema_content
+    assert 'format = "custom:credit_card"' in schema_content
 
 
 def test_custom_validator_thread_safety_in_schema_check(tmp_path: Path) -> None:

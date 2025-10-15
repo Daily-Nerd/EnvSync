@@ -115,6 +115,9 @@ class TestBasicFunctionality:
         """Test default values work correctly."""
         env = TripWireV2(auto_load=False)
 
+        # Ensure TIMEOUT doesn't exist (prevent pollution from other tests)
+        monkeypatch.delenv("TIMEOUT", raising=False)
+
         # Variable doesn't exist, should return default
         TIMEOUT: int = env.require("TIMEOUT", default=30)
 

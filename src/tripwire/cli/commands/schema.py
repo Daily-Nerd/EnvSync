@@ -31,6 +31,9 @@ from tripwire.cli.formatters.docs import (
 from tripwire.cli.utils.console import console
 from tripwire.cli.utils.helpers import should_skip_file_in_hook
 
+# Phase 1 (v0.12.0): Custom validator prefix for deferred validation
+CUSTOM_VALIDATOR_PREFIX = "custom:"
+
 
 @click.group()
 def schema() -> None:
@@ -466,9 +469,20 @@ def schema_from_code(output: str, force: bool, dry_run: bool, validate: bool) ->
         if var.secret:
             lines.append("secret = true")
 
-        # Format
+        # Format (Phase 1 v0.12.0: Emit custom: prefix for non-builtin validators)
         if var.format:
-            lines.append(f'format = "{var.format}"')
+            from tripwire.validation import list_validators
+
+            all_validators = list_validators()
+            builtin_validators = {name for name, vtype in all_validators.items() if vtype == "built-in"}
+
+            # Check if this is a custom validator (not in builtin list)
+            if var.format not in builtin_validators:
+                # Emit with custom: prefix to signal deferred validation
+                lines.append(f'format = "{CUSTOM_VALIDATOR_PREFIX}{var.format}"')
+            else:
+                # Builtin validator - emit without prefix
+                lines.append(f'format = "{var.format}"')
 
         # Pattern
         if var.pattern:
@@ -852,18 +866,29 @@ def schema_check(schema_file: str) -> None:
     all_validators = list_validators()
     valid_formats = set(all_validators.keys())
     format_errors = []
+    format_warnings = []  # Phase 1 (v0.12.0): Track custom validators separately
 
     if "variables" in data:
         for var_name, var_config in data["variables"].items():
             if "format" in var_config:
                 fmt = var_config["format"]
+
+                # Phase 1 (v0.12.0): Handle custom: prefix
+                if fmt.startswith(CUSTOM_VALIDATOR_PREFIX):
+                    custom_name = fmt[len(CUSTOM_VALIDATOR_PREFIX) :]  # Strip prefix
+                    format_warnings.append(
+                        f"variables.{var_name}: Uses custom validator '{custom_name}' "
+                        f"(validation deferred to runtime - ensure validator is registered at import-time)"
+                    )
+                    continue  # Skip further validation for custom validators
+
                 if fmt not in valid_formats:
-                    # Provide helpful error message suggesting registration
+                    # Provide helpful error message suggesting registration or custom: prefix
                     builtin_validators = {name for name, vtype in all_validators.items() if vtype == "built-in"}
                     format_errors.append(
                         f"variables.{var_name}: Unknown format '{fmt}'. "
                         f"Builtin formats: {', '.join(sorted(builtin_validators))}. "
-                        f"To use custom validators, register them with register_validator()"
+                        f"To use custom validators, use format = '{CUSTOM_VALIDATOR_PREFIX}{fmt}' in schema"
                     )
 
     if not format_errors:
@@ -880,6 +905,13 @@ def schema_check(schema_file: str) -> None:
         status = get_status_icon("invalid")
         console.print(f"{status} Format validator issues found")
         errors.extend(format_errors)
+
+    # Phase 1 (v0.12.0): Show warnings for custom validators (non-blocking)
+    if format_warnings:
+        console.print()
+        console.print("[yellow]Custom validators detected (runtime validation only):[/yellow]")
+        for warning in format_warnings:
+            console.print(f"  [yellow]⚠[/yellow] {warning}")
 
     # Check 4: Type values
     valid_types = {"string", "int", "float", "bool", "list", "dict"}

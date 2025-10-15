@@ -19,6 +19,9 @@ from tripwire.validation import (
     coerce_list,
 )
 
+# Phase 1 (v0.12.0): Custom validator prefix for deferred validation
+CUSTOM_VALIDATOR_PREFIX = "custom:"
+
 
 @dataclass
 class VariableSchema:
@@ -125,16 +128,29 @@ class VariableSchema:
         This method checks both built-in validators (email, url, postgresql, uuid, ipv4)
         and custom validators registered via register_validator().
 
+        Special handling for custom validators (Phase 1 v0.12.0):
+        - format="custom:*" skips validation (deferred to runtime)
+        - Returns True to pass schema validation
+        - Actual validation happens at application import-time when validators are registered
+        - This solves the process boundary problem where CLI commands don't have
+          access to custom validators registered in application code
+
         For custom validators to work, they must be imported/registered before
         validation runs (import-time registration).
 
         Returns:
-            True if value matches format, False otherwise
+            True if value matches format or is custom validator, False otherwise
         """
         from tripwire.validation import get_validator
 
         if not self.format:
             return False
+
+        # Phase 1 (v0.12.0): Detect custom validator prefix
+        # Skip validation for custom validators (not available in CLI context)
+        if self.format.startswith(CUSTOM_VALIDATOR_PREFIX):
+            # Defer validation to runtime when validators ARE registered
+            return True
 
         # Use validator registry which includes both built-in and custom validators
         validator = get_validator(self.format)
