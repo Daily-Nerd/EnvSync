@@ -35,11 +35,11 @@ Every Python developer has experienced this:
 ```python
 # Your code
 import os
-API_KEY = os.getenv("API_KEY")  # Returns None - no error yet
+DATABASE_URL = os.getenv("DATABASE_URL")  # Returns None - no error yet
 
 # 2 hours later in production...
-response = requests.get(url, headers={"Authorization": f"Bearer {API_KEY}"})
-# 💥 TypeError: can only concatenate str (not "NoneType") to str
+host = DATABASE_URL.split('@')[1].split('/')[0]
+# 💥 AttributeError: 'NoneType' object has no attribute 'split'
 
 # Production is down. Users are angry. You're debugging at 2 AM.
 ```
@@ -63,7 +63,7 @@ import os
 
 # Runtime crash waiting to happen
 DATABASE_URL = os.getenv("DATABASE_URL")  # Could be None
-PORT = int(os.getenv("PORT"))  # ValueError if PORT not set
+PORT = int(os.getenv("PORT"))  # TypeError if PORT not set
 DEBUG = os.getenv("DEBUG") == "true"  # Wrong! Returns False for "True", "1", etc.
 ```
 

@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **README Documentation Accuracy**: Corrected two technical inaccuracies in code examples (Issue #50, thanks @cleder!)
+  - Fixed "The Problem" section example (lines 35-45): Changed from incorrect f-string TypeError claim to realistic database URL parsing that actually raises AttributeError
+  - Fixed "Before TripWire" section (line 66): Corrected error type for `int(os.getenv("PORT"))` from ValueError to TypeError
+  - New DATABASE_URL example is more realistic and showcases TripWire's `format="postgresql"` validator
+  - F-strings convert None to string "None" without raising TypeError (would fail with HTTP 401/403 instead)
+  - Thanks to @cleder for the detailed bug report with reproduction steps
+
+### Documentation
+
+- **Enhanced Technical Accuracy**: All README examples now empirically validated
+  - Database URL parsing example: `DATABASE_URL.split('@')[1]` → AttributeError (verified)
+  - Type conversion example: `int(None)` → TypeError (verified)
+  - Examples tested in Python REPL to ensure claimed errors actually occur
+
+### Why This Matters
+
+The previous example claimed that f-strings would raise a TypeError when concatenating with None:
+```python
+# INCORRECT (old example)
+API_KEY = None
+f"Bearer {API_KEY}"  # Claimed: TypeError
+# Reality: Produces "Bearer None" string, no error
+```
+
+The new example uses realistic database connection string parsing:
+```python
+# CORRECT (new example)
+DATABASE_URL = None
+host = DATABASE_URL.split('@')[1]  # Actually raises AttributeError
+```
+
+This fix:
+- Restores technical credibility of our documentation
+- Demonstrates a more realistic production failure scenario
+- Showcases TripWire's `format="postgresql"` validator relevance
+- Sets the foundation for documentation quality testing in CI
+
 ## [0.12.0] - 2025-10-15
 
 ### Added
