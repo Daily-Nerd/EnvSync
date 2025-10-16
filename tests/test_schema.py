@@ -1,9 +1,7 @@
 """Comprehensive tests for schema validation functionality."""
 
-import json
 import tomllib
 from pathlib import Path
-from typing import Dict
 
 import pytest
 from click.testing import CliRunner

@@ -657,8 +657,8 @@ def _compute_field_diffs(
 ) -> Tuple[Dict[str, Any], List[str]]:
     """Compute field differences between existing and from_code schemas.
 
-    Single-pass comparison that returns only changed fields and formatted change descriptions.
-    This is an O(1) operation per variable instead of O(n) field assignments.
+    This performs a single pass over a fixed set of fields, reducing multiple assignment overhead
+    compared to iterating over all possible fields.
 
     Args:
         existing: Existing variable schema (from file)
@@ -737,7 +737,8 @@ def merge_variable_schemas(
     OPTIMIZED: Uses dataclass replace() for single operation instead of 14 field assignments.
     Implements early exit for unchanged schemas. Single-pass field comparison.
 
-    Performance: O(1) instead of O(n) field assignments. 70% faster for large schemas.
+    Performance: Constant-factor speedup by replacing multiple field assignments with a single
+    dataclass replace() call. 70% faster for large schemas.
 
     Strategy:
     - PRESERVE: description (if custom), examples, custom fields, custom: prefix in format
@@ -1137,6 +1138,64 @@ def _inject_toml_comments(
     return "\n".join(output_lines)
 
 
+def _escape_toml_string(value: str) -> str:
+    """Escape string for TOML format (quotes and backslashes).
+
+    Args:
+        value: String value to escape
+
+    Returns:
+        Escaped string safe for TOML serialization
+
+    Example:
+        >>> _escape_toml_string('He said "hello" with a \\ backslash')
+        'He said \\"hello\\" with a \\\\ backslash'
+    """
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _serialize_toml_value(value: Any) -> str:
+    """Serialize Python value to TOML-compliant string representation.
+
+    Handles proper escaping for strings, boolean lowercasing, and complex types.
+
+    Args:
+        value: Python value (str, int, float, bool, list, dict, etc.)
+
+    Returns:
+        TOML-formatted string representation
+
+    Examples:
+        >>> _serialize_toml_value(True)
+        'true'
+        >>> _serialize_toml_value("hello")
+        '"hello"'
+        >>> _serialize_toml_value([1, 2, 3])
+        '[1, 2, 3]'
+        >>> _serialize_toml_value({"key": "value"})
+        '{ key = "value" }'
+    """
+    if isinstance(value, bool):
+        return str(value).lower()
+    elif isinstance(value, (int, float)):
+        return str(value)
+    elif isinstance(value, str):
+        return '"' + _escape_toml_string(value) + '"'
+    elif isinstance(value, list):
+        # Serialize each item individually
+        items = [_serialize_toml_value(item) for item in value]
+        return "[" + ", ".join(items) + "]"
+    elif isinstance(value, dict):
+        # Serialize dict as inline table { key = value, ... }
+        items = []
+        for k, v in value.items():
+            items.append(f"{k} = {_serialize_toml_value(v)}")
+        return "{ " + ", ".join(items) + " }"
+    else:
+        # Fallback: treat as string with escaping
+        return '"' + _escape_toml_string(str(value)) + '"'
+
+
 def _write_toml_section(
     buffer: Any,
     section_name: str,
@@ -1170,14 +1229,11 @@ def _write_toml_section(
             buffer.write(f"{key} = {value}\n")
         elif isinstance(value, str):
             # Escape quotes and backslashes
-            escaped_value = value.replace("\\", "\\\\").replace('"', '\\"')
+            escaped_value = _escape_toml_string(value)
             buffer.write(f'{key} = "{escaped_value}"\n')
         elif isinstance(value, list):
-            # Format list
-            if all(isinstance(item, str) for item in value):
-                formatted_list = "[" + ", ".join(f'"{item}"' for item in value) + "]"
-            else:
-                formatted_list = str(value)
+            # Serialize list with proper escaping for each item
+            formatted_list = _serialize_toml_value(value)
             buffer.write(f"{key} = {formatted_list}\n")
         else:
             buffer.write(f"{key} = {value}\n")
@@ -1210,36 +1266,32 @@ def _write_variable_with_comments(
 
     # Write optional fields only if set
     if var_schema.default is not None:
-        if isinstance(var_schema.default, bool):
-            buffer.write(f"default = {str(var_schema.default).lower()}\n")
-        elif isinstance(var_schema.default, (int, float)):
-            buffer.write(f"default = {var_schema.default}\n")
-        elif isinstance(var_schema.default, str):
-            escaped_default = var_schema.default.replace("\\", "\\\\").replace('"', '\\"')
-            buffer.write(f'default = "{escaped_default}"\n')
-        else:
-            buffer.write(f"default = {var_schema.default}\n")
+        # Use _serialize_toml_value for complex types (lists, dicts, booleans)
+        serialized_default = _serialize_toml_value(var_schema.default)
+        buffer.write(f"default = {serialized_default}\n")
 
     if var_schema.description:
-        escaped_desc = var_schema.description.replace("\\", "\\\\").replace('"', '\\"')
+        escaped_desc = _escape_toml_string(var_schema.description)
         buffer.write(f'description = "{escaped_desc}"\n')
 
     if var_schema.secret:
         buffer.write(f"secret = {str(var_schema.secret).lower()}\n")
 
     if var_schema.examples:
-        formatted_examples = "[" + ", ".join(f'"{ex}"' for ex in var_schema.examples) + "]"
+        # Apply escaping to each example string
+        formatted_examples = "[" + ", ".join(f'"{_escape_toml_string(ex)}"' for ex in var_schema.examples) + "]"
         buffer.write(f"examples = {formatted_examples}\n")
 
     if var_schema.format:
         buffer.write(f'format = "{var_schema.format}"\n')
 
     if var_schema.pattern:
-        escaped_pattern = var_schema.pattern.replace("\\", "\\\\").replace('"', '\\"')
+        escaped_pattern = _escape_toml_string(var_schema.pattern)
         buffer.write(f'pattern = "{escaped_pattern}"\n')
 
     if var_schema.choices:
-        formatted_choices = "[" + ", ".join(f'"{choice}"' for choice in var_schema.choices) + "]"
+        # Apply escaping to each choice string
+        formatted_choices = "[" + ", ".join(f'"{_escape_toml_string(choice)}"' for choice in var_schema.choices) + "]"
         buffer.write(f"choices = {formatted_choices}\n")
 
     if var_schema.min is not None:
@@ -1267,9 +1319,12 @@ def write_schema_to_toml(
     output_path: Path,
     source_comments: Optional[Dict[str, List[str]]] = None,
 ) -> None:
-    """Write TripWireSchema to TOML file with streaming approach.
+    """Write TripWireSchema to TOML file using a single-pass in-memory build.
 
-    OPTIMIZED: Uses streaming write with StringIO buffer instead of multiple full-file reads.
+    OPTIMIZED: Accumulates TOML content in a StringIO buffer in memory, then performs a single
+    atomic write to disk. This reduces repeated full-file reconstructions and multiple disk writes,
+    but is not true incremental streaming to disk.
+
     Comments are injected inline during variable writes (O(n) instead of O(n²)).
 
     Performance: O(n) instead of O(n²). 22x faster for 1000+ variable schemas.
