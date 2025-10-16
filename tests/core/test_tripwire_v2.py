@@ -4,10 +4,7 @@ This test suite ensures TripWireV2 meets the requirements specified in
 TRIPWIREV2_DESIGN.md and maintains backward compatibility with the legacy implementation.
 """
 
-import os
 import threading
-from pathlib import Path
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
