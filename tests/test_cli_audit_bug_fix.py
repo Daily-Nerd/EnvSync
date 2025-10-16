@@ -94,6 +94,8 @@ class TestAuditBugFix:
             subprocess.run(
                 ["git", "config", "user.email", "test@example.com"], cwd=repo_path, check=True, capture_output=True
             )
+            # Disable GPG signing for tests
+            subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=repo_path, check=True, capture_output=True)
 
             # Create .env file with actual secret value
             env_file = repo_path / ".env"
@@ -209,6 +211,8 @@ curl -H "Authorization: Bearer hvs_secrettoken123" https://api.example.com
             subprocess.run(
                 ["git", "config", "user.email", "test@example.com"], cwd=repo_path, check=True, capture_output=True
             )
+            # Disable GPG signing for tests
+            subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=repo_path, check=True, capture_output=True)
 
             # Create .tripwire.toml schema marking variables as secrets
             # This is required for audit --all to detect these variables
@@ -311,6 +315,8 @@ TEST_KEY=xxx
             subprocess.run(
                 ["git", "config", "user.email", "test@example.com"], cwd=repo_path, check=True, capture_output=True
             )
+            # Disable GPG signing for tests
+            subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=repo_path, check=True, capture_output=True)
 
             # Create .tripwire.toml with secret variables
             schema_file = repo_path / ".tripwire.toml"
@@ -391,6 +397,8 @@ AWS_ACCESS_KEY_ID=
             subprocess.run(
                 ["git", "config", "user.email", "test@example.com"], cwd=repo_path, check=True, capture_output=True
             )
+            # Disable GPG signing for tests
+            subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=repo_path, check=True, capture_output=True)
 
             # Create .env with real-looking secret
             secret_value = "sk-proj-abc123xyz789-real-secret-key"
