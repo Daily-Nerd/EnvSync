@@ -11,11 +11,9 @@ from typing import Generator
 
 import pytest
 
+from tripwire.exceptions import GitCommandError, NotGitRepositoryError
 from tripwire.git_audit import (
     FileOccurrence,
-    GitAuditError,
-    GitCommandError,
-    NotGitRepositoryError,
     RemediationStep,
     SecretTimeline,
     _is_valid_git_path,

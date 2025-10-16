@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Set, Tuple
 
-from tripwire.exceptions import GitAuditError, GitCommandError, NotGitRepositoryError
+from tripwire.exceptions import GitCommandError, NotGitRepositoryError
 
 # ReDoS Protection: Maximum pattern length before sanitization
 _MAX_PATTERN_LENGTH: int = 1024
@@ -771,7 +771,7 @@ def analyze_secret_history(
         chunk = commit_hashes[chunk_start:chunk_end]
 
         # Process each commit in this chunk
-        for commit_hash in chunk:
+        for commit_index, commit_hash in enumerate(chunk, start=chunk_start):
             occurrences = find_secret_in_commit(commit_hash, sanitized_pattern, repo_path)
 
             for occ in occurrences:
@@ -790,7 +790,7 @@ def analyze_secret_history(
                             f"Memory limit of {max_memory_mb}MB reached while analyzing git history. "
                             f"Returning partial results ({len(all_occurrences)} occurrences from "
                             f"{len(seen_occurrences)} unique locations). "
-                            f"Processed {chunk_start + (commit_hashes.index(commit_hash) - chunk_start + 1)} of {total_commits} commits. "
+                            f"Processed {commit_index + 1} of {total_commits} commits. "
                             f"For large repositories, use audit_secret_stream() instead to avoid memory limits.",
                             RuntimeWarning,
                             stacklevel=2,
@@ -809,10 +809,6 @@ def analyze_secret_history(
         # Exit chunk loop if memory limit reached
         if memory_limit_reached:
             break
-
-        # Optional: Clear any temporary data between chunks
-        # (Python's GC should handle this, but explicit is better for large repos)
-        # Not needed here as occurrences are already appended to all_occurrences
 
     # Sort occurrences by date (required for first_seen/last_seen calculation)
     all_occurrences.sort(key=lambda x: x.commit_date)
