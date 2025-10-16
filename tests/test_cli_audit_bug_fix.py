@@ -40,6 +40,7 @@ THESE TESTS ENSURE:
 """
 
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -139,11 +140,15 @@ curl -H "Authorization: Bearer hvs_secrettoken123" https://api.example.com
 
             # Run audit --all and capture output
             result = subprocess.run(
-                ["python", "-m", "tripwire.cli", "security", "audit", "--all", "--json"],
+                [sys.executable, "-m", "tripwire.cli", "security", "audit", "--all", "--json"],
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",  # Fix Windows cp1252 encoding issues
             )
+
+            # Defensive error handling
+            assert result.stdout is not None, f"Command failed to produce output. stderr: {result.stderr}"
 
             # Parse JSON output
             import json
@@ -263,11 +268,15 @@ TEST_KEY=xxx
 
             # Run audit --all
             result = subprocess.run(
-                ["python", "-m", "tripwire.cli", "security", "audit", "--all"],
+                [sys.executable, "-m", "tripwire.cli", "security", "audit", "--all"],
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",  # Fix Windows cp1252 encoding issues
             )
+
+            # Defensive error handling
+            assert result.stdout is not None, f"Command failed to produce output. stderr: {result.stderr}"
 
             # ASSERTION: Should skip all placeholder values with warnings
             assert "Skipping" in result.stdout, "Should show skipping messages for placeholders"
@@ -337,14 +346,18 @@ AWS_ACCESS_KEY_ID=
 
             # Run audit --all
             result = subprocess.run(
-                ["python", "-m", "tripwire.cli", "security", "audit", "--all"],
+                [sys.executable, "-m", "tripwire.cli", "security", "audit", "--all"],
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",  # Fix Windows cp1252 encoding issues
             )
 
             # ASSERTION 1: Should NOT crash
             assert result.returncode in [0, 1], f"Should not crash, got exit code {result.returncode}"
+
+            # Defensive error handling
+            assert result.stdout is not None, f"Command failed to produce output. stderr: {result.stderr}"
 
             # ASSERTION 2: Should show skip messages for missing/empty values
             assert (
@@ -402,11 +415,15 @@ api_key = "{secret_value}"
 
             # Run audit --all
             result = subprocess.run(
-                ["python", "-m", "tripwire.cli", "security", "audit", "--all", "--json"],
+                [sys.executable, "-m", "tripwire.cli", "security", "audit", "--all", "--json"],
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",  # Fix Windows cp1252 encoding issues
             )
+
+            # Defensive error handling
+            assert result.stdout is not None, f"Command failed to produce output. stderr: {result.stderr}"
 
             # Parse JSON output
             import json
