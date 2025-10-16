@@ -1,16 +1,20 @@
+# Project Metadata
 [project]
 name = "your-project"
 version = "0.1.0"
 description = "Generated from code scanning"
 
+# Validation Settings
 [validation]
 strict = true
 allow_missing_optional = true
 
+# Security Settings
 [security]
 entropy_threshold = 4.5
 scan_git_history = true
 
+# Environment Variables
 [variables.ADMIN_EMAIL]
 type = "string"
 required = true
@@ -167,11 +171,7 @@ default = false
 type = "string"
 required = true
 description = "Application environment"
-choices = [
-    "development",
-    "staging",
-    "production",
-]
+choices = ["development", "staging", "production"]
 # Found in: examples/basic_usage.py:118
 
 [variables.HIGH_VAR]
@@ -183,12 +183,7 @@ max = 100
 [variables.LOG_LEVEL]
 type = "string"
 required = true
-choices = [
-    "DEBUG",
-    "INFO",
-    "WARNING",
-    "ERROR",
-]
+choices = ["DEBUG", "INFO", "WARNING", "ERROR"]
 # Found in: archive/multi_error_demo.py:174
 
 [variables.LONG_VAR]
@@ -297,9 +292,5 @@ format = "url"
 [variables.WRONG_CHOICE]
 type = "string"
 required = true
-choices = [
-    "dev",
-    "staging",
-    "prod",
-]
+choices = ["dev", "staging", "prod"]
 # Found in: archive/multi_error_demo.py:148
