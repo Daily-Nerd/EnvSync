@@ -179,7 +179,7 @@ class TripWireSchema:
     # Validation settings
     strict: bool = True
     allow_missing_optional: bool = True
-    warn_unused: bool = True
+    warn_unused: Optional[bool] = None  # None = unset, avoids phantom field injection
 
     # Security settings
     entropy_threshold: float = 4.5
@@ -211,7 +211,8 @@ class TripWireSchema:
             validation = data["validation"]
             schema.strict = validation.get("strict", True)
             schema.allow_missing_optional = validation.get("allow_missing_optional", True)
-            schema.warn_unused = validation.get("warn_unused", True)
+            # Use None as sentinel to avoid injecting phantom fields when unset
+            schema.warn_unused = validation.get("warn_unused", None) if "warn_unused" in validation else None
 
         # Parse security settings
         if "security" in data:
@@ -549,3 +550,677 @@ def validate_with_schema(
 
     # Validate
     return schema.validate_env(env_dict, environment)
+
+
+# ============================================================================
+# Schema Merge Functions (v0.12.3) - Smart Merge Logic
+# ============================================================================
+
+
+@dataclass
+class SchemaMergeResult:
+    """Result of merging schemas with change tracking."""
+
+    merged_schema: TripWireSchema
+    added_variables: List[str] = field(default_factory=list)
+    updated_variables: List[Tuple[str, List[str]]] = field(default_factory=list)  # (name, changes)
+    removed_variables: List[str] = field(default_factory=list)
+    preserved_sections: List[str] = field(default_factory=list)
+
+
+def load_existing_schema_safe(schema_path: Path) -> Optional[TripWireSchema]:
+    """Load existing schema safely, returning None if doesn't exist or is corrupt.
+
+    Args:
+        schema_path: Path to .tripwire.toml file
+
+    Returns:
+        TripWireSchema or None if file doesn't exist or cannot be loaded
+    """
+    if not schema_path.exists():
+        return None
+
+    try:
+        return TripWireSchema.from_toml(schema_path)
+    except Exception:
+        # Schema file exists but is corrupt - return None to trigger fresh generation
+        return None
+
+
+def _normalize_format(format_value: Optional[str]) -> Optional[str]:
+    """Normalize format string by stripping custom: prefix for comparison.
+
+    Args:
+        format_value: Format string (e.g., "custom:username", "email", None)
+
+    Returns:
+        Normalized format without prefix (e.g., "username", "email", None)
+
+    Examples:
+        >>> _normalize_format("custom:username")
+        "username"
+        >>> _normalize_format("email")
+        "email"
+        >>> _normalize_format(None)
+        None
+    """
+    if not format_value:
+        return None
+
+    if format_value.startswith(CUSTOM_VALIDATOR_PREFIX):
+        return format_value[len(CUSTOM_VALIDATOR_PREFIX) :]
+
+    return format_value
+
+
+def _preserve_custom_format_prefix(
+    existing_format: Optional[str],
+    new_format: Optional[str],
+) -> Optional[str]:
+    """Preserve custom: prefix when merging format fields.
+
+    Strategy:
+    - If base formats match (ignoring prefix), preserve existing format with prefix
+    - If base formats differ, use new format from code
+    - Preserves custom: prefix to maintain runtime validator registration
+
+    Args:
+        existing_format: Format from existing schema (e.g., "custom:username")
+        new_format: Format from code scanner (e.g., "username")
+
+    Returns:
+        Merged format with prefix preserved if applicable
+
+    Examples:
+        >>> _preserve_custom_format_prefix("custom:username", "username")
+        "custom:username"  # Preserves prefix, formats match
+        >>> _preserve_custom_format_prefix("custom:username", "email")
+        "email"  # Different formats, use new
+        >>> _preserve_custom_format_prefix("email", "postgresql")
+        "postgresql"  # Different formats, use new
+    """
+    # Normalize both formats for comparison
+    existing_base = _normalize_format(existing_format)
+    new_base = _normalize_format(new_format)
+
+    # If base formats match, preserve existing (with custom: prefix if present)
+    if existing_base == new_base:
+        return existing_format
+
+    # Formats differ - use new format from code
+    return new_format
+
+
+def merge_variable_schemas(
+    existing: VariableSchema,
+    from_code: VariableSchema,
+) -> Tuple[VariableSchema, List[str]]:
+    """Merge variable configs, preserving user customizations while updating code-inferred fields.
+
+    Strategy:
+    - PRESERVE: description (if custom), examples, custom fields, custom: prefix in format
+    - UPDATE: type, required, default, format (base), pattern, choices, min/max (from code)
+
+    Args:
+        existing: Existing variable schema (from file)
+        from_code: New variable schema (from code scanning)
+
+    Returns:
+        Tuple of (merged schema, list of change descriptions)
+    """
+    changes = []
+
+    # Start with existing schema
+    merged = VariableSchema(
+        name=existing.name,
+        type=existing.type,
+        required=existing.required,
+        default=existing.default,
+        description=existing.description,
+        secret=existing.secret,
+        examples=existing.examples,
+        format=existing.format,
+        pattern=existing.pattern,
+        choices=existing.choices,
+        min=existing.min,
+        max=existing.max,
+        min_length=existing.min_length,
+        max_length=existing.max_length,
+    )
+
+    # Update type if changed in code
+    if from_code.type != existing.type:
+        changes.append(f"type: {existing.type} → {from_code.type}")
+        merged.type = from_code.type
+
+    # Update required if changed in code
+    if from_code.required != existing.required:
+        changes.append(f"required: {existing.required} → {from_code.required}")
+        merged.required = from_code.required
+
+    # Update default if changed in code
+    if from_code.default != existing.default:
+        old_default = existing.default if existing.default is not None else "(none)"
+        new_default = from_code.default if from_code.default is not None else "(none)"
+        changes.append(f"default: {old_default} → {new_default}")
+        merged.default = from_code.default
+
+    # Update format if changed in code (preserving custom: prefix)
+    merged_format = _preserve_custom_format_prefix(existing.format, from_code.format)
+    if merged_format != existing.format:
+        old_format = existing.format if existing.format else "(none)"
+        new_format = merged_format if merged_format else "(none)"
+        changes.append(f"format: {old_format} → {new_format}")
+    merged.format = merged_format
+
+    # Update pattern if changed in code
+    if from_code.pattern != existing.pattern:
+        changes.append(f"pattern changed")
+        merged.pattern = from_code.pattern
+
+    # Update choices if changed in code
+    if from_code.choices != existing.choices:
+        changes.append(f"choices changed")
+        merged.choices = from_code.choices
+
+    # Update min/max if changed in code
+    if from_code.min != existing.min:
+        changes.append(f"min: {existing.min} → {from_code.min}")
+        merged.min = from_code.min
+
+    if from_code.max != existing.max:
+        changes.append(f"max: {existing.max} → {from_code.max}")
+        merged.max = from_code.max
+
+    # Update secret flag if changed in code
+    if from_code.secret != existing.secret:
+        changes.append(f"secret: {existing.secret} → {from_code.secret}")
+        merged.secret = from_code.secret
+
+    # Preserve description if it's more detailed than code-inferred one
+    # (Code scanning might not capture docstrings, so preserve user-written descriptions)
+    if from_code.description and not existing.description:
+        merged.description = from_code.description
+        changes.append("description added from code")
+    # If both have descriptions, keep existing (user-customized)
+
+    # Preserve examples (user-defined, not from code)
+    # Examples field is never populated by code scanning
+
+    return merged, changes
+
+
+def merge_schemas(
+    existing: TripWireSchema,
+    new_variables: Dict[str, VariableSchema],
+    remove_deprecated: bool = False,
+) -> SchemaMergeResult:
+    """Merge new variables into existing schema, preserving non-variable sections.
+
+    Args:
+        existing: Existing schema loaded from file
+        new_variables: New variable schemas from code scanning
+        remove_deprecated: If True, remove variables not in new_variables
+
+    Returns:
+        SchemaMergeResult with merged schema and change tracking
+    """
+    result = SchemaMergeResult(
+        merged_schema=TripWireSchema(
+            # PRESERVE project metadata
+            project_name=existing.project_name,
+            project_version=existing.project_version,
+            project_description=existing.project_description,
+            # PRESERVE validation settings
+            strict=existing.strict,
+            allow_missing_optional=existing.allow_missing_optional,
+            warn_unused=existing.warn_unused,
+            # PRESERVE security settings
+            entropy_threshold=existing.entropy_threshold,
+            scan_git_history=existing.scan_git_history,
+            exclude_patterns=existing.exclude_patterns.copy(),
+            # PRESERVE environments
+            environments={k: v.copy() for k, v in existing.environments.items()},
+            # Variables will be merged below
+            variables={},
+        )
+    )
+
+    # Track preserved sections
+    if existing.project_name or existing.project_version or existing.project_description:
+        result.preserved_sections.append("[project]")
+    if existing.environments:
+        result.preserved_sections.append(f"[environments] ({len(existing.environments)} configs)")
+    if existing.strict is not None:
+        result.preserved_sections.append("[validation]")
+    if existing.entropy_threshold is not None:
+        result.preserved_sections.append("[security]")
+
+    # Merge variables
+    existing_var_names = set(existing.variables.keys())
+    new_var_names = set(new_variables.keys())
+
+    # ADDED: Variables in code but not in schema
+    for var_name in sorted(new_var_names - existing_var_names):
+        result.merged_schema.variables[var_name] = new_variables[var_name]
+        result.added_variables.append(var_name)
+
+    # UPDATED: Variables in both (merge configs)
+    for var_name in sorted(existing_var_names & new_var_names):
+        merged_var, changes = merge_variable_schemas(
+            existing=existing.variables[var_name],
+            from_code=new_variables[var_name],
+        )
+        result.merged_schema.variables[var_name] = merged_var
+
+        if changes:
+            result.updated_variables.append((var_name, changes))
+
+    # REMOVED: Variables in schema but not in code
+    deprecated_vars = existing_var_names - new_var_names
+    for var_name in deprecated_vars:
+        result.removed_variables.append(var_name)
+
+        if not remove_deprecated:
+            # PRESERVE deprecated variables by default
+            result.merged_schema.variables[var_name] = existing.variables[var_name]
+
+    return result
+
+
+def create_schema_backup(schema_path: Path) -> Path:
+    """Create timestamped backup of schema file.
+
+    Args:
+        schema_path: Path to schema file to backup
+
+    Returns:
+        Path to backup file
+    """
+    import shutil
+    from datetime import datetime
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = schema_path.with_suffix(f".toml.bak.{timestamp}")
+
+    shutil.copy(schema_path, backup_path)
+
+    return backup_path
+
+
+def make_path_relative(file_path: str, reference_path: Optional[Path] = None) -> str:
+    """Convert absolute path to relative path for privacy/security.
+
+    Converts absolute paths to relative paths from project root to avoid
+    exposing developer usernames, home directories, and full project paths
+    in generated schema files.
+
+    Args:
+        file_path: File path (absolute or relative)
+        reference_path: Reference directory (defaults to cwd)
+
+    Returns:
+        Relative path if file is under reference directory, otherwise absolute path
+
+    Examples:
+        >>> make_path_relative("/Users/dev/project/src/main.py", Path("/Users/dev/project"))
+        "src/main.py"
+
+        >>> make_path_relative("/usr/lib/python3.11/site-packages/pkg/mod.py", Path("/Users/dev/project"))
+        "/usr/lib/python3.11/site-packages/pkg/mod.py"  # Outside project, keep absolute
+
+        >>> make_path_relative("src/main.py")
+        "src/main.py"  # Already relative
+    """
+    # Use current working directory as reference if not specified
+    if reference_path is None:
+        reference_path = Path.cwd()
+
+    try:
+        # Convert to Path object for cross-platform handling
+        file_path_obj = Path(file_path)
+
+        # If already relative, return as-is
+        if not file_path_obj.is_absolute():
+            return str(file_path_obj)
+
+        # Resolve symlinks and normalize paths for comparison
+        file_path_resolved = file_path_obj.resolve()
+        reference_path_resolved = reference_path.resolve()
+
+        # Calculate relative path
+        relative_path = file_path_resolved.relative_to(reference_path_resolved)
+
+        # Use forward slashes for cross-platform consistency
+        return str(relative_path).replace("\\", "/")
+
+    except ValueError:
+        # File is outside reference directory (e.g., system libraries)
+        # Fall back to absolute path
+        return str(file_path)
+    except Exception:
+        # Any other error (e.g., invalid path format)
+        # Fall back to original path
+        return str(file_path)
+
+
+def build_source_comments_from_envvarinfo(unique_vars: Dict[str, Any]) -> Dict[str, List[str]]:
+    """Build source location comments from EnvVarInfo instances.
+
+    Generates "# Found in: path/to/file.py:123" comments for schema files.
+    Uses relative paths from project root for privacy/security.
+
+    Args:
+        unique_vars: Dict mapping variable names to EnvVarInfo instances
+
+    Returns:
+        Dict mapping variable names to comment lines
+
+    Example:
+        >>> build_source_comments_from_envvarinfo({"API_KEY": env_var_info})
+        {"API_KEY": ["# Found in: src/config.py:42"]}
+    """
+    comments_map: Dict[str, List[str]] = {}
+
+    for var_name, var_info in unique_vars.items():
+        # Convert to relative path for privacy (avoid exposing usernames, home dirs)
+        relative_path = make_path_relative(var_info.file_path)
+
+        # Generate "# Found in:" comment with relative path
+        comment = f"# Found in: {relative_path}:{var_info.line_number}"
+        comments_map[var_name] = [comment]
+
+    return comments_map
+
+
+def envvarinfo_to_variableschema(env_var: Any) -> VariableSchema:
+    """Convert EnvVarInfo (from scanner) to VariableSchema.
+
+    Automatically adds custom: prefix to format validators that are not builtin.
+    This enables deferred validation for custom validators that are registered
+    at runtime (import-time) but not available during schema generation.
+
+    Args:
+        env_var: EnvVarInfo instance from code scanning
+
+    Returns:
+        VariableSchema instance with custom: prefix for non-builtin validators
+    """
+    from tripwire.validation import get_validator
+
+    # Type mapping from Python types to schema types
+    TYPE_MAPPING = {
+        "str": "string",
+        "int": "int",
+        "float": "float",
+        "bool": "bool",
+        "list": "list",
+        "dict": "dict",
+    }
+
+    schema_type = TYPE_MAPPING.get(env_var.var_type, "string")
+
+    # Auto-add custom: prefix for non-builtin validators (Phase 1 v0.12.0)
+    format_value = env_var.format
+    if format_value:
+        # Check if it's NOT a builtin validator
+        # get_validator returns None for unknown validators, but we can't rely on that
+        # since custom validators might not be registered yet during schema generation
+        # Instead, check against the known builtin list
+        from tripwire.validation import _BUILTIN_VALIDATORS
+
+        if format_value not in _BUILTIN_VALIDATORS:
+            # Not a builtin - add custom: prefix if not already present
+            if not format_value.startswith(CUSTOM_VALIDATOR_PREFIX):
+                format_value = f"{CUSTOM_VALIDATOR_PREFIX}{format_value}"
+
+    return VariableSchema(
+        name=env_var.name,
+        type=schema_type,
+        required=env_var.required,
+        default=env_var.default,
+        description=env_var.description or "",
+        secret=env_var.secret,
+        examples=[],  # Code scanning doesn't extract examples
+        format=format_value,
+        pattern=env_var.pattern,
+        choices=env_var.choices,
+        min=env_var.min_val,
+        max=env_var.max_val,
+        min_length=None,  # Code scanning doesn't extract min_length
+        max_length=None,  # Code scanning doesn't extract max_length
+    )
+
+
+def _extract_toml_comments(toml_path: Path) -> Dict[str, List[str]]:
+    """Extract comments from existing TOML file for preservation during merge.
+
+    Extracts variable-level comments (like "# Found in: ...") to preserve
+    code location metadata during schema regeneration.
+
+    Args:
+        toml_path: Path to existing TOML file
+
+    Returns:
+        Dict mapping variable names to their associated comments
+
+    Example return value:
+        {
+            "ADMIN_USERNAME": ["# Found in: /path/to/file.py:149"],
+            "APP_VERSION": ["# Found in: /path/to/file.py:150"]
+        }
+    """
+    if not toml_path.exists():
+        return {}
+
+    comments_map: Dict[str, List[str]] = {}
+    current_variable: Optional[str] = None
+    current_comments: List[str] = []
+
+    try:
+        with open(toml_path, "r", encoding="utf-8") as f:
+            for line in f:
+                stripped = line.strip()
+
+                # Detect variable section header [variables.NAME]
+                if stripped.startswith("[variables."):
+                    # Save previous variable's comments
+                    if current_variable and current_comments:
+                        comments_map[current_variable] = current_comments.copy()
+
+                    # Extract new variable name
+                    match = re.match(r"\[variables\.([^\]]+)\]", stripped)
+                    if match:
+                        current_variable = match.group(1)
+                        current_comments = []
+
+                # Collect comments after variable declaration
+                elif stripped.startswith("#") and current_variable:
+                    current_comments.append(stripped)
+
+                # Non-comment, non-variable line resets comment collection
+                elif stripped and not stripped.startswith("#"):
+                    # Don't reset on variable fields like "type = ..."
+                    # Only reset when we hit a new section
+                    if stripped.startswith("[") and not stripped.startswith("[variables."):
+                        current_variable = None
+                        current_comments = []
+
+            # Save last variable's comments
+            if current_variable and current_comments:
+                comments_map[current_variable] = current_comments
+
+    except Exception:
+        # If comment extraction fails, continue without comments
+        # Better to lose comments than fail schema writing
+        return {}
+
+    return comments_map
+
+
+def _inject_toml_comments(
+    toml_content: str,
+    comments_map: Dict[str, List[str]],
+) -> str:
+    """Inject preserved comments back into serialized TOML content.
+
+    Args:
+        toml_content: TOML content from tomli_w.dumps()
+        comments_map: Comments extracted via _extract_toml_comments()
+
+    Returns:
+        TOML content with comments re-injected after variable declarations
+
+    Example:
+        Input toml_content:
+            [variables.ADMIN_USERNAME]
+            type = "string"
+            required = true
+
+        Input comments_map:
+            {"ADMIN_USERNAME": ["# Found in: /path/to/file.py:149"]}
+
+        Output:
+            [variables.ADMIN_USERNAME]
+            type = "string"
+            required = true
+            # Found in: /path/to/file.py:149
+    """
+    if not comments_map:
+        return toml_content
+
+    lines = toml_content.split("\n")
+    output_lines: List[str] = []
+    current_variable: Optional[str] = None
+
+    for i, line in enumerate(lines):
+        output_lines.append(line)
+
+        # Detect variable section header [variables.NAME]
+        stripped = line.strip()
+        if stripped.startswith("[variables."):
+            match = re.match(r"\[variables\.([^\]]+)\]", stripped)
+            if match:
+                current_variable = match.group(1)
+
+        # Inject comments after variable's last field (before empty line or next section)
+        elif current_variable and current_variable in comments_map:
+            # Check if next line is empty or starts a new section
+            is_last_field = i + 1 >= len(lines) or lines[i + 1].strip() == "" or lines[i + 1].strip().startswith("[")
+
+            if is_last_field:
+                # Inject comments before the empty line/next section
+                for comment in comments_map[current_variable]:
+                    output_lines.append(comment)
+                current_variable = None  # Reset to avoid re-injection
+
+    return "\n".join(output_lines)
+
+
+def write_schema_to_toml(
+    schema: TripWireSchema,
+    output_path: Path,
+    source_comments: Optional[Dict[str, List[str]]] = None,
+) -> None:
+    """Write TripWireSchema to TOML file, preserving code location comments.
+
+    Args:
+        schema: Schema to serialize
+        output_path: Path to write TOML file
+        source_comments: Optional pre-generated comments for new variables
+                         (e.g., "# Found in: /path/to/file.py:123")
+    """
+    import tomli_w
+
+    # Step 1: Extract existing comments before overwriting
+    existing_comments = _extract_toml_comments(output_path)
+
+    # Step 2: Merge source_comments (new) with existing_comments (preserved)
+    # Priority: existing_comments > source_comments (preserve manual edits)
+    comments_map: Dict[str, List[str]] = {}
+    if source_comments:
+        comments_map.update(source_comments)
+    # Existing comments override source comments
+    comments_map.update(existing_comments)
+
+    # Step 3: Build TOML structure
+    toml_data: Dict[str, Any] = {}
+
+    # Add [project] section if any field is set
+    if schema.project_name or schema.project_version or schema.project_description:
+        toml_data["project"] = {}
+        if schema.project_name:
+            toml_data["project"]["name"] = schema.project_name
+        if schema.project_version:
+            toml_data["project"]["version"] = schema.project_version
+        if schema.project_description:
+            toml_data["project"]["description"] = schema.project_description
+
+    # Add [validation] section
+    toml_data["validation"] = {
+        "strict": schema.strict,
+        "allow_missing_optional": schema.allow_missing_optional,
+    }
+    # Only write warn_unused if explicitly set (avoid phantom field injection)
+    if schema.warn_unused is not None:
+        toml_data["validation"]["warn_unused"] = schema.warn_unused
+
+    # Add [security] section
+    toml_data["security"] = {
+        "entropy_threshold": schema.entropy_threshold,
+        "scan_git_history": schema.scan_git_history,
+    }
+    if schema.exclude_patterns:
+        toml_data["security"]["exclude_patterns"] = schema.exclude_patterns
+
+    # Add [variables.*] sections
+    toml_data["variables"] = {}
+    for var_name, var_schema in sorted(schema.variables.items()):
+        var_data: Dict[str, Any] = {
+            "type": var_schema.type,
+            "required": var_schema.required,
+        }
+
+        # Add optional fields only if set
+        if var_schema.default is not None:
+            var_data["default"] = var_schema.default
+        if var_schema.description:
+            var_data["description"] = var_schema.description
+        if var_schema.secret:
+            var_data["secret"] = var_schema.secret
+        if var_schema.examples:
+            var_data["examples"] = var_schema.examples
+        if var_schema.format:
+            var_data["format"] = var_schema.format
+        if var_schema.pattern:
+            var_data["pattern"] = var_schema.pattern
+        if var_schema.choices:
+            var_data["choices"] = var_schema.choices
+        if var_schema.min is not None:
+            var_data["min"] = var_schema.min
+        if var_schema.max is not None:
+            var_data["max"] = var_schema.max
+        if var_schema.min_length is not None:
+            var_data["min_length"] = var_schema.min_length
+        if var_schema.max_length is not None:
+            var_data["max_length"] = var_schema.max_length
+
+        toml_data["variables"][var_name] = var_data
+
+    # Add [environments.*] sections
+    if schema.environments:
+        toml_data["environments"] = schema.environments
+
+    # Step 3: Serialize to TOML string
+    import io
+
+    toml_buffer = io.BytesIO()
+    tomli_w.dump(toml_data, toml_buffer)
+    toml_content = toml_buffer.getvalue().decode("utf-8")
+
+    # Step 4: Re-inject preserved comments
+    toml_with_comments = _inject_toml_comments(toml_content, comments_map)
+
+    # Step 5: Write final content with comments
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(toml_with_comments)
