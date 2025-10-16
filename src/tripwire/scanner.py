@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 # Resource limits to prevent DOS attacks and memory exhaustion
-MAX_FILES_TO_SCAN = 1000  # Maximum number of files to scan
 MAX_FILE_SIZE = 1_000_000  # 1MB maximum file size to scan
 
 
@@ -233,6 +232,9 @@ def scan_directory(
 ) -> List[EnvVarInfo]:
     """Scan a directory recursively for environment variable usage.
 
+    Uses efficient directory-level filtering to skip entire trees
+    (like .venv/, __pycache__/) instead of checking every file.
+
     Args:
         directory: Root directory to scan
         exclude_patterns: Patterns to exclude (e.g., ['tests/*', '.venv/*'])
@@ -252,34 +254,92 @@ def scan_directory(
             "*.pyc",
         ]
 
-    all_variables: List[EnvVarInfo] = []
-    file_count = 0
+    # Directories to completely skip (don't descend into)
+    SKIP_DIRS = {
+        ".venv",
+        "venv",
+        ".virtualenv",
+        "env",
+        "__pycache__",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".ruff_cache",
+        ".tox",
+        ".git",
+        ".hg",
+        ".svn",
+        "build",
+        "dist",
+        ".eggs",
+        "node_modules",
+        ".idea",
+        ".vscode",
+    }
 
-    # Find all Python files
-    for py_file in directory.rglob("*.py"):
-        # Security: Enforce maximum file count to prevent resource exhaustion
-        if file_count >= MAX_FILES_TO_SCAN:
-            print(f"Warning: Hit scan limit of {MAX_FILES_TO_SCAN} files. Some files were skipped.")
-            break
+    def should_skip_dir(dir_path: Path) -> bool:
+        """Check if directory should be skipped entirely."""
+        dir_name = dir_path.name
 
-        # Check if file should be excluded
-        relative_path = py_file.relative_to(directory)
-        should_exclude = False
+        # Skip known directories
+        if dir_name in SKIP_DIRS:
+            return True
 
+        # Skip hidden directories (except project root)
+        if dir_name.startswith(".") and dir_path != directory:
+            return True
+
+        # Skip egg-info directories
+        if dir_name.endswith(".egg-info"):
+            return True
+
+        return False
+
+    def should_exclude_file(file_path: Path) -> bool:
+        """Check if file should be excluded by pattern matching."""
+        try:
+            relative_path = file_path.relative_to(directory)
+        except ValueError:
+            return True
+
+        # Check against exclude patterns
         for pattern in exclude_patterns:
             if relative_path.match(pattern):
-                should_exclude = True
-                break
+                return True
 
-        if should_exclude:
-            continue
+        return False
 
+    def walk_python_files(current_dir: Path, depth: int = 0):
+        """Recursively walk directory tree, skipping unwanted dirs."""
         # Check depth limit
-        if max_depth is not None:
-            depth = len(relative_path.parts) - 1
-            if depth > max_depth:
-                continue
+        if max_depth is not None and depth > max_depth:
+            return
 
+        try:
+            for item in current_dir.iterdir():
+                # Skip if not accessible
+                if not item.exists():
+                    continue
+
+                if item.is_dir():
+                    # Directory-level filtering - skip entire trees
+                    if should_skip_dir(item):
+                        continue
+                    # Recurse into allowed directories
+                    yield from walk_python_files(item, depth + 1)
+
+                elif item.is_file() and item.suffix == ".py":
+                    # File-level filtering
+                    if not should_exclude_file(item):
+                        yield item
+
+        except PermissionError:
+            # Skip directories we can't access
+            pass
+
+    all_variables: List[EnvVarInfo] = []
+
+    # Scan all discovered Python files
+    for py_file in walk_python_files(directory):
         # Security: Check file size before reading to prevent memory exhaustion
         try:
             file_size = py_file.stat().st_size
@@ -294,7 +354,6 @@ def scan_directory(
         try:
             variables = scan_file(py_file)
             all_variables.extend(variables)
-            file_count += 1
         except (SyntaxError, UnicodeDecodeError):
             # Skip files with syntax errors or encoding issues
             continue

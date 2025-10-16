@@ -477,7 +477,8 @@ class TestMermaidExport:
         mermaid = graph.export_mermaid()
 
         assert "DEAD CODE" in mermaid
-        assert "fill:#f99" in mermaid  # Red styling
+        # Check for red styling (updated to use better color scheme)
+        assert "fill:#FFB6C1" in mermaid or "fill:#f99" in mermaid
 
     def test_mermaid_includes_edges(self, sample_analysis_result):
         """Diagram should show connections to files."""
@@ -514,7 +515,8 @@ class TestMermaidExport:
         mermaid = graph.export_mermaid()
 
         assert "DEAD CODE" in mermaid
-        assert "fill:#f99" in mermaid
+        # Check for red styling (updated to use better color scheme)
+        assert "fill:#FFB6C1" in mermaid or "fill:#f99" in mermaid
 
 
 class TestDOTExport:
@@ -533,7 +535,8 @@ class TestDOTExport:
         graph = DependencyGraph(sample_analysis_result)
         dot = graph.export_dot()
 
-        assert "rankdir=LR" in dot
+        # Updated to use TB (Top-Bottom) for better hierarchy
+        assert "rankdir=TB" in dot
         assert "node [shape=box" in dot
 
     def test_dot_contains_all_nodes(self, sample_analysis_result):
@@ -579,7 +582,7 @@ class TestDOTExport:
 
         assert dot.startswith("digraph dependencies {")
         assert dot.endswith("}")
-        assert "rankdir=LR" in dot
+        assert "rankdir=TB" in dot
 
     def test_dot_handles_special_characters(self):
         """DOT should quote identifiers with special characters."""

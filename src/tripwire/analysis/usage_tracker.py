@@ -572,11 +572,8 @@ class UsageAnalyzer:
             # No declarations found, nothing to track
             return
 
-        # Scan all Python files in project
-        for py_file in self.project_root.rglob("*.py"):
-            if self._should_skip_file(py_file):
-                continue
-
+        # Scan all Python files in project with directory-level filtering
+        for py_file in self._iter_python_files(self.project_root):
             try:
                 source = py_file.read_text(encoding="utf-8")
                 tree = ast.parse(source, filename=str(py_file))
@@ -594,6 +591,89 @@ class UsageAnalyzer:
             except (SyntaxError, UnicodeDecodeError):
                 # Skip files with syntax errors or encoding issues
                 continue
+
+    def _iter_python_files(self, root: Path):
+        """Recursively iterate Python files with directory-level filtering.
+
+        This method skips entire directories (like .venv/, __pycache__/)
+        instead of checking every file individually, dramatically improving
+        performance on large codebases.
+
+        Args:
+            root: Root directory to search
+
+        Yields:
+            Path objects for Python files that pass filtering
+        """
+        # Directories to completely skip (don't descend into)
+        SKIP_DIRS = {
+            ".venv",
+            "venv",
+            ".virtualenv",
+            "env",
+            "__pycache__",
+            ".pytest_cache",
+            ".mypy_cache",
+            ".ruff_cache",
+            ".tox",
+            ".git",
+            ".hg",
+            ".svn",
+            "build",
+            "dist",
+            ".eggs",
+            "node_modules",
+            ".idea",
+            ".vscode",
+        }
+
+        # File extensions to skip
+        SKIP_EXTENSIONS = {".pyc", ".pyo", ".pyd", ".so", ".dll"}
+
+        def should_skip_dir(dir_path: Path) -> bool:
+            """Check if directory should be skipped entirely."""
+            dir_name = dir_path.name
+
+            # Skip known directories
+            if dir_name in SKIP_DIRS:
+                return True
+
+            # Skip hidden directories (except project root)
+            if dir_name.startswith(".") and dir_path != root:
+                return True
+
+            # Skip egg-info directories
+            if dir_name.endswith(".egg-info"):
+                return True
+
+            return False
+
+        def walk_python_files(directory: Path):
+            """Recursively walk directory tree, skipping unwanted dirs."""
+            try:
+                for item in directory.iterdir():
+                    # Skip if not accessible
+                    if not item.exists():
+                        continue
+
+                    if item.is_dir():
+                        # Directory-level filtering - skip entire trees
+                        if should_skip_dir(item):
+                            continue
+                        # Recurse into allowed directories
+                        yield from walk_python_files(item)
+
+                    elif item.is_file():
+                        # File-level filtering
+                        if item.suffix not in SKIP_EXTENSIONS and item.suffix == ".py":
+                            if not self._should_skip_file(item):
+                                yield item
+
+            except PermissionError:
+                # Skip directories we can't access
+                pass
+
+        yield from walk_python_files(root)
 
     def _should_skip_file(self, file_path: Path) -> bool:
         """Check if file should be skipped during analysis.

@@ -9,6 +9,7 @@ from tripwire.branding import LOGO_SIMPLE
 
 # Import all commands
 from tripwire.cli.commands import (
+    analyze,
     check,
     deprecated_audit,
     deprecated_scan,
@@ -57,6 +58,7 @@ main.add_command(diff.diff)
 main.add_command(install_hooks.install_hooks, name="install-hooks")
 
 # Register command groups
+main.add_command(analyze)
 main.add_command(schema.schema)
 main.add_command(security)
 main.add_command(plugin)

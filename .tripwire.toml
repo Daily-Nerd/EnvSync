@@ -39,6 +39,7 @@ description = "Comma-separated list of allowed hosts"
 type = "string"
 required = true
 description = "API key for external service"
+pattern = "^sk_(test|live)_[a-zA-Z0-9]{12,}$"
 # Found in: examples/basic_usage.py:63
 
 [variables.API_TOKEN]
@@ -138,6 +139,11 @@ description = "Company domain"
 format = "custom:domain"
 # Found in: examples/custom_validators.py:152
 
+[variables.CSRF_COOKIE_SECURE]
+type = "string"
+required = false
+# Found in: examples/frameworks/django_settings.py:65
+
 [variables.DATABASE_URL]
 type = "string"
 required = true
@@ -154,6 +160,11 @@ format = "postgresql"
 type = "bool"
 required = true
 # Found in: archive/multi_error_demo.py:175
+
+[variables.DJANGO_SECRET_KEY]
+type = "string"
+required = true
+# Found in: examples/frameworks/django_settings.py:50
 
 [variables.EMAIL]
 type = "string"
@@ -180,6 +191,12 @@ required = true
 max = 100
 # Found in: archive/multi_error_demo.py:147
 
+[variables.LANGUAGE_CODE]
+type = "string"
+required = false
+default = "en-us"
+# Found in: examples/frameworks/django_settings.py:60
+
 [variables.LOG_LEVEL]
 type = "string"
 required = true
@@ -196,6 +213,13 @@ type = "int"
 required = true
 min = 10
 # Found in: archive/multi_error_demo.py:146
+
+[variables.MAX_CONNECTIONS]
+type = "string"
+required = true
+min = 1
+max = 10000
+# Found in: examples/advanced/01_range_validation.py:50
 
 [variables.MAX_RETRIES]
 type = "int"
@@ -229,6 +253,11 @@ required = true
 max = 65535
 # Found in: archive/multi_error_demo.py:81
 
+[variables.RATE_LIMIT]
+type = "string"
+required = true
+# Found in: examples/basic/03_type_coercion.py:52
+
 [variables.REDIS_URL]
 type = "string"
 required = true
@@ -245,6 +274,16 @@ description = "S3 bucket name"
 type = "string"
 required = true
 # Found in: archive/multi_error_demo.py:47
+
+[variables.SECURE_SSL_REDIRECT]
+type = "string"
+required = false
+# Found in: examples/frameworks/django_settings.py:63
+
+[variables.SESSION_COOKIE_SECURE]
+type = "string"
+required = false
+# Found in: examples/frameworks/django_settings.py:64
 
 [variables.SHORT_VAR]
 type = "string"
@@ -264,6 +303,18 @@ required = true
 min = 10
 # Found in: archive/multi_error_demo.py:116
 
+[variables.TIME_ZONE]
+type = "string"
+required = false
+default = "UTC"
+# Found in: examples/frameworks/django_settings.py:59
+
+[variables.USERNAME]
+type = "string"
+required = true
+format = "custom:username"
+# Found in: examples/advanced/04_custom_validators.py:83
+
 [variables.UUID_VAR]
 type = "string"
 required = true
@@ -282,11 +333,17 @@ required = true
 secret = true
 # Found in: examples/secret-masking.py:67
 
+[variables.VERSION]
+type = "string"
+required = true
+pattern = "^\\d+\\.\\d+\\.\\d+$"
+# Found in: examples/advanced/03_pattern_matching.py:49
+
 [variables.WEBHOOK_URL]
 type = "string"
-required = false
+required = true
 description = "Optional webhook URL for event notifications"
-format = "url"
+format = "custom:webhook_url"
 # Found in: examples/advanced_usage.py:58
 
 [variables.WRONG_CHOICE]

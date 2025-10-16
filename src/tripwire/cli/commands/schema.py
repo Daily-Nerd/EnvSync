@@ -364,7 +364,14 @@ def schema_to_example(schema_file: str, output: str, force: bool, check: bool) -
     is_flag=True,
     help="Remove variables from schema that are no longer in code (default: keep them)",
 )
-def schema_from_code(output: str, force: bool, dry_run: bool, validate: bool, remove_deprecated: bool) -> None:
+@click.option(
+    "--exclude-unused",
+    is_flag=True,
+    help="Exclude dead variables (declared but never used) from schema",
+)
+def schema_from_code(
+    output: str, force: bool, dry_run: bool, validate: bool, remove_deprecated: bool, exclude_unused: bool
+) -> None:
     """Create schema FROM Python code analysis.
 
     Scans Python files for env.require() and env.optional() calls
@@ -411,6 +418,42 @@ def schema_from_code(output: str, force: bool, dry_run: bool, validate: bool, re
     # Deduplicate
     unique_vars = deduplicate_variables(variables)
     console.print(f"Found {len(unique_vars)} unique variable(s) in code")
+
+    # NEW: Exclude unused variables if flag is set
+    if exclude_unused:
+        console.print("[dim]Analyzing variable usage to exclude dead code...[/dim]")
+
+        try:
+            from tripwire.analysis.usage_tracker import UsageAnalyzer
+
+            analyzer = UsageAnalyzer(Path.cwd())
+            result = analyzer.analyze()
+            dead_var_names = set(result.dead_variables)
+
+            if dead_var_names:
+                # Filter out dead variables
+                original_count = len(unique_vars)
+                unique_vars = {
+                    var_name: var_info for var_name, var_info in unique_vars.items() if var_name not in dead_var_names
+                }
+                removed_count = original_count - len(unique_vars)
+
+                if removed_count > 0:
+                    console.print(f"[yellow]Excluded {removed_count} unused variable(s) from schema[/yellow]")
+                    if removed_count <= 5:
+                        for var_name in dead_var_names:
+                            if var_name in [v for v in variables]:
+                                console.print(f"  [dim]- {var_name}[/dim]")
+                    else:
+                        shown = list(dead_var_names)[:5]
+                        for var_name in shown:
+                            console.print(f"  [dim]- {var_name}[/dim]")
+                        console.print(f"  [dim]... and {removed_count - 5} more[/dim]")
+            else:
+                console.print("[green]No dead variables found - all declared variables are used[/green]")
+        except Exception as e:
+            console.print(f"[yellow]Warning: Could not analyze usage: {e}[/yellow]")
+            console.print("[dim]Proceeding with all variables...[/dim]")
 
     source_comments = build_source_comments_from_envvarinfo(unique_vars)
 
