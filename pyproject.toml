@@ -1,6 +1,6 @@
 [project]
 name = "tripwire-py"
-version = "0.12.3"
+version = "0.12.4"
 description = "Catch config errors before they explode - Python environment variable management with import-time validation, type safety, and secret detection"
 authors = [
     { name = "Kibukx" }
