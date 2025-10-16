@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **CRITICAL BUG FIX: `audit --all` now searches for secret VALUES instead of variable NAMES** (Issue #XXX)
+- **CRITICAL BUG FIX: `audit --all` now searches for secret VALUES instead of variable NAMES** (Issue #54)
   - Fixed critical bug where `audit --all` searched git history for variable NAMES (e.g., "VAULT_TOKEN") instead of actual secret VALUES (e.g., "hvs.secrettoken123")
   - **Impact:** Eliminated 100% false positive rate - command was flagging ALL legitimate code that referenced variable names
   - **Root cause:** Lines 214 & 242 in `audit.py` were passing `secret_value=None` to `analyze_secret_history()`, forcing fallback to name-based pattern search
