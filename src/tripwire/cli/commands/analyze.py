@@ -12,7 +12,7 @@ Commands:
 import json
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional
 
 import click
 from rich.panel import Panel
@@ -446,7 +446,7 @@ def dependencies(
         if node.usages:
             console.print(f"[bold]Usages ({len(node.usages)}):[/bold]")
             # Group by file
-            by_file = {}
+            by_file: Dict[str, List[int]] = {}
             for usage in node.usages:
                 file_name = str(usage.file_path)
                 if file_name not in by_file:

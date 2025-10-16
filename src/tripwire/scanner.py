@@ -7,7 +7,7 @@ in Python source files, extracting metadata about environment variables.
 import ast
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, Iterator, List, Optional, Set
 
 # Resource limits to prevent DOS attacks and memory exhaustion
 MAX_FILE_SIZE = 1_000_000  # 1MB maximum file size to scan
@@ -308,7 +308,7 @@ def scan_directory(
 
         return False
 
-    def walk_python_files(current_dir: Path, depth: int = 0):
+    def walk_python_files(current_dir: Path, depth: int = 0) -> Iterator[Path]:
         """Recursively walk directory tree, skipping unwanted dirs."""
         # Check depth limit
         if max_depth is not None and depth > max_depth:

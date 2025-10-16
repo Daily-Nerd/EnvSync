@@ -5,6 +5,7 @@ the rich library for terminal formatting.
 """
 
 from pathlib import Path
+from typing import Dict, List, Optional
 
 from rich import box
 from rich.panel import Panel
@@ -160,7 +161,7 @@ def render_usage_analysis(result: UsageAnalysisResult) -> None:
             var_node = tree.add(f"[bold green]{var_name}[/bold green] ({len(usages)} uses)")
 
             # Group by file
-            by_file = {}
+            by_file: Dict[str, List[int]] = {}
             for usage in usages:
                 file_name = usage.file_path.name
                 if file_name not in by_file:
@@ -232,7 +233,7 @@ def render_deadcode_report(result: UsageAnalysisResult) -> None:
         console.print()
 
 
-def render_dependency_tree(graph: DependencyGraph, var_name: str = None) -> None:
+def render_dependency_tree(graph: DependencyGraph, var_name: Optional[str] = None) -> None:
     """Render dependency tree showing variable usage.
 
     Shows:
@@ -260,7 +261,7 @@ def render_dependency_tree(graph: DependencyGraph, var_name: str = None) -> None
             tree.add("[red]DEAD CODE - No usages[/red]")
         else:
             # Group by file
-            by_file = {}
+            by_file: Dict[str, List[int]] = {}
             for usage in node.usages:
                 file_name = usage.file_path.name
                 if file_name not in by_file:
@@ -289,14 +290,14 @@ def render_dependency_tree(graph: DependencyGraph, var_name: str = None) -> None
             var_node = tree.add(f"[bold green]{node.variable_name}[/bold green] ({node.usage_count} uses)")
 
             # Group by file
-            by_file = {}
+            file_groups: Dict[str, List[int]] = {}
             for usage in node.usages:
                 file_name = usage.file_path.name
-                if file_name not in by_file:
-                    by_file[file_name] = []
-                by_file[file_name].append(usage.line_number)
+                if file_name not in file_groups:
+                    file_groups[file_name] = []
+                file_groups[file_name].append(usage.line_number)
 
-            for file_name, lines in sorted(by_file.items()):
+            for file_name, lines in sorted(file_groups.items()):
                 file_node = var_node.add(f"📄 {file_name}")
                 line_summary = f"Lines: {', '.join(map(str, sorted(lines)[:5]))}"
                 if len(lines) > 5:

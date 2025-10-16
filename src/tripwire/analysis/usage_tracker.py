@@ -13,7 +13,7 @@ referenced across a Python codebase, handling 30+ edge cases including:
 
 import ast
 from pathlib import Path
-from typing import List, Optional, Set
+from typing import Iterator, List, Optional, Set
 
 from tripwire.analysis.models import (
     UsageAnalysisResult,
@@ -592,7 +592,7 @@ class UsageAnalyzer:
                 # Skip files with syntax errors or encoding issues
                 continue
 
-    def _iter_python_files(self, root: Path):
+    def _iter_python_files(self, root: Path) -> Iterator[Path]:
         """Recursively iterate Python files with directory-level filtering.
 
         This method skips entire directories (like .venv/, __pycache__/)
@@ -648,7 +648,7 @@ class UsageAnalyzer:
 
             return False
 
-        def walk_python_files(directory: Path):
+        def walk_python_files(directory: Path) -> Iterator[Path]:
             """Recursively walk directory tree, skipping unwanted dirs."""
             try:
                 for item in directory.iterdir():
