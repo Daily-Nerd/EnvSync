@@ -5,6 +5,10 @@ are declared and used across the codebase, enabling dead code detection and
 dependency visualization.
 """
 
+from tripwire.analysis.dependency_graph import (
+    DependencyGraph,
+    DependencyNode,
+)
 from tripwire.analysis.models import (
     UsageAnalysisResult,
     VariableDeclaration,
@@ -21,4 +25,6 @@ __all__ = [
     "UsageAnalysisResult",
     "UsageTrackingVisitor",
     "UsageAnalyzer",
+    "DependencyGraph",
+    "DependencyNode",
 ]
