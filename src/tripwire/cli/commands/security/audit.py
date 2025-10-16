@@ -17,6 +17,74 @@ from tripwire.cli.progress import audit_progress
 from tripwire.cli.utils.console import console
 
 
+def load_env_values(env_file: Path) -> dict[str, str]:
+    """Load environment variable values from .env file.
+
+    Args:
+        env_file: Path to .env file
+
+    Returns:
+        Dictionary mapping variable names to their values
+
+    Note:
+        Uses dotenv_values() which returns None for variables with no value.
+        We convert None to empty string for consistent handling.
+    """
+    from dotenv import dotenv_values
+
+    if not env_file.exists():
+        return {}
+
+    raw_values = dotenv_values(env_file)
+    # Convert None to empty string for consistent handling
+    return {k: (v if v is not None else "") for k, v in raw_values.items()}
+
+
+def is_placeholder_value(value: str) -> bool:
+    """Check if value is a placeholder that shouldn't be audited.
+
+    Common placeholders: CHANGE_ME, YOUR_X_HERE, <placeholder>, xxx, etc.
+    These are intentionally non-secret placeholder values used in documentation
+    and .env.example files.
+
+    Args:
+        value: Environment variable value to check
+
+    Returns:
+        True if value is a placeholder pattern
+
+    Examples:
+        >>> is_placeholder_value("CHANGE_ME")
+        True
+        >>> is_placeholder_value("YOUR_API_KEY_HERE")
+        True
+        >>> is_placeholder_value("<your-token-here>")
+        True
+        >>> is_placeholder_value("sk-abc123xyz")  # Real API key format
+        False
+    """
+    if not value or value.strip() == "":
+        return True
+
+    # Common placeholder patterns (case insensitive)
+    placeholder_patterns = [
+        r"^CHANGE[_-]?ME",  # CHANGE_ME, CHANGEME, CHANGE-ME
+        r"^YOUR_.+_HERE$",  # YOUR_API_KEY_HERE, YOUR_TOKEN_HERE
+        r"^<.+>$",  # <your-token-here>, <placeholder>
+        r"^placeholder$",  # placeholder
+        r"^example$",  # example
+        r"^xxx+$",  # xxx, xxxxx
+        r"^test",  # test, testkey, test123
+        r"^dummy",  # dummy, dummyvalue
+    ]
+
+    for pattern in placeholder_patterns:
+        if re.match(pattern, value, re.IGNORECASE):
+            return True
+
+    return False
+
+
 @click.command(name="audit")
 @click.argument("secret_name", required=False)
 @click.option(
@@ -198,6 +266,9 @@ def audit(
         # Audit each detected secret with progress tracking
         all_results = []
 
+        # Load actual values from .env file to search for VALUES not NAMES
+        env_values = load_env_values(env_file)
+
         # Use progress tracking for multi-secret audit (spinner mode - unknown total commits)
         if not output_json and len(detected_secrets) > 0:
             with audit_progress(total_commits=None, console=console) as tracker:
@@ -209,9 +280,20 @@ def audit(
                     console.print(f"[bold cyan]{'=' * 70}[/bold cyan]\n")
 
                     try:
+                        # Get actual secret value from .env file
+                        actual_value = env_values.get(secret.variable_name)
+
+                        # Skip if placeholder or empty value
+                        if not actual_value or is_placeholder_value(actual_value):
+                            console.print(
+                                f"[yellow]⚠ Skipping {secret.variable_name}: " f"placeholder or empty value[/yellow]\n"
+                            )
+                            continue
+
+                        # CRITICAL FIX: Search for actual VALUE not variable NAME
                         timeline = analyze_secret_history(
                             secret_name=secret.variable_name,
-                            secret_value=None,  # Don't pass value for privacy
+                            secret_value=actual_value,  # ✅ FIX: Pass actual value
                             repo_path=Path.cwd(),
                             max_commits=max_commits,
                         )
@@ -237,9 +319,21 @@ def audit(
                     console.print(f"[bold cyan]{'=' * 70}[/bold cyan]\n")
 
                 try:
+                    # Get actual secret value from .env file
+                    actual_value = env_values.get(secret.variable_name)
+
+                    # Skip if placeholder or empty value
+                    if not actual_value or is_placeholder_value(actual_value):
+                        if not output_json:
+                            console.print(
+                                f"[yellow]⚠ Skipping {secret.variable_name}: " f"placeholder or empty value[/yellow]\n"
+                            )
+                        continue
+
+                    # CRITICAL FIX: Search for actual VALUE not variable NAME
                     timeline = analyze_secret_history(
                         secret_name=secret.variable_name,
-                        secret_value=None,  # Don't pass value for privacy
+                        secret_value=actual_value,  # ✅ FIX: Pass actual value
                         repo_path=Path.cwd(),
                         max_commits=max_commits,
                     )
@@ -294,13 +388,41 @@ def audit(
     # At this point secret_name is guaranteed to be non-None due to validation above
     assert secret_name is not None, "secret_name must be provided in single secret mode"
 
+    # CRITICAL FIX: Load actual value from .env file (unless --value flag provided)
+    # This mirrors the same logic used in --all mode (lines 269-342)
+    if not value:
+        env_file = Path.cwd() / ".env"
+        if env_file.exists():
+            env_values = load_env_values(env_file)
+            value = env_values.get(secret_name)
+
+            # Skip if placeholder or empty value
+            if not value or is_placeholder_value(value):
+                if not output_json:
+                    console.print(f"[yellow]⚠ Skipping {secret_name}: " f"placeholder or empty value[/yellow]\n")
+                    console.print("No audit needed for placeholder values.")
+                return
+        else:
+            # No .env file found and no --value flag provided
+            if not output_json:
+                console.print(
+                    f"[yellow]⚠ Warning: .env file not found in current directory.[/yellow]\n"
+                    f"Without a .env file or --value flag, audit will search for variable name pattern '{secret_name}'\n"
+                    f"instead of the actual secret value. This may produce inaccurate results.\n"
+                    f"\n"
+                    f"[bold]Recommended:[/bold] Either:\n"
+                    f"  1. Create a .env file with {secret_name}=<actual-value>\n"
+                    f"  2. Use --value flag: tripwire security audit {secret_name} --value '<actual-secret-value>'\n"
+                )
+
     try:
         from tripwire.git_audit import count_commits, sanitize_git_pattern
 
-        # Build search pattern (same logic as analyze_secret_history)
+        # Build search pattern using ACTUAL VALUE (if available)
         if value:
             secret_pattern = re.escape(value)
         else:
+            # Fallback to name pattern if no .env file found (with warning above)
             secret_pattern = rf"{re.escape(secret_name)}\s*[:=]\s*['\"]?[^\s'\";]+['\"]?"
 
         # Sanitize pattern
