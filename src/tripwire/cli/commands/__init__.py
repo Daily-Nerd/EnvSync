@@ -2,6 +2,7 @@
 
 import click
 
+from tripwire.cli.commands import analyze as analyze_module
 from tripwire.cli.commands import plugin as plugin_module
 from tripwire.cli.commands import security as security_module
 
@@ -116,7 +117,8 @@ deprecated_scan = create_deprecated_scan()
 deprecated_audit = create_deprecated_audit()
 
 # Export command groups
+analyze = analyze_module.analyze
 security = security_module.security
 plugin = plugin_module.plugin
 
-__all__ = ["security", "plugin", "deprecated_scan", "deprecated_audit"]
+__all__ = ["analyze", "security", "plugin", "deprecated_scan", "deprecated_audit"]
