@@ -20,6 +20,7 @@ from tripwire.analysis.models import (
     VariableDeclaration,
     VariableUsage,
 )
+from tripwire.constants import SKIP_DIRS
 
 
 class UsageTrackingVisitor(ast.NodeVisitor):
@@ -498,7 +499,7 @@ class UsageAnalyzer:
         from tripwire.scanner import scan_directory
 
         # Use existing scanner to find declarations
-        env_vars = scan_directory(self.project_root)
+        env_vars = scan_directory(self.project_root, exclude_patterns=self.exclude_patterns)
 
         # Convert to VariableDeclaration objects
         # We need to extract the Python variable name from the declaration context
@@ -605,28 +606,6 @@ class UsageAnalyzer:
         Yields:
             Path objects for Python files that pass filtering
         """
-        # Directories to completely skip (don't descend into)
-        SKIP_DIRS = {
-            ".venv",
-            "venv",
-            ".virtualenv",
-            "env",
-            "__pycache__",
-            ".pytest_cache",
-            ".mypy_cache",
-            ".ruff_cache",
-            ".tox",
-            ".git",
-            ".hg",
-            ".svn",
-            "build",
-            "dist",
-            ".eggs",
-            "node_modules",
-            ".idea",
-            ".vscode",
-        }
-
         # File extensions to skip
         SKIP_EXTENSIONS = {".pyc", ".pyo", ".pyd", ".so", ".dll"}
 

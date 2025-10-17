@@ -431,22 +431,22 @@ def schema_from_code(
             dead_var_names = set(result.dead_variables)
 
             if dead_var_names:
-                # Filter out dead variables
-                original_count = len(unique_vars)
+                # Filter out dead variables and track what was actually removed
+                original_var_names = set(unique_vars.keys())
                 unique_vars = {
                     var_name: var_info for var_name, var_info in unique_vars.items() if var_name not in dead_var_names
                 }
-                removed_count = original_count - len(unique_vars)
+                removed = original_var_names - set(unique_vars.keys())  # Actually removed vars
+                removed_count = len(removed)
 
                 if removed_count > 0:
                     console.print(f"[yellow]Excluded {removed_count} unused variable(s) from schema[/yellow]")
+                    removed_list = sorted(list(removed))  # Sort for consistency
                     if removed_count <= 5:
-                        for var_name in dead_var_names:
-                            if var_name in unique_vars:
-                                console.print(f"  [dim]- {var_name}[/dim]")
+                        for var_name in removed_list:
+                            console.print(f"  [dim]- {var_name}[/dim]")
                     else:
-                        shown = list(dead_var_names)[:5]
-                        for var_name in shown:
+                        for var_name in removed_list[:5]:
                             console.print(f"  [dim]- {var_name}[/dim]")
                         console.print(f"  [dim]... and {removed_count - 5} more[/dim]")
             else:

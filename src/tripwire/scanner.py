@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Set
 
+from tripwire.constants import SKIP_DIRS
+
 # Resource limits to prevent DOS attacks and memory exhaustion
 MAX_FILE_SIZE = 1_000_000  # 1MB maximum file size to scan
 
@@ -253,28 +255,6 @@ def scan_directory(
             "__pycache__/*",
             "*.pyc",
         ]
-
-    # Directories to completely skip (don't descend into)
-    SKIP_DIRS = {
-        ".venv",
-        "venv",
-        ".virtualenv",
-        "env",
-        "__pycache__",
-        ".pytest_cache",
-        ".mypy_cache",
-        ".ruff_cache",
-        ".tox",
-        ".git",
-        ".hg",
-        ".svn",
-        "build",
-        "dist",
-        ".eggs",
-        "node_modules",
-        ".idea",
-        ".vscode",
-    }
 
     def should_skip_dir(dir_path: Path) -> bool:
         """Check if directory should be skipped entirely."""
