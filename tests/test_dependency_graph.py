@@ -518,6 +518,146 @@ class TestMermaidExport:
         # Check for red styling (updated to use better color scheme)
         assert "fill:#FFB6C1" in mermaid or "fill:#f99" in mermaid
 
+    def test_mermaid_large_graph_with_subgraphs(self):
+        """Large graph (>10 nodes) should use subgraphs for organization."""
+        result = UsageAnalysisResult()
+
+        # Create 15 variables with different usage patterns
+        # Heavy usage: 3 variables with 20+ uses
+        for i in range(3):
+            var_name = f"HEAVY_VAR_{i}"
+            result.declarations[var_name] = VariableDeclaration(
+                name=var_name,
+                env_var=var_name,
+                file_path=Path("config.py"),
+                line_number=i + 1,
+                is_required=True,
+                type_annotation="str",
+                validator=None,
+            )
+            result.usages[var_name] = [
+                VariableUsage(
+                    variable_name=var_name,
+                    file_path=Path(f"app{j}.py"),
+                    line_number=10 + j,
+                    context="reference",
+                    scope="module",
+                )
+                for j in range(25)  # 25 uses
+            ]
+
+        # Medium usage: 4 variables with 5-19 uses
+        for i in range(4):
+            var_name = f"MEDIUM_VAR_{i}"
+            result.declarations[var_name] = VariableDeclaration(
+                name=var_name,
+                env_var=var_name,
+                file_path=Path("config.py"),
+                line_number=i + 10,
+                is_required=True,
+                type_annotation="str",
+                validator=None,
+            )
+            result.usages[var_name] = [
+                VariableUsage(
+                    variable_name=var_name,
+                    file_path=Path(f"service{j}.py"),
+                    line_number=20 + j,
+                    context="reference",
+                    scope="module",
+                )
+                for j in range(10)  # 10 uses
+            ]
+
+        # Light usage: 5 variables with 1-4 uses
+        for i in range(5):
+            var_name = f"LIGHT_VAR_{i}"
+            result.declarations[var_name] = VariableDeclaration(
+                name=var_name,
+                env_var=var_name,
+                file_path=Path("config.py"),
+                line_number=i + 20,
+                is_required=True,
+                type_annotation="str",
+                validator=None,
+            )
+            result.usages[var_name] = [
+                VariableUsage(
+                    variable_name=var_name,
+                    file_path=Path("util.py"),
+                    line_number=30 + i,
+                    context="reference",
+                    scope="module",
+                )
+                for j in range(2)  # 2 uses
+            ]
+
+        # Dead variables: 3 variables with 0 uses
+        for i in range(3):
+            var_name = f"DEAD_VAR_{i}"
+            result.declarations[var_name] = VariableDeclaration(
+                name=var_name,
+                env_var=var_name,
+                file_path=Path("config.py"),
+                line_number=i + 30,
+                is_required=False,
+                type_annotation="str",
+                validator=None,
+            )
+
+        graph = DependencyGraph(result)
+        mermaid = graph.export_mermaid(use_subgraphs=True)
+
+        # Should have subgraphs
+        assert 'subgraph Heavy["Heavy Usage (20+ uses)"]' in mermaid
+        assert 'subgraph Medium["Medium Usage (5-19 uses)"]' in mermaid
+        assert 'subgraph Light["Light Usage (1-4 uses)"]' in mermaid
+        assert 'subgraph Dead["Dead Code (0 uses)"]' in mermaid
+
+        # Should have summary comment
+        assert "% Total: 15 variables" in mermaid
+
+        # Heavy nodes should be styled green
+        assert "fill:#90EE90" in mermaid
+
+        # Dead nodes should be styled red
+        assert "fill:#FFB6C1" in mermaid
+
+    def test_mermaid_large_graph_without_subgraphs(self):
+        """Large graph can optionally skip subgraphs."""
+        result = UsageAnalysisResult()
+
+        # Create 12 variables
+        for i in range(12):
+            var_name = f"VAR_{i}"
+            result.declarations[var_name] = VariableDeclaration(
+                name=var_name,
+                env_var=var_name,
+                file_path=Path("config.py"),
+                line_number=i + 1,
+                is_required=True,
+                type_annotation="str",
+                validator=None,
+            )
+            result.usages[var_name] = [
+                VariableUsage(
+                    variable_name=var_name,
+                    file_path=Path("app.py"),
+                    line_number=10 + i,
+                    context="reference",
+                    scope="module",
+                )
+            ]
+
+        graph = DependencyGraph(result)
+        mermaid = graph.export_mermaid(use_subgraphs=False)
+
+        # Should NOT have subgraphs
+        assert "subgraph" not in mermaid
+
+        # Should have flat structure with styling
+        assert "fill:#" in mermaid
+
 
 class TestDOTExport:
     """Tests for Graphviz DOT export functionality."""
@@ -611,6 +751,238 @@ class TestDOTExport:
 
         # Should handle file names with dots
         assert '"file.name.py"' in dot or "file.name.py" in dot
+
+    def test_dot_large_graph_with_clusters(self):
+        """Large graph (>10 nodes) should use clusters for organization."""
+        result = UsageAnalysisResult()
+
+        # Create 15 variables with different usage patterns
+        # Heavy usage: 3 variables with 20+ uses
+        for i in range(3):
+            var_name = f"HEAVY_VAR_{i}"
+            result.declarations[var_name] = VariableDeclaration(
+                name=var_name,
+                env_var=var_name,
+                file_path=Path("config.py"),
+                line_number=i + 1,
+                is_required=True,
+                type_annotation="str",
+                validator=None,
+            )
+            result.usages[var_name] = [
+                VariableUsage(
+                    variable_name=var_name,
+                    file_path=Path(f"app{j}.py"),
+                    line_number=10 + j,
+                    context="reference",
+                    scope="module",
+                )
+                for j in range(25)  # 25 uses
+            ]
+
+        # Medium usage: 4 variables with 5-19 uses
+        for i in range(4):
+            var_name = f"MEDIUM_VAR_{i}"
+            result.declarations[var_name] = VariableDeclaration(
+                name=var_name,
+                env_var=var_name,
+                file_path=Path("config.py"),
+                line_number=i + 10,
+                is_required=True,
+                type_annotation="str",
+                validator=None,
+            )
+            result.usages[var_name] = [
+                VariableUsage(
+                    variable_name=var_name,
+                    file_path=Path(f"service{j}.py"),
+                    line_number=20 + j,
+                    context="reference",
+                    scope="module",
+                )
+                for j in range(10)  # 10 uses
+            ]
+
+        # Light usage: 5 variables with 1-4 uses
+        for i in range(5):
+            var_name = f"LIGHT_VAR_{i}"
+            result.declarations[var_name] = VariableDeclaration(
+                name=var_name,
+                env_var=var_name,
+                file_path=Path("config.py"),
+                line_number=i + 20,
+                is_required=True,
+                type_annotation="str",
+                validator=None,
+            )
+            result.usages[var_name] = [
+                VariableUsage(
+                    variable_name=var_name,
+                    file_path=Path("util.py"),
+                    line_number=30 + i,
+                    context="reference",
+                    scope="module",
+                )
+                for j in range(2)  # 2 uses
+            ]
+
+        # Dead variables: 3 variables with 0 uses
+        for i in range(3):
+            var_name = f"DEAD_VAR_{i}"
+            result.declarations[var_name] = VariableDeclaration(
+                name=var_name,
+                env_var=var_name,
+                file_path=Path("config.py"),
+                line_number=i + 30,
+                is_required=False,
+                type_annotation="str",
+                validator=None,
+            )
+
+        graph = DependencyGraph(result)
+        dot = graph.export_dot(use_clusters=True)
+
+        # Should have clusters
+        assert "subgraph cluster_0" in dot
+        assert "subgraph cluster_1" in dot
+        assert "subgraph cluster_2" in dot
+        assert "subgraph cluster_3" in dot
+
+        # Should have cluster labels
+        assert 'label="Heavy Usage (20+ uses)"' in dot
+        assert 'label="Medium Usage (5-19 uses)"' in dot
+        assert 'label="Light Usage (1-4 uses)"' in dot
+        assert 'label="Dead Code (0 uses)"' in dot
+
+        # Should have graph title with summary
+        assert 'label="Environment Variables' in dot
+        assert "15 total" in dot
+
+        # Heavy nodes should be styled green
+        assert 'fillcolor="#90EE90"' in dot
+
+        # Dead nodes should be styled red
+        assert 'fillcolor="#FFB6C1"' in dot
+        assert "color=red" in dot
+
+    def test_dot_large_graph_without_clusters(self):
+        """Large graph can optionally skip clusters."""
+        result = UsageAnalysisResult()
+
+        # Create 12 variables
+        for i in range(12):
+            var_name = f"VAR_{i}"
+            result.declarations[var_name] = VariableDeclaration(
+                name=var_name,
+                env_var=var_name,
+                file_path=Path("config.py"),
+                line_number=i + 1,
+                is_required=True,
+                type_annotation="str",
+                validator=None,
+            )
+            result.usages[var_name] = [
+                VariableUsage(
+                    variable_name=var_name,
+                    file_path=Path("app.py"),
+                    line_number=10 + i,
+                    context="reference",
+                    scope="module",
+                )
+            ]
+
+        graph = DependencyGraph(result)
+        dot = graph.export_dot(use_clusters=False)
+
+        # Should NOT have clusters
+        assert "subgraph cluster" not in dot
+
+        # Should have flat structure with styling
+        assert "fillcolor" in dot
+
+
+class TestGraphFiltering:
+    """Tests for graph filtering methods."""
+
+    def test_filter_by_top_n(self, sample_analysis_result):
+        """Should create filtered graph with top N variables."""
+        graph = DependencyGraph(sample_analysis_result)
+        filtered = graph.filter_by_top_n(2)
+
+        assert len(filtered.nodes) == 2
+        assert "DATABASE_URL" in filtered.nodes
+        assert "API_KEY" in filtered.nodes
+
+    def test_filter_by_min_usage(self, sample_analysis_result):
+        """Should filter variables by minimum usage count."""
+        graph = DependencyGraph(sample_analysis_result)
+
+        # Filter for variables used at least twice
+        filtered = graph.filter_by_min_usage(2)
+        assert len(filtered.nodes) == 2
+        assert "DATABASE_URL" in filtered.nodes  # 3 uses
+        assert "API_KEY" in filtered.nodes  # 2 uses
+        assert "DEBUG_MODE" not in filtered.nodes  # Only 1 use
+        assert "UNUSED_VAR" not in filtered.nodes  # 0 uses
+
+    def test_filter_by_min_usage_zero(self, sample_analysis_result):
+        """Should include all variables when min_usage is 0."""
+        graph = DependencyGraph(sample_analysis_result)
+        filtered = graph.filter_by_min_usage(0)
+
+        assert len(filtered.nodes) == 4  # All variables
+
+    def test_filter_dead_only(self, sample_analysis_result):
+        """Should create graph with only dead variables."""
+        graph = DependencyGraph(sample_analysis_result)
+        filtered = graph.filter_dead_only()
+
+        assert len(filtered.nodes) == 1
+        assert "UNUSED_VAR" in filtered.nodes
+        assert filtered.nodes["UNUSED_VAR"].is_dead
+
+    def test_filter_used_only(self, sample_analysis_result):
+        """Should create graph excluding dead variables."""
+        graph = DependencyGraph(sample_analysis_result)
+        filtered = graph.filter_used_only()
+
+        assert len(filtered.nodes) == 3
+        assert "DATABASE_URL" in filtered.nodes
+        assert "API_KEY" in filtered.nodes
+        assert "DEBUG_MODE" in filtered.nodes
+        assert "UNUSED_VAR" not in filtered.nodes
+
+    def test_filter_by_variables(self, sample_analysis_result):
+        """Should create graph with specific variables only."""
+        graph = DependencyGraph(sample_analysis_result)
+        filtered = graph.filter_by_variables(["DATABASE_URL", "API_KEY"])
+
+        assert len(filtered.nodes) == 2
+        assert "DATABASE_URL" in filtered.nodes
+        assert "API_KEY" in filtered.nodes
+
+    def test_filter_by_variables_missing(self, sample_analysis_result):
+        """Should raise ValueError for missing variable names."""
+        graph = DependencyGraph(sample_analysis_result)
+
+        with pytest.raises(ValueError, match="Variables not found"):
+            graph.filter_by_variables(["DATABASE_URL", "NONEXISTENT"])
+
+    def test_filter_by_variables_all_missing(self, sample_analysis_result):
+        """Should raise ValueError when all variables are missing."""
+        graph = DependencyGraph(sample_analysis_result)
+
+        with pytest.raises(ValueError, match="Variables not found"):
+            graph.filter_by_variables(["MISSING1", "MISSING2"])
+
+    def test_filtered_graph_maintains_usages(self, sample_analysis_result):
+        """Filtered graph should preserve usage information."""
+        graph = DependencyGraph(sample_analysis_result)
+        filtered = graph.filter_by_variables(["DATABASE_URL"])
+
+        node = filtered.nodes["DATABASE_URL"]
+        assert node.usage_count == 3
+        assert len(node.usages) == 3
 
 
 class TestEdgeCases:
