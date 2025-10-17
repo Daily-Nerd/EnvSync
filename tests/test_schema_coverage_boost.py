@@ -246,16 +246,28 @@ class TestPathUtilities:
 
     def test_make_path_relative_already_relative(self):
         """Line 906: Test make_path_relative with already relative path."""
+        import os
         result = make_path_relative("src/config.py")
-        assert result == "src/config.py"
+        # Normalize for platform (Windows uses backslash, Unix uses forward slash)
+        expected = os.path.join("src", "config.py")
+        assert result == expected
 
     def test_make_path_relative_outside_project(self):
         """Lines 897->900: Test make_path_relative with path outside project."""
-        # System path outside project
-        system_path = "/usr/lib/python3.11/site-packages/pkg/mod.py"
-        result = make_path_relative(system_path, Path("/home/user/project"))
-        # Should return absolute path when outside reference
-        assert result == system_path
+        import os
+        # Use platform-appropriate paths
+        if os.name == 'nt':  # Windows
+            # Test with Windows-style absolute path
+            system_path = r"C:\Python\Lib\site-packages\pkg\mod.py"
+            reference = Path(r"C:\Users\project")
+        else:  # Unix/Linux/macOS
+            system_path = "/usr/lib/python3.11/site-packages/pkg/mod.py"
+            reference = Path("/home/user/project")
+
+        result = make_path_relative(system_path, reference)
+        # Should return the original path when outside reference (may be normalized)
+        # Use Path to normalize for comparison
+        assert Path(result) == Path(system_path)
 
     def test_build_source_comments_from_envvarinfo(self):
         """Test build_source_comments_from_envvarinfo."""
