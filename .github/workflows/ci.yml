@@ -5,10 +5,12 @@ on:
     branches: [ main, feature/* ]
     paths:
       - "src/**"
+      - "tests/**"
   pull_request:
     branches: [ main ]
     paths:
       - "src/**"
+      - "tests/**"
 
 env:
   PYTHON_VERSION: "3.11"
