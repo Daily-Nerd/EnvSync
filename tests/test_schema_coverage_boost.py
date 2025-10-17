@@ -247,6 +247,7 @@ class TestPathUtilities:
     def test_make_path_relative_already_relative(self):
         """Line 906: Test make_path_relative with already relative path."""
         import os
+
         result = make_path_relative("src/config.py")
         # Normalize for platform (Windows uses backslash, Unix uses forward slash)
         expected = os.path.join("src", "config.py")
@@ -255,8 +256,9 @@ class TestPathUtilities:
     def test_make_path_relative_outside_project(self):
         """Lines 897->900: Test make_path_relative with path outside project."""
         import os
+
         # Use platform-appropriate paths
-        if os.name == 'nt':  # Windows
+        if os.name == "nt":  # Windows
             # Test with Windows-style absolute path
             system_path = r"C:\Python\Lib\site-packages\pkg\mod.py"
             reference = Path(r"C:\Users\project")
